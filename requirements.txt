@@ -4,3 +4,4 @@ pandas
 yfinance
 pykrx
 openpyxl
+finance-datareader
