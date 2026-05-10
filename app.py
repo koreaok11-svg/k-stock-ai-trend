@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 import yfinance as yf
 from pykrx import stock
+import FinanceDataReader as fdr
 from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
