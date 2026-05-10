@@ -131,15 +131,102 @@ def api_analyze():
     limit = int(request.args.get("limit", "700"))
     limit = max(100, min(limit, 1600))
 
-    rows = get_market_df(limit=limit)
-    results = []
-    for _, row in rows.iterrows():
-        item = analyze_one(row)
-        if item:
-            results.append(item)
+    df = get_market_df(limit=limit)
 
-    if not results:
-        return jsonify({"updated": datetime.now().strftime("%Y-%m-%d %H:%M"), "analyzedCount": 0, "summary": [], "recommend": [], "watch": [], "all": []})
+    if df.empty:
+        return jsonify({
+            "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "analyzedCount": 0,
+            "summary": [],
+            "recommend": [],
+            "watch": [],
+            "all": []
+        })
+
+    change_col = "ChagesRatio" if "ChagesRatio" in df.columns else None
+
+    if change_col:
+        df["dayChange"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0)
+    else:
+        df["dayChange"] = 0
+
+    df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
+    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+    df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
+    df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+
+    df["theme"] = df["Name"].apply(lambda x: THEME_MAP.get(x, "미분류"))
+    df["themeWeight"] = df["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
+
+    df["amountScore"] = df["Amount"].rank(pct=True) * 100
+    df["volumeScore"] = df["Volume"].rank(pct=True) * 100
+    df["marcapScore"] = df["Marcap"].rank(pct=True) * 100
+
+    df["score"] = (
+        df["dayChange"] * 0.45 +
+        df["amountScore"] * 0.25 +
+        df["volumeScore"] * 0.20 +
+        df["marcapScore"] * 0.10
+    ) * df["themeWeight"]
+
+    df = df.sort_values("score", ascending=False).reset_index(drop=True)
+
+    records = []
+
+    for idx, row in df.iterrows():
+        category = "관찰"
+        if idx < 10:
+            category = "추천"
+        elif idx < 40:
+            category = "관심"
+
+        item = {
+            "rank": int(idx + 1),
+            "category": category,
+            "market": str(row["Market"]),
+            "code": str(row["Code"]),
+            "name": str(row["Name"]),
+            "theme": str(row["theme"]),
+            "price": float(row["Close"]),
+            "return5": round(float(row["dayChange"]), 2),
+            "return20": 0,
+            "volumePower": round(float(row["volumeScore"] / 50), 2),
+            "trendPower": 1,
+            "score": round(float(row["score"]), 2),
+        }
+
+        item["opinion"] = make_opinion(item, category)
+        records.append(item)
+
+    summary_df = (
+        pd.DataFrame(records)
+        .groupby("theme")
+        .agg(
+            avgScore=("score", "mean"),
+            maxScore=("score", "max"),
+            count=("name", "count")
+        )
+        .sort_values("avgScore", ascending=False)
+        .reset_index()
+    )
+
+    summary = []
+    for _, row in summary_df.head(8).iterrows():
+        summary.append({
+            "theme": row["theme"],
+            "avgScore": round(float(row["avgScore"]), 2),
+            "maxScore": round(float(row["maxScore"]), 2),
+            "count": int(row["count"]),
+        })
+
+    return jsonify({
+        "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "analyzedCount": len(records),
+        "summary": summary,
+        "recommend": records[:10],
+        "watch": records[10:40],
+        "all": records[:120],
+    })
 
     df = pd.DataFrame(results).sort_values("score", ascending=False).reset_index(drop=True)
     df["rank"] = df.index + 1
