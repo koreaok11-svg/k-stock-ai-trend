@@ -4,7 +4,6 @@ from datetime import datetime
 
 import pandas as pd
 import yfinance as yf
-from pykrx import stock
 import FinanceDataReader as fdr
 from flask import Flask, render_template_string, request, jsonify
 
@@ -46,22 +45,18 @@ WEIGHT = {
 }
 
 def get_market_df(limit=700):
-    today = datetime.now().strftime("%Y%m%d")
-    rows = []
-    for market, suffix in [("KOSPI", ".KS"), ("KOSDAQ", ".KQ")]:
-        tickers = stock.get_market_ticker_list(today, market=market)
-        for t in tickers:
-            rows.append({
-                "market": market,
-                "code": t,
-                "name": stock.get_market_ticker_name(t),
-                "ticker": t + suffix
-            })
+    krx = fdr.StockListing("KRX")
 
-    df = pd.DataFrame(rows)
+    krx = krx[krx["Market"].isin(["KOSPI", "KOSDAQ"])].copy()
+
+    krx["Code"] = krx["Code"].astype(str).str.zfill(6)
+    krx["Name"] = krx["Name"].astype(str)
+    krx["Market"] = krx["Market"].astype(str)
+
     if limit:
-        df = df.head(int(limit))
-    return df
+        krx = krx.head(int(limit))
+
+    return krx
 
 def analyze_one(row):
     try:
