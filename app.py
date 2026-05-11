@@ -662,12 +662,23 @@ function listHtml(arr) {
   return arr.map(x => `<li>${x}</li>`).join("");
 }
 
+function badgeLevel(item) {
+  if (item.score >= 70) return '<span class="grade strong">강한 후보</span>';
+  if (item.score >= 50) return '<span class="grade normal">관심 후보</span>';
+  return '<span class="grade watch">관찰 필요</span>';
+}
+
+function listHtml(arr) {
+  if (!arr || arr.length === 0) return "";
+  return arr.map(x => `<li>${x}</li>`).join("");
+}
+
 function makeCard(item, type) {
   const rankClass = type === "watch" ? "rank watch-rank" : "rank";
-  const scoreClass = Number(item.score) >= 70 ? "score-hot" : Number(item.score) >= 50 ? "score-mid" : "score-low";
 
   return `
     <div class="card premium-card">
+
       <div class="top-line">
         <span class="${rankClass}">#${item.rank} ${item.category}</span>
         <span class="market">${item.market}</span>
@@ -675,26 +686,43 @@ function makeCard(item, type) {
         ${badgeLevel(item)}
       </div>
 
-      <div class="name-row">
-        <div>
-          <div class="name">${item.name}</div>
-          <div class="theme">${item.theme}</div>
-        </div>
-        <div class="score-circle ${scoreClass}">
-          <small>AI 점수</small>
-          <b>${item.score}</b>
-        </div>
-      </div>
+      <div class="name">${item.name}</div>
+      <div class="theme">${item.theme}</div>
 
       <div class="grid premium-grid">
-        <div class="metric"><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
-        <div class="metric"><span>5일/당일 흐름</span>${fmtRate(item.return5)}</div>
-        <div class="metric"><span>거래량 강도</span><b>${item.volumePower}</b></div>
-        <div class="metric"><span>추세 강도</span><b>${item.trendPower}</b></div>
+        <div class="metric">
+          <span>현재가</span>
+          <b>${fmtPrice(item.price)}</b>
+        </div>
+
+        <div class="metric">
+          <span>AI 점수</span>
+          <b>${item.score}</b>
+        </div>
+
+        <div class="metric">
+          <span>5일 수익률</span>
+          ${fmtRate(item.return5)}
+        </div>
+
+        <div class="metric">
+          <span>20일 수익률</span>
+          ${fmtRate(item.return20)}
+        </div>
+
+        <div class="metric">
+          <span>거래량강도</span>
+          <b>${item.volumePower}</b>
+        </div>
+
+        <div class="metric">
+          <span>추세강도</span>
+          <b>${item.trendPower}</b>
+        </div>
       </div>
 
       <div class="ai-box">
-        <div class="ai-title">🤖 AI 선별 요약</div>
+        <div class="detail-title">🤖 AI 선별 요약</div>
         <p>${item.opinion}</p>
       </div>
 
@@ -712,6 +740,7 @@ function makeCard(item, type) {
         <div class="detail-title">⚠️ 주의 포인트</div>
         <ul>${listHtml(item.risk)}</ul>
       </div>
+
     </div>
   `;
 }
