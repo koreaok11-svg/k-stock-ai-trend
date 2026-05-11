@@ -588,6 +588,136 @@ HTML = """
     font-size: 25px;
   }
 }
+body {
+  background:
+    radial-gradient(circle at top left, #fff7d6 0, transparent 32%),
+    radial-gradient(circle at top right, #dff7e8 0, transparent 30%),
+    linear-gradient(180deg, #fffaf0 0%, #eef8ee 55%, #f7efe3 100%);
+  color: #243025;
+}
+
+.hero {
+  background: linear-gradient(135deg, #6fa87a, #8fbf91, #f2c879);
+  color: #23301f;
+  box-shadow: 0 18px 40px rgba(105, 140, 92, .28);
+  border: 1px solid rgba(255,255,255,.65);
+}
+
+.hero p,
+.mini {
+  color: #2f3b29;
+  opacity: .95;
+}
+
+.hero-grid div {
+  background: rgba(255,255,255,.45);
+  color: #243025;
+  backdrop-filter: blur(10px);
+}
+
+.control,
+.card,
+.theme-box {
+  background: rgba(255, 255, 248, .86);
+  border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 18px 38px rgba(98, 126, 86, .18);
+  backdrop-filter: blur(12px);
+}
+
+button {
+  background: linear-gradient(135deg, #e9a95b, #f5c16c, #9fcf8f);
+  color: #2f2a1e;
+  box-shadow: 0 12px 26px rgba(190, 142, 75, .28);
+}
+
+.notice {
+  background: #48634d;
+  color: #fffdf4;
+}
+
+.tab {
+  background: rgba(255,255,248,.9);
+  color: #63705f;
+  border: 1px solid rgba(180, 200, 160, .45);
+}
+
+.tab.active {
+  background: linear-gradient(135deg, #526b4f, #7fa36f);
+  color: #fffdf5;
+}
+
+.rank {
+  background: #e98b58;
+}
+
+.watch-rank {
+  background: #78a978;
+}
+
+.market {
+  background: #eef2df;
+  color: #4c5c47;
+}
+
+.theme {
+  background: #fff3c7;
+  color: #74622a;
+}
+
+.metric {
+  background: rgba(250, 248, 235, .9);
+}
+
+.premium-card::before {
+  background: linear-gradient(90deg, #f0b86a, #9bcf8f, #88b7d6);
+}
+
+.ai-box {
+  background: linear-gradient(135deg, #5d7758, #8aaa73);
+  color: #fffdf4;
+}
+
+.detail-box {
+  background: rgba(255, 252, 236, .9);
+  border-color: #eadfbf;
+}
+
+.strategy-box {
+  background: #eef8e8;
+  border-color: #cfe7c5;
+}
+
+.risk-box {
+  background: #fff4d6;
+  border-color: #efd18d;
+}
+
+.score-hot {
+  background: linear-gradient(135deg, #e68a54, #f0bd68);
+}
+
+.score-mid {
+  background: linear-gradient(135deg, #7fa36f, #9fcf8f);
+}
+
+.score-low {
+  background: linear-gradient(135deg, #8f9d82, #5c6b55);
+}
+
+.grade.strong {
+  background: #ffe5ca;
+  color: #9c4f23;
+}
+
+.grade.normal {
+  background: #e6f4dc;
+  color: #3f6b35;
+}
+
+.grade.watch {
+  background: #f4eddc;
+  color: #6b5b3f;
+}
   </style>
 </head>
 <body>
