@@ -339,28 +339,26 @@ def api_analyze():
 @app.route("/api/chart")
 def api_chart():
     code = request.args.get("code", "")
-    market = request.args.get("market", "KOSPI")
 
     if not code:
         return jsonify({"labels": [], "prices": []})
 
-    suffix = ".KS" if market == "KOSPI" else ".KQ"
-    ticker = code + suffix
-
     try:
-        data = yf.download(
-            ticker,
-            period="3mo",
-            interval="1d",
-            progress=False,
-            auto_adjust=True,
-            threads=False
+        end = datetime.now()
+        start = end - pd.DateOffset(months=3)
+
+        data = fdr.DataReader(
+            code,
+            start.strftime("%Y-%m-%d"),
+            end.strftime("%Y-%m-%d")
         )
 
-        if data.empty:
+        if data is None or data.empty:
             return jsonify({"labels": [], "prices": []})
 
-        labels = [str(x.strftime("%m/%d")) for x in data.index]
+        data = data.reset_index()
+
+        labels = [x.strftime("%m/%d") for x in data["Date"]]
         prices = [round(float(x), 0) for x in data["Close"].fillna(0).tolist()]
 
         return jsonify({
@@ -369,7 +367,11 @@ def api_chart():
         })
 
     except Exception as e:
-        return jsonify({"labels": [], "prices": [], "error": str(e)})
+        return jsonify({
+            "labels": [],
+            "prices": [],
+            "error": str(e)
+        })
 
 
 HTML = """
