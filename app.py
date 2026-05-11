@@ -1,4 +1,3 @@
-
 import os
 from datetime import datetime
 
@@ -33,102 +32,28 @@ THEME_MAP = {
     "두산에너빌리티": "원전/전력인프라", "한전기술": "원전/전력인프라",
     "우진": "원전/전력인프라", "비에이치아이": "원전/전력인프라",
 }
+
 AUTO_THEME_KEYWORDS = {
-    "AI반도체/HBM": [
-        "반도체", "하이닉스", "HBM", "메모리", "디램", "낸드", "파운드리",
-        "테크윙", "리노", "ISC", "HPSP", "원익", "주성", "이오테크닉스",
-        "한미반도체", "하나마이크론", "가온칩스", "오픈엣지"
-    ],
-    "반도체장비/소재": [
-        "소부장", "실리콘", "웨이퍼", "식각", "증착", "포토", "테스트",
-        "프로브", "쿼츠", "세라믹", "테스", "피에스케이", "유진테크",
-        "동진쎄미켐", "솔브레인", "티씨케이", "원익QnC"
-    ],
-    "전력설비/데이터센터": [
-        "전력", "전기", "일렉트릭", "변압기", "케이블", "전선", "중공업",
-        "효성", "LS", "대한전선", "제룡", "산일", "가온전선", "현대일렉트릭"
-    ],
-    "광통신/CPO": [
-        "광", "통신", "CPO", "네트웍스", "솔루션", "라이트론", "오이솔루션",
-        "쏠리드", "케이엠더블유", "다산"
-    ],
-    "AI서버/PCB": [
-        "PCB", "기판", "써키트", "페타시스", "대덕", "심텍", "티엘비",
-        "코리아써키트", "서버"
-    ],
-    "로봇/피지컬AI": [
-        "로봇", "로보", "자동화", "뉴로메카", "레인보우", "두산로보틱스",
-        "에스피지", "로보티즈", "휴림"
-    ],
-    "2차전지/배터리": [
-        "배터리", "전지", "2차전지", "리튬", "양극재", "음극재", "전해액",
-        "분리막", "에코프로", "엘앤에프", "포스코퓨처엠", "천보", "대주전자재료",
-        "나노신소재", "코스모", "금양"
-    ],
-    "자동차/자율주행": [
-        "자동차", "모비스", "만도", "HL", "현대차", "기아", "자율주행",
-        "카메라", "센서", "전장", "모트렉스", "칩스앤미디어"
-    ],
-    "바이오/제약": [
-        "바이오", "제약", "헬스", "셀트리온", "삼성바이오", "유한양행",
-        "한미약품", "알테오젠", "HLB", "레고켐", "리가켐", "보로노이",
-        "에이비엘", "오스코텍", "휴젤", "메디톡스"
-    ],
-    "방산/우주항공": [
-        "방산", "항공", "우주", "한화에어로", "한국항공우주", "LIG",
-        "현대로템", "쎄트렉아이", "인텔리안", "켄코아", "제노코"
-    ],
-    "조선/해운": [
-        "조선", "해양", "중공업", "미포", "한화오션", "삼성중공업",
-        "HD현대중공업", "팬오션", "HMM", "대한해운"
-    ],
-    "원전/전력인프라": [
-        "원전", "원자력", "두산에너빌리티", "한전기술", "우진", "비에이치아이",
-        "보성파워텍", "우리기술"
-    ],
-    "화장품/미용": [
-        "화장품", "코스맥스", "한국콜마", "아모레", "클리오", "실리콘투",
-        "브이티", "마녀공장", "토니모리", "잉글우드랩"
-    ],
-    "엔터/콘텐츠": [
-        "엔터", "하이브", "JYP", "YG", "SM", "스튜디오", "콘텐츠", "드라마",
-        "CJ ENM", "NEW", "덱스터", "래몽래인"
-    ],
-    "게임/웹툰": [
-        "게임", "넷마블", "엔씨", "크래프톤", "펄어비스", "컴투스",
-        "위메이드", "카카오게임즈", "웹툰"
-    ],
-    "금융/증권": [
-        "금융", "은행", "증권", "보험", "카드", "KB", "신한", "하나금융",
-        "우리금융", "삼성증권", "키움", "미래에셋"
-    ],
-    "친환경/수소": [
-        "수소", "풍력", "태양광", "친환경", "연료전지", "두산퓨얼셀",
-        "씨에스윈드", "한화솔루션", "OCI"
-    ],
-    "음식료/소비재": [
-        "식품", "푸드", "농심", "삼양", "오리온", "CJ제일제당", "빙그레",
-        "하이트", "롯데칠성", "동원"
-    ],
-    "건설/인프라": [
-        "건설", "시멘트", "레미콘", "현대건설", "GS건설", "대우건설",
-        "DL이앤씨", "삼표", "쌍용C&E"
-    ],
+    "AI반도체/HBM": ["반도체", "하이닉스", "HBM", "메모리", "디램", "낸드", "파운드리", "테크윙", "리노", "ISC", "HPSP", "원익", "주성", "이오테크닉스", "한미반도체", "하나마이크론", "가온칩스", "오픈엣지"],
+    "반도체장비/소재": ["소부장", "실리콘", "웨이퍼", "식각", "증착", "포토", "테스트", "프로브", "쿼츠", "세라믹", "테스", "피에스케이", "유진테크", "동진쎄미켐", "솔브레인", "티씨케이", "원익QnC"],
+    "전력설비/데이터센터": ["전력", "전기", "일렉트릭", "변압기", "케이블", "전선", "중공업", "효성", "LS", "대한전선", "제룡", "산일", "가온전선", "현대일렉트릭"],
+    "광통신/CPO": ["광", "통신", "CPO", "네트웍스", "솔루션", "라이트론", "오이솔루션", "쏠리드", "케이엠더블유", "다산"],
+    "AI서버/PCB": ["PCB", "기판", "써키트", "페타시스", "대덕", "심텍", "티엘비", "코리아써키트", "서버"],
+    "로봇/피지컬AI": ["로봇", "로보", "자동화", "뉴로메카", "레인보우", "두산로보틱스", "에스피지", "로보티즈", "휴림"],
+    "2차전지/배터리": ["배터리", "전지", "2차전지", "리튬", "양극재", "음극재", "전해액", "분리막", "에코프로", "엘앤에프", "포스코퓨처엠", "천보", "대주전자재료", "나노신소재", "코스모", "금양"],
+    "자동차/자율주행": ["자동차", "모비스", "만도", "HL", "현대차", "기아", "자율주행", "카메라", "센서", "전장", "모트렉스", "칩스앤미디어"],
+    "바이오/제약": ["바이오", "제약", "헬스", "셀트리온", "삼성바이오", "유한양행", "한미약품", "알테오젠", "HLB", "레고켐", "리가켐", "보로노이", "에이비엘", "오스코텍", "휴젤", "메디톡스"],
+    "방산/우주항공": ["방산", "항공", "우주", "한화에어로", "한국항공우주", "LIG", "현대로템", "쎄트렉아이", "인텔리안", "켄코아", "제노코"],
+    "조선/해운": ["조선", "해양", "중공업", "미포", "한화오션", "삼성중공업", "HD현대중공업", "팬오션", "HMM", "대한해운"],
+    "원전/전력인프라": ["원전", "원자력", "두산에너빌리티", "한전기술", "우진", "비에이치아이", "보성파워텍", "우리기술"],
+    "화장품/미용": ["화장품", "코스맥스", "한국콜마", "아모레", "클리오", "실리콘투", "브이티", "마녀공장", "토니모리", "잉글우드랩"],
+    "엔터/콘텐츠": ["엔터", "하이브", "JYP", "YG", "SM", "스튜디오", "콘텐츠", "드라마", "CJ ENM", "NEW", "덱스터", "래몽래인"],
+    "게임/웹툰": ["게임", "넷마블", "엔씨", "크래프톤", "펄어비스", "컴투스", "위메이드", "카카오게임즈", "웹툰"],
+    "금융/증권": ["금융", "은행", "증권", "보험", "카드", "KB", "신한", "하나금융", "우리금융", "삼성증권", "키움", "미래에셋"],
+    "친환경/수소": ["수소", "풍력", "태양광", "친환경", "연료전지", "두산퓨얼셀", "씨에스윈드", "한화솔루션", "OCI"],
+    "음식료/소비재": ["식품", "푸드", "농심", "삼양", "오리온", "CJ제일제당", "빙그레", "하이트", "롯데칠성", "동원"],
+    "건설/인프라": ["건설", "시멘트", "레미콘", "현대건설", "GS건설", "대우건설", "DL이앤씨", "삼표", "쌍용C&E"],
 }
-
-
-def classify_theme(name):
-    name = str(name)
-
-    if name in THEME_MAP:
-        return THEME_MAP[name]
-
-    for theme, keywords in AUTO_THEME_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in name:
-                return theme
-
-    return "미분류"
 
 WEIGHT = {
     "AI반도체/HBM": 1.35,
@@ -137,14 +62,28 @@ WEIGHT = {
     "AI서버/PCB": 1.18,
     "원전/전력인프라": 1.15,
     "로봇/피지컬AI": 1.10,
+    "2차전지/배터리": 1.10,
+    "방산/우주항공": 1.08,
+    "반도체장비/소재": 1.08,
+    "바이오/제약": 1.04,
     "미분류": 1.00,
 }
 
+
+def classify_theme(name):
+    name = str(name)
+    if name in THEME_MAP:
+        return THEME_MAP[name]
+    for theme, keywords in AUTO_THEME_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword in name:
+                return theme
+    return "미분류"
+
+
 def get_market_df(limit=700):
     krx = fdr.StockListing("KRX")
-
     krx = krx[krx["Market"].isin(["KOSPI", "KOSDAQ"])].copy()
-
     krx["Code"] = krx["Code"].astype(str).str.zfill(6)
     krx["Name"] = krx["Name"].astype(str)
     krx["Market"] = krx["Market"].astype(str)
@@ -154,43 +93,6 @@ def get_market_df(limit=700):
 
     return krx
 
-def analyze_one(row):
-    try:
-        data = yf.download(row["ticker"], period="3mo", interval="1d", progress=False, auto_adjust=True, threads=False)
-        if data.empty or len(data) < 25:
-            return None
-
-        close = data["Close"]
-        volume = data["Volume"]
-
-        price = float(close.iloc[-1])
-        r5 = (price / float(close.iloc[-6]) - 1) * 100
-        r20 = (price / float(close.iloc[-21]) - 1) * 100
-
-        v20 = float(volume.tail(20).mean())
-        volume_power = float(volume.tail(5).mean()) / v20 if v20 > 0 else 0
-
-        ma5 = float(close.tail(5).mean())
-        ma20 = float(close.tail(20).mean())
-        trend_power = ma5 / ma20 if ma20 > 0 else 1
-
-        theme = classify_theme(row["name"])
-        score = (r5 * 0.25 + r20 * 0.43 + volume_power * 10 * 0.22 + trend_power * 10 * 0.10) * WEIGHT.get(theme, 1.0)
-
-        return {
-            "market": row["market"],
-            "code": row["code"],
-            "name": row["name"],
-            "theme": theme,
-            "price": round(price, 0),
-            "return5": round(r5, 2),
-            "return20": round(r20, 2),
-            "volumePower": round(volume_power, 2),
-            "trendPower": round(trend_power, 3),
-            "score": round(score, 2),
-        }
-    except Exception:
-        return None
 
 def make_opinion(item, category):
     theme = item.get("theme", "미분류")
@@ -262,9 +164,68 @@ def make_opinion(item, category):
         "risk": risk,
     }
 
+
+def get_trade_plan(item):
+    price = float(item.get("price", 0))
+    score = float(item.get("score", 0))
+    change = float(item.get("return5", 0))
+    volume_power = float(item.get("volumePower", 1))
+
+    if price <= 0:
+        return {
+            "buy": 0,
+            "sell1": 0,
+            "sell2": 0,
+            "stop": 0,
+            "message": "현재가 데이터가 없어 매매 기준가를 계산할 수 없습니다."
+        }
+
+    if score >= 70:
+        buy_rate = 0.985
+        sell1_rate = 1.06
+        sell2_rate = 1.12
+        stop_rate = 0.94
+        message = "강한 후보군입니다. 단기 눌림 후 분할 접근이 유리합니다."
+    elif score >= 50:
+        buy_rate = 0.97
+        sell1_rate = 1.045
+        sell2_rate = 1.09
+        stop_rate = 0.93
+        message = "관심 후보군입니다. 거래량 유지 확인 후 보수적으로 접근하는 구간입니다."
+    else:
+        buy_rate = 0.95
+        sell1_rate = 1.035
+        sell2_rate = 1.07
+        stop_rate = 0.92
+        message = "관찰 단계입니다. 무리한 진입보다 지지선 확인이 우선입니다."
+
+    if change >= 15:
+        buy_rate -= 0.02
+        message += " 최근 상승률이 높아 추격매수는 피하고 깊은 눌림을 기다리는 것이 좋습니다."
+
+    if volume_power >= 1.7:
+        sell1_rate += 0.015
+        sell2_rate += 0.02
+        message += " 거래량이 강해 목표가는 조금 더 열어볼 수 있습니다."
+
+    buy = round(price * buy_rate, 0)
+    sell1 = round(buy * sell1_rate, 0)
+    sell2 = round(buy * sell2_rate, 0)
+    stop = round(buy * stop_rate, 0)
+
+    return {
+        "buy": buy,
+        "sell1": sell1,
+        "sell2": sell2,
+        "stop": stop,
+        "message": message
+    }
+
+
 @app.route("/")
 def index():
     return render_template_string(HTML)
+
 
 @app.route("/api/analyze")
 def api_analyze():
@@ -340,6 +301,7 @@ def api_analyze():
         item["reasons"] = analysis["reasons"]
         item["strategy"] = analysis["strategy"]
         item["risk"] = analysis["risk"]
+        item["tradePlan"] = get_trade_plan(item)
 
         records.append(item)
 
@@ -374,41 +336,104 @@ def api_analyze():
     })
 
 
+@app.route("/api/chart")
+def api_chart():
+    code = request.args.get("code", "")
+    market = request.args.get("market", "KOSPI")
+
+    if not code:
+        return jsonify({"labels": [], "prices": []})
+
+    suffix = ".KS" if market == "KOSPI" else ".KQ"
+    ticker = code + suffix
+
+    try:
+        data = yf.download(
+            ticker,
+            period="3mo",
+            interval="1d",
+            progress=False,
+            auto_adjust=True,
+            threads=False
+        )
+
+        if data.empty:
+            return jsonify({"labels": [], "prices": []})
+
+        labels = [str(x.strftime("%m/%d")) for x in data.index]
+        prices = [round(float(x), 0) for x in data["Close"].fillna(0).tolist()]
+
+        return jsonify({
+            "labels": labels[-60:],
+            "prices": prices[-60:]
+        })
+
+    except Exception as e:
+        return jsonify({"labels": [], "prices": [], "error": str(e)})
+
+
 HTML = """
 <!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#111827">
+  <meta name="theme-color" content="#6fa87a">
   <title>K-Stock AI Trend</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    :root { --bg:#f3f4f6; --card:#fff; --text:#111827; --sub:#6b7280; --blue:#2563eb; --red:#dc2626; --dark:#111827; --line:#e5e7eb; --yellow:#fffbeb; }
+    :root { --bg:#fffaf0; --card:#fff; --text:#243025; --sub:#6b7280; --blue:#2563eb; --red:#dc2626; --dark:#48634d; --line:#e5e7eb; --yellow:#fffbeb; }
     * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
+    body {
+      margin:0;
+      background:
+        radial-gradient(circle at top left, #fff7d6 0, transparent 32%),
+        radial-gradient(circle at top right, #dff7e8 0, transparent 30%),
+        linear-gradient(180deg, #fffaf0 0%, #eef8ee 55%, #f7efe3 100%);
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    }
     .app { max-width:820px; margin:0 auto; padding:16px 14px 110px; }
-    .hero { background:linear-gradient(135deg,#111827,#1d4ed8); color:white; border-radius:30px; padding:24px; box-shadow:0 16px 34px rgba(0,0,0,.25); margin-top:8px; }
-    .mini { font-size:12px; letter-spacing:1.2px; opacity:.85; font-weight:800; }
+    .hero {
+      background:linear-gradient(135deg, #6fa87a, #8fbf91, #f2c879);
+      color:#23301f;
+      border-radius:30px;
+      padding:24px;
+      box-shadow:0 18px 40px rgba(105, 140, 92, .28);
+      border:1px solid rgba(255,255,255,.65);
+      margin-top:8px;
+    }
+    .mini { font-size:12px; letter-spacing:1.2px; color:#2f3b29; opacity:.95; font-weight:800; }
     h1 { font-size:31px; line-height:1.16; margin:8px 0 8px; }
-    .hero p { margin:0 0 18px; opacity:.92; line-height:1.5; font-size:15px; }
+    .hero p { margin:0 0 18px; color:#2f3b29; opacity:.95; line-height:1.5; font-size:15px; }
     .hero-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-    .hero-grid div { background:rgba(255,255,255,.14); border-radius:18px; padding:12px 8px; text-align:center; }
+    .hero-grid div { background:rgba(255,255,255,.45); color:#243025; backdrop-filter:blur(10px); border-radius:18px; padding:12px 8px; text-align:center; }
     .hero-grid b { display:block; font-size:23px; }
     .hero-grid span { display:block; font-size:12px; opacity:.9; margin-top:2px; }
-    .control { background:white; border-radius:24px; padding:16px; margin:16px 0; box-shadow:0 8px 22px rgba(0,0,0,.08); }
+    .control, .card, .theme-box {
+      background:rgba(255, 255, 248, .86);
+      border:1px solid rgba(255,255,255,.9);
+      box-shadow:0 18px 38px rgba(98, 126, 86, .18);
+      backdrop-filter:blur(12px);
+    }
+    .control { border-radius:24px; padding:16px; margin:16px 0; }
     .control label { font-weight:900; font-size:15px; }
     select { width:100%; margin-top:8px; border:1px solid var(--line); border-radius:15px; padding:12px; font-size:16px; background:#f9fafb; }
-    button { width:100%; margin-top:14px; border:none; border-radius:18px; padding:16px; font-size:17px; font-weight:900; color:white; background:linear-gradient(135deg,#ef4444,#f97316); box-shadow:0 10px 20px rgba(239,68,68,.25); }
+    button {
+      width:100%; margin-top:14px; border:none; border-radius:18px; padding:16px; font-size:17px; font-weight:900;
+      color:#2f2a1e; background:linear-gradient(135deg,#e9a95b,#f5c16c,#9fcf8f);
+      box-shadow:0 12px 26px rgba(190,142,75,.28);
+    }
     button:active { transform:scale(.99); }
-    .notice { background:var(--dark); color:white; border-radius:20px; padding:14px; line-height:1.55; font-size:14px; margin:12px 0; }
+    .notice { background:#48634d; color:#fffdf4; border-radius:20px; padding:14px; line-height:1.55; font-size:14px; margin:12px 0; }
     .loading { display:none; background:white; border-radius:22px; padding:22px; text-align:center; margin:14px 0; box-shadow:0 8px 22px rgba(0,0,0,.08); }
-    .spinner { width:42px; height:42px; border:5px solid #e5e7eb; border-top-color:var(--blue); border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 12px; }
+    .spinner { width:42px; height:42px; border:5px solid #e5e7eb; border-top-color:#7fa36f; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 12px; }
     @keyframes spin { to { transform:rotate(360deg); } }
-    .tabs { position:sticky; top:0; z-index:20; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; background:rgba(243,244,246,.92); backdrop-filter:blur(12px); padding:10px 0; margin-top:10px; }
-    .tab { background:white; color:var(--sub); border-radius:999px; padding:10px 8px; font-weight:900; font-size:13px; text-align:center; border:1px solid var(--line); }
-    .tab.active { background:var(--dark); color:white; }
+    .tabs { position:sticky; top:0; z-index:20; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; background:rgba(255,250,240,.82); backdrop-filter:blur(12px); padding:10px 0; margin-top:10px; }
+    .tab { background:rgba(255,255,248,.9); color:#63705f; border-radius:999px; padding:10px 8px; font-weight:900; font-size:13px; text-align:center; border:1px solid rgba(180,200,160,.45); }
+    .tab.active { background:linear-gradient(135deg,#526b4f,#7fa36f); color:#fffdf5; }
     h2 { font-size:25px; margin:24px 0 12px; }
-    .theme-box,.card { background:var(--card); border-radius:24px; box-shadow:0 8px 22px rgba(0,0,0,.09); border:1px solid var(--line); }
+    .theme-box,.card { border-radius:24px; }
     .theme-box { padding:12px; }
     .theme-row { padding:13px 10px; border-bottom:1px solid var(--line); }
     .theme-row:last-child { border-bottom:none; }
@@ -416,308 +441,57 @@ HTML = """
     .theme-row span { display:block; color:var(--sub); font-size:13px; margin-top:3px; }
     .card { padding:18px; margin:14px 0; }
     .top-line { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-    .rank { background:#ef4444; color:white; padding:6px 12px; border-radius:999px; font-weight:900; font-size:14px; }
-    .watch-rank { background:#2563eb; }
-    .market { background:#e5e7eb; color:#374151; padding:6px 10px; border-radius:999px; font-weight:800; font-size:13px; }
+    .rank { background:#e98b58; color:white; padding:6px 12px; border-radius:999px; font-weight:900; font-size:14px; }
+    .watch-rank { background:#78a978; }
+    .market { background:#eef2df; color:#4c5c47; padding:6px 10px; border-radius:999px; font-weight:800; font-size:13px; }
     .name { font-size:28px; font-weight:900; margin:12px 0 6px; }
-    .theme { display:inline-block; background:#eef2ff; color:#3730a3; border-radius:999px; padding:6px 11px; font-size:13px; font-weight:800; }
+    .theme { display:inline-block; background:#fff3c7; color:#74622a; border-radius:999px; padding:6px 11px; font-size:13px; font-weight:800; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
-    .metric { background:#f9fafb; border-radius:16px; padding:12px; }
+    .metric { background:rgba(250,248,235,.9); border-radius:16px; padding:12px; }
     .metric span { display:block; color:var(--sub); font-size:12px; }
     .metric b { display:block; font-size:19px; margin-top:4px; }
     .red { color:var(--red); } .blue { color:var(--blue); }
-    .opinion { background:var(--yellow); border-radius:16px; padding:13px; margin-top:14px; line-height:1.55; color:#374151; font-size:14px; }
     .section { display:none; } .section.active { display:block; }
     .footer { color:var(--sub); font-size:12px; text-align:center; margin-top:28px; line-height:1.5; }
     .install-tip { background:#ecfeff; color:#164e63; border-radius:18px; padding:13px; line-height:1.5; font-size:14px; margin-top:12px; border:1px solid #a5f3fc; }
-    .premium-card {
-  position: relative;
-  overflow: hidden;
-}
 
-.premium-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 5px;
-  background: linear-gradient(90deg, #ef4444, #f97316, #2563eb);
-}
+    .premium-card { position:relative; overflow:hidden; }
+    .premium-card::before { content:""; position:absolute; top:0; left:0; width:100%; height:5px; background:linear-gradient(90deg,#f0b86a,#9bcf8f,#88b7d6); }
+    .grade { padding:6px 10px; border-radius:999px; font-size:12px; font-weight:900; }
+    .grade.strong { background:#ffe5ca; color:#9c4f23; }
+    .grade.normal { background:#e6f4dc; color:#3f6b35; }
+    .grade.watch { background:#f4eddc; color:#6b5b3f; }
+    .premium-grid { margin-top:16px; }
+    .ai-box { margin-top:15px; background:linear-gradient(135deg,#5d7758,#8aaa73); color:#fffdf4; border-radius:18px; padding:15px; line-height:1.55; }
+    .ai-box p { margin:7px 0 0; font-size:14px; opacity:.95; }
+    .detail-box { margin-top:12px; background:rgba(255,252,236,.9); border:1px solid #eadfbf; border-radius:18px; padding:14px; }
+    .detail-title { font-weight:900; margin-bottom:8px; font-size:15px; }
+    .detail-box ul { margin:0; padding-left:18px; }
+    .detail-box li { margin:6px 0; line-height:1.5; font-size:14px; color:#374151; }
+    .strategy-box { background:#eef8e8; border-color:#cfe7c5; }
+    .risk-box { background:#fff4d6; border-color:#efd18d; }
 
-.name-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  margin-top: 10px;
-}
+    .trade-box { margin-top:12px; background:linear-gradient(135deg,#fff8df,#edf8e8); border:1px solid #e7d8a7; border-radius:20px; padding:14px; }
+    .trade-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .trade-grid div { background:rgba(255,255,255,.72); border-radius:15px; padding:12px; }
+    .trade-grid span { display:block; color:#6b7280; font-size:12px; }
+    .trade-grid b { display:block; margin-top:4px; font-size:18px; color:#1f2937; }
+    .trade-box p { margin:12px 0 0; line-height:1.55; font-size:14px; color:#4b5563; }
+    .chart-btn { margin-top:14px; background:linear-gradient(135deg,#7fa36f,#88b7d6); color:#fffdf4; box-shadow:0 12px 24px rgba(96,130,92,.22); }
 
-.score-circle {
-  min-width: 78px;
-  height: 78px;
-  border-radius: 22px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  color: white;
-  box-shadow: 0 10px 24px rgba(0,0,0,.18);
-}
+    .chart-modal { display:none; position:fixed; inset:0; background:rgba(36,48,37,.45); backdrop-filter:blur(8px); z-index:9999; align-items:center; justify-content:center; padding:18px; }
+    .chart-card { width:min(720px,100%); background:linear-gradient(180deg,#fffdf4,#edf8e8); border-radius:28px; padding:18px; box-shadow:0 24px 60px rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.85); }
+    .chart-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .chart-label { font-size:11px; font-weight:900; letter-spacing:1.2px; color:#6b7f5e; }
+    .chart-head h3 { margin:4px 0 0; font-size:24px; }
+    .chart-close { width:auto; margin:0; padding:10px 14px; border-radius:999px; font-size:13px; background:#526b4f; color:white; box-shadow:none; }
+    .chart-note { margin-top:10px; font-size:12px; color:#6b7280; text-align:center; }
 
-.score-circle small {
-  font-size: 11px;
-  opacity: .9;
-}
-
-.score-circle b {
-  font-size: 24px;
-  line-height: 1.1;
-}
-
-.score-hot {
-  background: linear-gradient(135deg, #dc2626, #f97316);
-}
-
-.score-mid {
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-}
-
-.score-low {
-  background: linear-gradient(135deg, #6b7280, #111827);
-}
-
-.grade {
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.grade.strong {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.grade.normal {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.grade.watch {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.premium-grid {
-  margin-top: 16px;
-}
-
-.ai-box {
-  margin-top: 15px;
-  background: linear-gradient(135deg, #111827, #1e3a8a);
-  color: white;
-  border-radius: 18px;
-  padding: 15px;
-  line-height: 1.55;
-}
-
-.ai-box p {
-  margin: 7px 0 0;
-  font-size: 14px;
-  opacity: .95;
-}
-
-.ai-title {
-  font-weight: 900;
-  font-size: 15px;
-}
-
-.detail-box {
-  margin-top: 12px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  padding: 14px;
-}
-
-.detail-title {
-  font-weight: 900;
-  margin-bottom: 8px;
-  font-size: 15px;
-}
-
-.detail-box ul {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.detail-box li {
-  margin: 6px 0;
-  line-height: 1.5;
-  font-size: 14px;
-  color: #374151;
-}
-
-.strategy-box {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-}
-
-.risk-box {
-  background: #fffbeb;
-  border-color: #fde68a;
-}
-
-@media (max-width: 480px) {
-  .name-row {
-    align-items: stretch;
-  }
-
-  .score-circle {
-    min-width: 70px;
-    height: 70px;
-    border-radius: 20px;
-  }
-
-  .score-circle b {
-    font-size: 21px;
-  }
-
-  .name {
-    font-size: 25px;
-  }
-}
-body {
-  background:
-    radial-gradient(circle at top left, #fff7d6 0, transparent 32%),
-    radial-gradient(circle at top right, #dff7e8 0, transparent 30%),
-    linear-gradient(180deg, #fffaf0 0%, #eef8ee 55%, #f7efe3 100%);
-  color: #243025;
-}
-
-.hero {
-  background: linear-gradient(135deg, #6fa87a, #8fbf91, #f2c879);
-  color: #23301f;
-  box-shadow: 0 18px 40px rgba(105, 140, 92, .28);
-  border: 1px solid rgba(255,255,255,.65);
-}
-
-.hero p,
-.mini {
-  color: #2f3b29;
-  opacity: .95;
-}
-
-.hero-grid div {
-  background: rgba(255,255,255,.45);
-  color: #243025;
-  backdrop-filter: blur(10px);
-}
-
-.control,
-.card,
-.theme-box {
-  background: rgba(255, 255, 248, .86);
-  border: 1px solid rgba(255,255,255,.9);
-  box-shadow: 0 18px 38px rgba(98, 126, 86, .18);
-  backdrop-filter: blur(12px);
-}
-
-button {
-  background: linear-gradient(135deg, #e9a95b, #f5c16c, #9fcf8f);
-  color: #2f2a1e;
-  box-shadow: 0 12px 26px rgba(190, 142, 75, .28);
-}
-
-.notice {
-  background: #48634d;
-  color: #fffdf4;
-}
-
-.tab {
-  background: rgba(255,255,248,.9);
-  color: #63705f;
-  border: 1px solid rgba(180, 200, 160, .45);
-}
-
-.tab.active {
-  background: linear-gradient(135deg, #526b4f, #7fa36f);
-  color: #fffdf5;
-}
-
-.rank {
-  background: #e98b58;
-}
-
-.watch-rank {
-  background: #78a978;
-}
-
-.market {
-  background: #eef2df;
-  color: #4c5c47;
-}
-
-.theme {
-  background: #fff3c7;
-  color: #74622a;
-}
-
-.metric {
-  background: rgba(250, 248, 235, .9);
-}
-
-.premium-card::before {
-  background: linear-gradient(90deg, #f0b86a, #9bcf8f, #88b7d6);
-}
-
-.ai-box {
-  background: linear-gradient(135deg, #5d7758, #8aaa73);
-  color: #fffdf4;
-}
-
-.detail-box {
-  background: rgba(255, 252, 236, .9);
-  border-color: #eadfbf;
-}
-
-.strategy-box {
-  background: #eef8e8;
-  border-color: #cfe7c5;
-}
-
-.risk-box {
-  background: #fff4d6;
-  border-color: #efd18d;
-}
-
-.score-hot {
-  background: linear-gradient(135deg, #e68a54, #f0bd68);
-}
-
-.score-mid {
-  background: linear-gradient(135deg, #7fa36f, #9fcf8f);
-}
-
-.score-low {
-  background: linear-gradient(135deg, #8f9d82, #5c6b55);
-}
-
-.grade.strong {
-  background: #ffe5ca;
-  color: #9c4f23;
-}
-
-.grade.normal {
-  background: #e6f4dc;
-  color: #3f6b35;
-}
-
-.grade.watch {
-  background: #f4eddc;
-  color: #6b5b3f;
-}
+    @media (max-width:480px) {
+      .trade-grid { grid-template-columns:1fr; }
+      .chart-card { border-radius:24px; }
+      .name { font-size:25px; }
+    }
   </style>
 </head>
 <body>
@@ -766,7 +540,23 @@ button {
     <div class="footer">K-Stock AI Trend WebApp<br>데이터 제공 상태에 따라 일부 종목은 누락될 수 있습니다.</div>
   </main>
 
+  <div id="chartModal" class="chart-modal" onclick="closeChartModal(event)">
+    <div class="chart-card" onclick="event.stopPropagation()">
+      <div class="chart-head">
+        <div>
+          <div class="chart-label">AI TREND CHART</div>
+          <h3 id="chartTitle">종목 차트</h3>
+        </div>
+        <button class="chart-close" onclick="hideChart()">닫기</button>
+      </div>
+      <canvas id="stockChart"></canvas>
+      <div class="chart-note">최근 3개월 흐름입니다. 데이터 제공 상태에 따라 일부 지연될 수 있습니다.</div>
+    </div>
+  </div>
+
   <script>
+    let stockChart = null;
+
     function showTab(id, el) {
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -775,105 +565,133 @@ button {
     }
 
     function fmtPrice(v) { return (v === null || v === undefined) ? "-" : Number(v).toLocaleString() + "원"; }
+    function fmtMoney(v) { return (!v || Number(v) <= 0) ? "-" : Number(v).toLocaleString() + "원"; }
 
     function fmtRate(v) {
       const cls = Number(v) >= 0 ? "red" : "blue";
       return `<b class="${cls}">${v}%</b>`;
     }
 
-function badgeLevel(item) {
-  if (item.score >= 70) return '<span class="grade strong">강한 후보</span>';
-  if (item.score >= 50) return '<span class="grade normal">관심 후보</span>';
-  return '<span class="grade watch">관찰 필요</span>';
-}
+    function badgeLevel(item) {
+      if (item.score >= 70) return '<span class="grade strong">강한 후보</span>';
+      if (item.score >= 50) return '<span class="grade normal">관심 후보</span>';
+      return '<span class="grade watch">관찰 필요</span>';
+    }
 
-function listHtml(arr) {
-  if (!arr || arr.length === 0) return "";
-  return arr.map(x => `<li>${x}</li>`).join("");
-}
+    function listHtml(arr) {
+      if (!arr || arr.length === 0) return "";
+      return arr.map(x => `<li>${x}</li>`).join("");
+    }
 
-function badgeLevel(item) {
-  if (item.score >= 70) return '<span class="grade strong">강한 후보</span>';
-  if (item.score >= 50) return '<span class="grade normal">관심 후보</span>';
-  return '<span class="grade watch">관찰 필요</span>';
-}
+    function safeItemForClick(item) {
+      return JSON.stringify(item).replace(/'/g, "&apos;");
+    }
 
-function listHtml(arr) {
-  if (!arr || arr.length === 0) return "";
-  return arr.map(x => `<li>${x}</li>`).join("");
-}
+    function makeCard(item, type) {
+      const rankClass = type === "watch" ? "rank watch-rank" : "rank";
 
-function makeCard(item, type) {
-  const rankClass = type === "watch" ? "rank watch-rank" : "rank";
+      return `
+        <div class="card premium-card">
+          <div class="top-line">
+            <span class="${rankClass}">#${item.rank} ${item.category}</span>
+            <span class="market">${item.market}</span>
+            <span class="market">${item.code}</span>
+            ${badgeLevel(item)}
+          </div>
 
-  return `
-    <div class="card premium-card">
+          <div class="name">${item.name}</div>
+          <div class="theme">${item.theme}</div>
 
-      <div class="top-line">
-        <span class="${rankClass}">#${item.rank} ${item.category}</span>
-        <span class="market">${item.market}</span>
-        <span class="market">${item.code}</span>
-        ${badgeLevel(item)}
-      </div>
+          <div class="grid premium-grid">
+            <div class="metric"><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
+            <div class="metric"><span>AI 점수</span><b>${item.score}</b></div>
+            <div class="metric"><span>5일/당일 흐름</span>${fmtRate(item.return5)}</div>
+            <div class="metric"><span>20일 수익률</span>${fmtRate(item.return20)}</div>
+            <div class="metric"><span>거래량강도</span><b>${item.volumePower}</b></div>
+            <div class="metric"><span>추세강도</span><b>${item.trendPower}</b></div>
+          </div>
 
-      <div class="name">${item.name}</div>
-      <div class="theme">${item.theme}</div>
+          <div class="ai-box">
+            <div class="detail-title">🤖 AI 선별 요약</div>
+            <p>${item.opinion}</p>
+          </div>
 
-      <div class="grid premium-grid">
-        <div class="metric">
-          <span>현재가</span>
-          <b>${fmtPrice(item.price)}</b>
+          <div class="detail-box">
+            <div class="detail-title">✅ 선별 이유</div>
+            <ul>${listHtml(item.reasons)}</ul>
+          </div>
+
+          <div class="detail-box strategy-box">
+            <div class="detail-title">📌 대응 전략</div>
+            <ul>${listHtml(item.strategy)}</ul>
+          </div>
+
+          <div class="detail-box risk-box">
+            <div class="detail-title">⚠️ 주의 포인트</div>
+            <ul>${listHtml(item.risk)}</ul>
+          </div>
+
+          <div class="trade-box">
+            <div class="detail-title">💰 AI 수치화 매매 기준</div>
+            <div class="trade-grid">
+              <div><span>추천매수가</span><b>${fmtMoney(item.tradePlan?.buy)}</b></div>
+              <div><span>1차 매도가</span><b>${fmtMoney(item.tradePlan?.sell1)}</b></div>
+              <div><span>2차 매도가</span><b>${fmtMoney(item.tradePlan?.sell2)}</b></div>
+              <div><span>손절 기준가</span><b>${fmtMoney(item.tradePlan?.stop)}</b></div>
+            </div>
+            <p>${item.tradePlan?.message || ""}</p>
+          </div>
+
+          <button class="chart-btn" onclick='showChart(${safeItemForClick(item)})'>📈 차트 보기</button>
         </div>
+      `;
+    }
 
-        <div class="metric">
-          <span>AI 점수</span>
-          <b>${item.score}</b>
-        </div>
+    async function showChart(item) {
+      const modal = document.getElementById("chartModal");
+      const title = document.getElementById("chartTitle");
+      title.innerText = item.name + " · " + item.code;
+      modal.style.display = "flex";
 
-        <div class="metric">
-          <span>5일 수익률</span>
-          ${fmtRate(item.return5)}
-        </div>
+      const res = await fetch(`/api/chart?code=${item.code}&market=${item.market}`);
+      const data = await res.json();
 
-        <div class="metric">
-          <span>20일 수익률</span>
-          ${fmtRate(item.return20)}
-        </div>
+      const ctx = document.getElementById("stockChart");
 
-        <div class="metric">
-          <span>거래량강도</span>
-          <b>${item.volumePower}</b>
-        </div>
+      if (stockChart) {
+        stockChart.destroy();
+      }
 
-        <div class="metric">
-          <span>추세강도</span>
-          <b>${item.trendPower}</b>
-        </div>
-      </div>
+      stockChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: data.labels,
+          datasets: [{
+            label: item.name,
+            data: data.prices,
+            tension: 0.35,
+            fill: true,
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { maxTicksLimit: 6 } },
+            y: { ticks: { callback: value => Number(value).toLocaleString() } }
+          }
+        }
+      });
+    }
 
-      <div class="ai-box">
-        <div class="detail-title">🤖 AI 선별 요약</div>
-        <p>${item.opinion}</p>
-      </div>
+    function hideChart() {
+      document.getElementById("chartModal").style.display = "none";
+    }
 
-      <div class="detail-box">
-        <div class="detail-title">✅ 선별 이유</div>
-        <ul>${listHtml(item.reasons)}</ul>
-      </div>
-
-      <div class="detail-box strategy-box">
-        <div class="detail-title">📌 대응 전략</div>
-        <ul>${listHtml(item.strategy)}</ul>
-      </div>
-
-      <div class="detail-box risk-box">
-        <div class="detail-title">⚠️ 주의 포인트</div>
-        <ul>${listHtml(item.risk)}</ul>
-      </div>
-
-    </div>
-  `;
-}
+    function closeChartModal(event) {
+      if (event.target.id === "chartModal") hideChart();
+    }
 
     async function runAnalyze() {
       const limit = document.getElementById("limit").value;
