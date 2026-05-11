@@ -174,7 +174,7 @@ def analyze_one(row):
         ma20 = float(close.tail(20).mean())
         trend_power = ma5 / ma20 if ma20 > 0 else 1
 
-        theme = THEME_MAP.get(row["name"], "미분류")
+        theme = classify_theme(row["name"])
         score = (r5 * 0.25 + r20 * 0.43 + volume_power * 10 * 0.22 + trend_power * 10 * 0.10) * WEIGHT.get(theme, 1.0)
 
         return {
@@ -193,25 +193,74 @@ def analyze_one(row):
         return None
 
 def make_opinion(item, category):
+    theme = item.get("theme", "미분류")
+    score = float(item.get("score", 0))
+    change = float(item.get("return5", 0))
+    volume_power = float(item.get("volumePower", 0))
+    price = float(item.get("price", 0))
+
+    reasons = []
+    strategy = []
+    risk = []
+
     if category == "추천":
-        text = "현재 전체 분석 종목 중 상위권입니다. 주가 흐름, 거래량, 추세가 동시에 강한 편입니다."
+        base = "AI 선별 결과, 현재 분석 종목 중 상위권에 위치한 종목입니다."
     elif category == "관심":
-        text = "관심권 종목입니다. 눌림목과 거래대금 유지 여부를 확인하는 전략이 좋습니다."
+        base = "현재 주도권은 다소 약하지만, 흐름이 유지되면 관심권으로 볼 수 있는 종목입니다."
     else:
-        text = "관찰 단계입니다."
+        base = "아직 추천권은 아니지만 시장 흐름 관찰이 필요한 종목입니다."
 
-    if item["theme"] != "미분류":
-        text += f" 관련 테마는 {item['theme']}입니다."
+    if theme != "미분류":
+        reasons.append(f"현재 '{theme}' 테마로 분류되며, 최근 시장에서 해당 테마의 상대 강도가 반영되었습니다.")
     else:
-        text += " 테마는 자동 분류되지 않았으므로 별도 확인이 필요합니다."
+        reasons.append("명확한 테마가 자동 분류되지 않아 개별 이슈 또는 단기 수급성 종목일 가능성이 있습니다.")
 
-    if item["return5"] >= 20:
-        text += " 최근 5일 상승률이 커서 추격매수는 주의가 필요합니다."
-    if item["return20"] >= 40:
-        text += " 최근 20일 상승률이 높아 단기 과열 여부를 확인해야 합니다."
-    if item["volumePower"] >= 2:
-        text += " 최근 거래량이 평소보다 크게 증가해 시장 관심이 붙은 상태입니다."
-    return text
+    if score >= 70:
+        reasons.append("종합점수가 높아 가격 흐름, 거래대금, 거래량 조건이 동시에 양호한 편입니다.")
+    elif score >= 50:
+        reasons.append("종합점수는 중상위권으로, 단기 관심권에 들어올 수 있는 수준입니다.")
+    else:
+        reasons.append("종합점수는 아직 낮은 편이므로 추세 확인이 더 필요합니다.")
+
+    if change >= 15:
+        reasons.append("상승 탄력이 강하게 반영되어 시장 관심이 집중된 상태입니다.")
+        risk.append("단기 급등 구간일 수 있어 추격매수보다는 눌림 확인이 필요합니다.")
+    elif change >= 5:
+        reasons.append("상승률이 양호해 단기 모멘텀이 붙은 상태로 볼 수 있습니다.")
+    elif change > 0:
+        reasons.append("상승 흐름은 있으나 과열 수준은 상대적으로 낮습니다.")
+    else:
+        reasons.append("가격 상승 모멘텀은 약하지만 거래량 또는 테마 점수로 선별되었을 수 있습니다.")
+        risk.append("가격 흐름이 약하므로 추가 하락 여부를 확인해야 합니다.")
+
+    if volume_power >= 1.7:
+        reasons.append("거래량/거래대금 점수가 높아 평소보다 시장 참여가 늘어난 종목입니다.")
+        strategy.append("거래대금이 유지되는지 확인하면 단기 추세 판단에 도움이 됩니다.")
+    elif volume_power >= 1.2:
+        reasons.append("거래량은 평균 이상으로, 관심이 서서히 붙는 흐름입니다.")
+    else:
+        reasons.append("거래량 강도는 아직 크지 않아 본격적인 수급 유입은 추가 확인이 필요합니다.")
+
+    if category == "추천":
+        strategy.append("단기 매매라면 당일 고점 추격보다 1차 눌림 또는 전일 종가 부근 지지를 확인하는 전략이 좋습니다.")
+        strategy.append("스윙 관점에서는 해당 테마가 2~3일 이상 유지되는지 확인하는 것이 중요합니다.")
+    elif category == "관심":
+        strategy.append("관심종목은 바로 매수보다 거래대금 증가, 양봉 유지, 테마 지속 여부를 확인한 뒤 접근하는 것이 좋습니다.")
+    else:
+        strategy.append("관찰 단계에서는 급등 여부보다 거래량 증가와 테마 편입 가능성을 확인하는 것이 좋습니다.")
+
+    if price <= 0:
+        risk.append("현재가 데이터가 정상 수집되지 않았을 수 있으므로 실제 HTS 가격 확인이 필요합니다.")
+
+    if not risk:
+        risk.append("단기 변동성은 항상 존재하므로 손절 기준을 먼저 정한 뒤 접근하는 것이 좋습니다.")
+
+    return {
+        "summary": base,
+        "reasons": reasons,
+        "strategy": strategy,
+        "risk": risk,
+    }
 
 @app.route("/")
 def index():
@@ -286,7 +335,12 @@ def api_analyze():
             "score": round(float(row["score"]), 2),
         }
 
-        item["opinion"] = make_opinion(item, category)
+        analysis = make_opinion(item, category)
+        item["opinion"] = analysis["summary"]
+        item["reasons"] = analysis["reasons"]
+        item["strategy"] = analysis["strategy"]
+        item["risk"] = analysis["risk"]
+
         records.append(item)
 
     summary_df = (
@@ -319,35 +373,6 @@ def api_analyze():
         "all": records[:120],
     })
 
-    df = pd.DataFrame(results).sort_values("score", ascending=False).reset_index(drop=True)
-    df["rank"] = df.index + 1
-    df["category"] = "관찰"
-    df.loc[:9, "category"] = "추천"
-    df.loc[10:39, "category"] = "관심"
-
-    records = df.to_dict(orient="records")
-    for item in records:
-        item["opinion"] = make_opinion(item, item["category"])
-
-    theme_summary = (
-        df.groupby("theme")
-        .agg(avgScore=("score", "mean"), maxScore=("score", "max"), count=("name", "count"))
-        .sort_values("avgScore", ascending=False)
-        .reset_index()
-    )
-
-    summary = []
-    for _, row in theme_summary.head(8).iterrows():
-        summary.append({"theme": row["theme"], "avgScore": round(float(row["avgScore"]), 2), "maxScore": round(float(row["maxScore"]), 2), "count": int(row["count"])})
-
-    return jsonify({
-        "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "analyzedCount": len(records),
-        "summary": summary,
-        "recommend": records[:10],
-        "watch": records[10:40],
-        "all": records[:120],
-    })
 
 HTML = """
 <!doctype html>
@@ -405,6 +430,164 @@ HTML = """
     .section { display:none; } .section.active { display:block; }
     .footer { color:var(--sub); font-size:12px; text-align:center; margin-top:28px; line-height:1.5; }
     .install-tip { background:#ecfeff; color:#164e63; border-radius:18px; padding:13px; line-height:1.5; font-size:14px; margin-top:12px; border:1px solid #a5f3fc; }
+    .premium-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.premium-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  background: linear-gradient(90deg, #ef4444, #f97316, #2563eb);
+}
+
+.name-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+.score-circle {
+  min-width: 78px;
+  height: 78px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  box-shadow: 0 10px 24px rgba(0,0,0,.18);
+}
+
+.score-circle small {
+  font-size: 11px;
+  opacity: .9;
+}
+
+.score-circle b {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.score-hot {
+  background: linear-gradient(135deg, #dc2626, #f97316);
+}
+
+.score-mid {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+}
+
+.score-low {
+  background: linear-gradient(135deg, #6b7280, #111827);
+}
+
+.grade {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.grade.strong {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.grade.normal {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.grade.watch {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.premium-grid {
+  margin-top: 16px;
+}
+
+.ai-box {
+  margin-top: 15px;
+  background: linear-gradient(135deg, #111827, #1e3a8a);
+  color: white;
+  border-radius: 18px;
+  padding: 15px;
+  line-height: 1.55;
+}
+
+.ai-box p {
+  margin: 7px 0 0;
+  font-size: 14px;
+  opacity: .95;
+}
+
+.ai-title {
+  font-weight: 900;
+  font-size: 15px;
+}
+
+.detail-box {
+  margin-top: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.detail-title {
+  font-weight: 900;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.detail-box ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.detail-box li {
+  margin: 6px 0;
+  line-height: 1.5;
+  font-size: 14px;
+  color: #374151;
+}
+
+.strategy-box {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.risk-box {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+@media (max-width: 480px) {
+  .name-row {
+    align-items: stretch;
+  }
+
+  .score-circle {
+    min-width: 70px;
+    height: 70px;
+    border-radius: 20px;
+  }
+
+  .score-circle b {
+    font-size: 21px;
+  }
+
+  .name {
+    font-size: 25px;
+  }
+}
   </style>
 </head>
 <body>
@@ -468,29 +651,70 @@ HTML = """
       return `<b class="${cls}">${v}%</b>`;
     }
 
-    function makeCard(item, type) {
-      const rankClass = type === "watch" ? "rank watch-rank" : "rank";
-      return `
-        <div class="card">
-          <div class="top-line">
-            <span class="${rankClass}">#${item.rank} ${item.category}</span>
-            <span class="market">${item.market}</span>
-            <span class="market">${item.code}</span>
-          </div>
+function badgeLevel(item) {
+  if (item.score >= 70) return '<span class="grade strong">강한 후보</span>';
+  if (item.score >= 50) return '<span class="grade normal">관심 후보</span>';
+  return '<span class="grade watch">관찰 필요</span>';
+}
+
+function listHtml(arr) {
+  if (!arr || arr.length === 0) return "";
+  return arr.map(x => `<li>${x}</li>`).join("");
+}
+
+function makeCard(item, type) {
+  const rankClass = type === "watch" ? "rank watch-rank" : "rank";
+  const scoreClass = Number(item.score) >= 70 ? "score-hot" : Number(item.score) >= 50 ? "score-mid" : "score-low";
+
+  return `
+    <div class="card premium-card">
+      <div class="top-line">
+        <span class="${rankClass}">#${item.rank} ${item.category}</span>
+        <span class="market">${item.market}</span>
+        <span class="market">${item.code}</span>
+        ${badgeLevel(item)}
+      </div>
+
+      <div class="name-row">
+        <div>
           <div class="name">${item.name}</div>
           <div class="theme">${item.theme}</div>
-          <div class="grid">
-            <div class="metric"><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
-            <div class="metric"><span>종합점수</span><b>${item.score}</b></div>
-            <div class="metric"><span>5일 수익률</span>${fmtRate(item.return5)}</div>
-            <div class="metric"><span>20일 수익률</span>${fmtRate(item.return20)}</div>
-            <div class="metric"><span>거래량강도</span><b>${item.volumePower}</b></div>
-            <div class="metric"><span>추세강도</span><b>${item.trendPower}</b></div>
-          </div>
-          <div class="opinion">💬 ${item.opinion}</div>
         </div>
-      `;
-    }
+        <div class="score-circle ${scoreClass}">
+          <small>AI 점수</small>
+          <b>${item.score}</b>
+        </div>
+      </div>
+
+      <div class="grid premium-grid">
+        <div class="metric"><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
+        <div class="metric"><span>5일/당일 흐름</span>${fmtRate(item.return5)}</div>
+        <div class="metric"><span>거래량 강도</span><b>${item.volumePower}</b></div>
+        <div class="metric"><span>추세 강도</span><b>${item.trendPower}</b></div>
+      </div>
+
+      <div class="ai-box">
+        <div class="ai-title">🤖 AI 선별 요약</div>
+        <p>${item.opinion}</p>
+      </div>
+
+      <div class="detail-box">
+        <div class="detail-title">✅ 선별 이유</div>
+        <ul>${listHtml(item.reasons)}</ul>
+      </div>
+
+      <div class="detail-box strategy-box">
+        <div class="detail-title">📌 대응 전략</div>
+        <ul>${listHtml(item.strategy)}</ul>
+      </div>
+
+      <div class="detail-box risk-box">
+        <div class="detail-title">⚠️ 주의 포인트</div>
+        <ul>${listHtml(item.risk)}</ul>
+      </div>
+    </div>
+  `;
+}
 
     async function runAnalyze() {
       const limit = document.getElementById("limit").value;
