@@ -222,6 +222,81 @@ def get_trade_plan(item):
     }
 
 
+def get_company_profile(item):
+    name = item.get("name", "")
+    theme = item.get("theme", "미분류")
+    score = float(item.get("score", 0))
+    change = float(item.get("return5", 0))
+    volume_power = float(item.get("volumePower", 0))
+
+    theme_desc = {
+        "AI반도체/HBM": "AI 서버와 고성능 메모리 수요에 영향을 받는 반도체 관련 기업입니다.",
+        "반도체장비/소재": "반도체 생산 공정에 필요한 장비·소재·부품 공급망과 관련된 기업입니다.",
+        "전력설비/데이터센터": "AI 데이터센터, 전력망 투자, 변압기·전선·전력기기 수요와 연관된 기업입니다.",
+        "광통신/CPO": "AI 데이터센터의 고속 통신, 광모듈, 네트워크 인프라와 관련된 기업입니다.",
+        "AI서버/PCB": "AI 서버와 고성능 전자기기에 필요한 PCB·기판·서버 부품 관련 기업입니다.",
+        "로봇/피지컬AI": "로봇, 자동화, 피지컬 AI 확산과 관련된 기업입니다.",
+        "2차전지/배터리": "전기차, ESS, 배터리 소재와 공급망에 영향을 받는 기업입니다.",
+        "바이오/제약": "신약, 바이오시밀러, 헬스케어, 임상 성과에 영향을 받는 기업입니다.",
+        "방산/우주항공": "방산 수출, 항공우주, 지정학적 이슈와 관련된 기업입니다.",
+        "조선/해운": "선박 발주, 해운 운임, LNG선·친환경 선박 수요에 영향을 받는 기업입니다.",
+        "원전/전력인프라": "원전 재개, 전력 인프라 투자, 에너지 정책 변화와 관련된 기업입니다.",
+        "화장품/미용": "K-뷰티, 수출, 소비 회복과 관련된 기업입니다.",
+        "엔터/콘텐츠": "K-콘텐츠, 음반·공연·플랫폼 매출에 영향을 받는 기업입니다.",
+        "게임/웹툰": "신작 출시, 글로벌 흥행, 콘텐츠 IP 확장과 관련된 기업입니다.",
+        "금융/증권": "금리, 증시 거래대금, 배당 기대감에 영향을 받는 금융 기업입니다.",
+        "친환경/수소": "수소, 태양광, 풍력, 친환경 에너지 정책과 관련된 기업입니다.",
+        "음식료/소비재": "원가, 환율, 소비심리, 수출 확대에 영향을 받는 소비재 기업입니다.",
+        "건설/인프라": "부동산 경기, SOC 투자, 원자재 가격에 영향을 받는 건설·인프라 기업입니다.",
+        "미분류": "자동 테마 분류가 명확하지 않아 개별 이슈 확인이 필요한 기업입니다.",
+    }
+
+    if score >= 70:
+        grade = "강한 후보"
+        ai_eval = "현재 데이터 기준으로 가격 흐름, 거래량, 시장 관심도가 강하게 결합된 상태입니다."
+    elif score >= 50:
+        grade = "관심 후보"
+        ai_eval = "점수는 중상위권으로, 테마 지속성과 거래대금 유지 여부를 확인하면 좋습니다."
+    else:
+        grade = "관찰 후보"
+        ai_eval = "아직 강한 추세라고 보기에는 부족하며, 추가 수급 유입 확인이 필요합니다."
+
+    strengths = []
+    cautions = []
+
+    if theme != "미분류":
+        strengths.append(f"'{theme}' 테마에 포함되어 시장 트렌드와 연결성이 있습니다.")
+    else:
+        cautions.append("테마 분류가 명확하지 않아 뉴스·공시 확인이 필요합니다.")
+
+    if change >= 10:
+        strengths.append("최근 상승률이 높아 시장 관심이 붙은 상태입니다.")
+        cautions.append("단기 급등 이후 변동성이 커질 수 있습니다.")
+    elif change > 0:
+        strengths.append("최근 가격 흐름이 양호한 편입니다.")
+    else:
+        cautions.append("최근 가격 모멘텀은 약하므로 지지선 확인이 필요합니다.")
+
+    if volume_power >= 1.7:
+        strengths.append("거래량 강도가 높아 수급 유입 가능성이 있습니다.")
+    elif volume_power < 1.0:
+        cautions.append("거래량이 약해 추세 지속성을 추가 확인해야 합니다.")
+
+    if not strengths:
+        strengths.append("현재는 뚜렷한 강점보다 관찰 중심으로 보는 것이 좋습니다.")
+
+    if not cautions:
+        cautions.append("투자 전 손절 기준과 분할 매수 기준을 먼저 정하는 것이 좋습니다.")
+
+    return {
+        "overview": theme_desc.get(theme, theme_desc["미분류"]),
+        "aiEval": ai_eval,
+        "grade": grade,
+        "strengths": strengths,
+        "cautions": cautions,
+    }
+
+
 @app.route("/")
 def index():
     return render_template_string(HTML)
@@ -302,6 +377,7 @@ def api_analyze():
         item["strategy"] = analysis["strategy"]
         item["risk"] = analysis["risk"]
         item["tradePlan"] = get_trade_plan(item)
+        item["companyProfile"] = get_company_profile(item)
 
         records.append(item)
 
@@ -326,10 +402,18 @@ def api_analyze():
             "count": int(row["count"]),
         })
 
+    theme_groups = {}
+    for item in records:
+        theme_groups.setdefault(item["theme"], []).append(item)
+
+    for theme in theme_groups:
+        theme_groups[theme] = sorted(theme_groups[theme], key=lambda x: x["score"], reverse=True)
+
     return jsonify({
         "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "analyzedCount": len(records),
         "summary": summary,
+        "themeGroups": theme_groups,
         "recommend": records[:10],
         "watch": records[10:40],
         "all": records[:120],
@@ -489,6 +573,46 @@ HTML = """
     .chart-close { width:auto; margin:0; padding:10px 14px; border-radius:999px; font-size:13px; background:#526b4f; color:white; box-shadow:none; }
     .chart-note { margin-top:10px; font-size:12px; color:#6b7280; text-align:center; }
 
+
+    .theme-row.clickable { cursor:pointer; border-radius:16px; transition:.15s ease; }
+    .theme-row.clickable:hover { background:rgba(255,243,199,.55); }
+    .theme-detail { margin-top:12px; display:none; }
+    .theme-detail.active { display:block; }
+    .theme-stock-card {
+      background:rgba(255,255,248,.84);
+      border:1px solid #eadfbf;
+      border-radius:20px;
+      padding:14px;
+      margin:10px 0;
+      box-shadow:0 10px 22px rgba(98,126,86,.12);
+    }
+    .theme-stock-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .theme-stock-name { font-size:20px; font-weight:900; }
+    .theme-stock-meta { font-size:12px; color:#6b7280; margin-top:4px; }
+    .profile-pill {
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      background:#e6f4dc;
+      color:#3f6b35;
+      font-weight:900;
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .profile-box {
+      margin-top:10px;
+      background:linear-gradient(135deg,#fffdf4,#eef8e8);
+      border:1px solid #e8dfbd;
+      border-radius:16px;
+      padding:12px;
+      line-height:1.55;
+      font-size:14px;
+      color:#374151;
+    }
+    .profile-title { font-weight:900; color:#243025; margin:8px 0 5px; }
+    .profile-box ul { margin:0; padding-left:18px; }
+    .profile-box li { margin:5px 0; }
+
     @media (max-width:480px) {
       .trade-grid { grid-template-columns:1fr; }
       .chart-card { border-radius:24px; }
@@ -558,6 +682,7 @@ HTML = """
 
   <script>
     let stockChart = null;
+    let latestData = null;
 
     function showTab(id, el) {
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -695,6 +820,70 @@ HTML = """
       if (event.target.id === "chartModal") hideChart();
     }
 
+
+    function makeThemeStockCard(item) {
+      const p = item.companyProfile || {};
+      return `
+        <div class="theme-stock-card">
+          <div class="theme-stock-head">
+            <div>
+              <div class="theme-stock-name">${item.name}</div>
+              <div class="theme-stock-meta">${item.market} · ${item.code} · AI점수 ${item.score} · 현재가 ${fmtPrice(item.price)}</div>
+            </div>
+            <span class="profile-pill">${p.grade || "AI 평가"}</span>
+          </div>
+
+          <div class="profile-box">
+            <div class="profile-title">🏢 회사 개요</div>
+            <div>${p.overview || "회사 개요 정보가 부족합니다."}</div>
+
+            <div class="profile-title">🤖 AI 평가</div>
+            <div>${p.aiEval || "AI 평가 정보가 부족합니다."}</div>
+
+            <div class="profile-title">✅ 강점</div>
+            <ul>${listHtml(p.strengths)}</ul>
+
+            <div class="profile-title">⚠️ 주의점</div>
+            <ul>${listHtml(p.cautions)}</ul>
+          </div>
+
+          <button class="chart-btn" onclick='showChart(${safeItemForClick(item)})'>📈 차트 보기</button>
+        </div>
+      `;
+    }
+
+    function toggleTheme(theme) {
+      const target = document.getElementById("theme-detail-" + btoa(unescape(encodeURIComponent(theme))).replace(/=/g, ""));
+      if (!target) return;
+
+      const isOpen = target.classList.contains("active");
+      document.querySelectorAll(".theme-detail").forEach(x => x.classList.remove("active"));
+
+      if (!isOpen) {
+        target.classList.add("active");
+      }
+    }
+
+    function renderThemeList(data) {
+      const groups = data.themeGroups || {};
+      return data.summary.map(t => {
+        const key = btoa(unescape(encodeURIComponent(t.theme))).replace(/=/g, "");
+        const items = groups[t.theme] || [];
+        const stockHtml = items.map(item => makeThemeStockCard(item)).join("");
+
+        return `
+          <div class="theme-row clickable" onclick='toggleTheme(${JSON.stringify(t.theme)})'>
+            <b>${t.theme}</b>
+            <span>평균점수 ${t.avgScore} · 최고점수 ${t.maxScore} · 종목수 ${t.count}개 · 클릭하면 종목별 AI 평가 보기</span>
+          </div>
+          <div id="theme-detail-${key}" class="theme-detail">
+            ${stockHtml}
+          </div>
+        `;
+      }).join("");
+    }
+
+
     async function runAnalyze() {
       const limit = document.getElementById("limit").value;
       const loading = document.getElementById("loading");
@@ -708,15 +897,11 @@ HTML = """
       try {
         const res = await fetch(`/api/analyze?limit=${limit}`);
         const data = await res.json();
+        latestData = data;
         document.getElementById("analyzedCount").innerText = data.analyzedCount || 0;
         document.getElementById("recommendList").innerHTML = data.recommend.map(item => makeCard(item, "recommend")).join("");
         document.getElementById("watchList").innerHTML = data.watch.map(item => makeCard(item, "watch")).join("");
-        document.getElementById("themeList").innerHTML = data.summary.map(t => `
-          <div class="theme-row">
-            <b>${t.theme}</b>
-            <span>평균점수 ${t.avgScore} · 최고점수 ${t.maxScore} · 종목수 ${t.count}개</span>
-          </div>
-        `).join("");
+        document.getElementById("themeList").innerHTML = renderThemeList(data);
         loading.style.display = "none";
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (e) {
