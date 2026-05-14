@@ -618,9 +618,185 @@ HTML = """
       .chart-card { border-radius:24px; }
       .name { font-size:25px; }
     }
+
+    /* ----------------------------- */
+    /* 🌅 성일의 AI 주식바람 로딩화면 */
+    /* ----------------------------- */
+    .sunrise-loading{
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      background:
+        linear-gradient(
+          180deg,
+          #fff7d8 0%,
+          #dff6d6 45%,
+          #cfe8ff 100%
+        );
+    }
+
+    .sunrise-loading.hide{
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .8s ease;
+    }
+
+    .sun{
+      position:absolute;
+      top:10%;
+      width:140px;
+      height:140px;
+      border-radius:50%;
+      background:
+        radial-gradient(circle,
+          #fff6b0,
+          #ffd76f
+        );
+      box-shadow:
+        0 0 80px rgba(255,220,120,.8);
+      animation:sunGlow 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes sunGlow{
+      from{ transform:scale(1); }
+      to{ transform:scale(1.08); }
+    }
+
+    .cloud{
+      position:absolute;
+      width:180px;
+      height:55px;
+      background:rgba(255,255,255,.7);
+      border-radius:999px;
+      filter:blur(1px);
+    }
+
+    .cloud:before,
+    .cloud:after{
+      content:"";
+      position:absolute;
+      background:rgba(255,255,255,.7);
+      border-radius:50%;
+    }
+
+    .cloud:before{
+      width:70px;
+      height:70px;
+      left:20px;
+      top:-30px;
+    }
+
+    .cloud:after{
+      width:90px;
+      height:90px;
+      right:20px;
+      top:-45px;
+    }
+
+    .cloud1{
+      top:18%;
+      left:-200px;
+      animation:cloudMove 18s linear infinite;
+    }
+
+    .cloud2{
+      top:28%;
+      left:-250px;
+      transform:scale(.7);
+      animation:cloudMove 22s linear infinite;
+    }
+
+    @keyframes cloudMove{
+      from{ left:-250px; }
+      to{ left:110%; }
+    }
+
+    .leaf{
+      position:absolute;
+      top:22%;
+      left:18%;
+      font-size:32px;
+      animation:leafFloat 4s ease-in-out infinite;
+    }
+
+    @keyframes leafFloat{
+      0%{ transform:translateY(0px) rotate(0deg); }
+      50%{ transform:translateY(20px) rotate(10deg); }
+      100%{ transform:translateY(0px) rotate(0deg); }
+    }
+
+    .sunrise-card{
+      position:relative;
+      width:min(86%, 360px);
+      padding:34px 28px;
+      border-radius:30px;
+      text-align:center;
+      background:rgba(255,255,255,.45);
+      backdrop-filter:blur(14px);
+      box-shadow:0 12px 40px rgba(0,0,0,.12);
+      border:1px solid rgba(255,255,255,.7);
+    }
+
+    .sunrise-card .title{
+      font-size:34px;
+      font-weight:900;
+      line-height:1.3;
+      color:#2f4f2f;
+      margin-bottom:14px;
+    }
+
+    .sunrise-card .subtitle{
+      font-size:16px;
+      color:#5f6f5f;
+      margin-bottom:26px;
+    }
+
+    .loading-bar{
+      width:100%;
+      height:12px;
+      border-radius:999px;
+      overflow:hidden;
+      background:rgba(255,255,255,.7);
+      border:1px solid rgba(255,255,255,.9);
+    }
+
+    .loading-bar span{
+      display:block;
+      width:40%;
+      height:100%;
+      border-radius:999px;
+      background:linear-gradient(90deg,#f6c86c,#9adf8f);
+      animation:loadingMove 1.5s ease-in-out infinite;
+    }
+
+    @keyframes loadingMove{
+      0%{ margin-left:-40%; }
+      100%{ margin-left:100%; }
+    }
+
   </style>
 </head>
 <body>
+
+  <div id="sunriseLoading" class="sunrise-loading">
+    <div class="sun"></div>
+    <div class="cloud cloud1"></div>
+    <div class="cloud cloud2"></div>
+    <div class="leaf">🍃</div>
+
+    <div class="sunrise-card">
+      <div class="title">성일의 AI 주식바람 🍃</div>
+      <div class="subtitle">오늘 시장의 흐름을 읽는 중...</div>
+      <div class="loading-bar">
+        <span></span>
+      </div>
+    </div>
+  </div>
+
   <main class="app">
     <section class="hero">
       <div class="mini">KOSPI · KOSDAQ AI TREND</div>
@@ -908,6 +1084,16 @@ HTML = """
         loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p>";
       }
     }
+
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        const loading = document.getElementById("sunriseLoading");
+        if (loading) {
+          loading.classList.add("hide");
+        }
+      }, 1500);
+    });
+
   </script>
 </body>
 </html>
