@@ -9,6 +9,43 @@ from flask import Flask, render_template_string, request, jsonify
 app = Flask(__name__)
 
 THEME_MAP = {
+
+    # 생활/소비재/육아
+    "폴레드": "육아/키즈",
+    "아가방컴퍼니": "육아/키즈", "제로투세븐": "육아/키즈", "캐리소프트": "육아/키즈",
+    "꿈비": "육아/키즈", "토박스코리아": "육아/키즈", "메디앙스": "육아/키즈",
+
+    # 유통/소비
+    "BGF리테일": "유통/플랫폼", "GS리테일": "유통/플랫폼",
+    "이마트": "유통/플랫폼", "롯데쇼핑": "유통/플랫폼", "현대백화점": "유통/플랫폼",
+    "신세계": "유통/플랫폼",
+
+    # 패션/의류
+    "F&F": "패션/의류", "휠라홀딩스": "패션/의류", "영원무역": "패션/의류",
+    "한세실업": "패션/의류", "감성코퍼레이션": "패션/의류", "브랜드엑스코퍼레이션": "패션/의류",
+
+    # 교육
+    "메가스터디교육": "교육/에듀테크", "웅진씽크빅": "교육/에듀테크", "대교": "교육/에듀테크",
+    "비상교육": "교육/에듀테크", "YBM넷": "교육/에듀테크", "NE능률": "교육/에듀테크",
+
+    # 여행/레저
+    "하나투어": "여행/레저", "모두투어": "여행/레저", "노랑풍선": "여행/레저",
+    "강원랜드": "여행/레저", "파라다이스": "여행/레저", "롯데관광개발": "여행/레저",
+
+    # 물류/운송/항공
+    "CJ대한통운": "물류/운송", "한진": "물류/운송", "현대글로비스": "물류/운송",
+    "대한항공": "항공/여행", "아시아나항공": "항공/여행", "제주항공": "항공/여행",
+    "진에어": "항공/여행", "티웨이항공": "항공/여행",
+
+    # 보안/소프트웨어/플랫폼
+    "안랩": "보안/소프트웨어", "더존비즈온": "보안/소프트웨어", "한글과컴퓨터": "보안/소프트웨어",
+    "이스트소프트": "보안/소프트웨어", "라온시큐어": "보안/소프트웨어", "파수": "보안/소프트웨어",
+    "NAVER": "인터넷/플랫폼", "카카오": "인터넷/플랫폼", "카카오페이": "인터넷/플랫폼",
+    "카카오뱅크": "인터넷/플랫폼", "NHN": "인터넷/플랫폼",
+
+    # 반려동물
+    "오에스피": "반려동물/펫",
+
     "삼성전자": "AI반도체/HBM", "SK하이닉스": "AI반도체/HBM", "한미반도체": "AI반도체/HBM",
     "이오테크닉스": "AI반도체/HBM", "리노공업": "AI반도체/HBM", "ISC": "AI반도체/HBM",
     "테크윙": "AI반도체/HBM", "HPSP": "AI반도체/HBM", "하나마이크론": "AI반도체/HBM",
@@ -34,6 +71,18 @@ THEME_MAP = {
 }
 
 AUTO_THEME_KEYWORDS = {
+
+    "육아/키즈": ["육아", "유아", "아기", "키즈", "어린이", "카시트", "유모차", "분유", "완구", "폴레드", "아가방", "제로투세븐", "꿈비", "메디앙스", "토박스"],
+    "유통/플랫폼": ["리테일", "쇼핑", "백화점", "마트", "편의점", "유통", "커머스", "신세계", "이마트", "롯데쇼핑", "GS리테일", "BGF"],
+    "패션/의류": ["패션", "의류", "브랜드", "섬유", "원단", "휠라", "영원무역", "한세실업", "감성코퍼레이션"],
+    "교육/에듀테크": ["교육", "에듀", "스터디", "학습", "교재", "능률", "대교", "웅진", "YBM", "비상교육"],
+    "여행/레저": ["여행", "투어", "호텔", "카지노", "레저", "관광", "하나투어", "모두투어", "노랑풍선", "강원랜드", "파라다이스"],
+    "항공/여행": ["항공", "대한항공", "아시아나", "제주항공", "진에어", "티웨이"],
+    "물류/운송": ["물류", "운송", "택배", "글로비스", "대한통운", "한진"],
+    "보안/소프트웨어": ["보안", "소프트웨어", "솔루션", "시큐어", "클라우드", "안랩", "더존", "한글과컴퓨터", "이스트소프트"],
+    "인터넷/플랫폼": ["인터넷", "플랫폼", "포털", "카카오", "NAVER", "네이버", "페이", "뱅크"],
+    "반려동물/펫": ["펫", "반려", "동물", "사료", "오에스피"],
+
     "AI반도체/HBM": ["반도체", "하이닉스", "HBM", "메모리", "디램", "낸드", "파운드리", "테크윙", "리노", "ISC", "HPSP", "원익", "주성", "이오테크닉스", "한미반도체", "하나마이크론", "가온칩스", "오픈엣지"],
     "반도체장비/소재": ["소부장", "실리콘", "웨이퍼", "식각", "증착", "포토", "테스트", "프로브", "쿼츠", "세라믹", "테스", "피에스케이", "유진테크", "동진쎄미켐", "솔브레인", "티씨케이", "원익QnC"],
     "전력설비/데이터센터": ["전력", "전기", "일렉트릭", "변압기", "케이블", "전선", "중공업", "효성", "LS", "대한전선", "제룡", "산일", "가온전선", "현대일렉트릭"],
@@ -66,7 +115,20 @@ WEIGHT = {
     "방산/우주항공": 1.08,
     "반도체장비/소재": 1.08,
     "바이오/제약": 1.04,
-    "미분류": 1.00,
+    "육아/키즈": 1.03,
+    "유통/플랫폼": 1.03,
+    "패션/의류": 1.02,
+    "교육/에듀테크": 1.02,
+    "여행/레저": 1.03,
+    "항공/여행": 1.03,
+    "물류/운송": 1.02,
+    "보안/소프트웨어": 1.06,
+    "인터넷/플랫폼": 1.05,
+    "반려동물/펫": 1.02,
+    "IT/전자": 1.03,
+    "화학/소재": 1.02,
+    "기타/개별이슈": 0.96,
+    "미분류": 0.95,
 }
 
 
@@ -248,6 +310,7 @@ def get_company_profile(item):
         "친환경/수소": "수소, 태양광, 풍력, 친환경 에너지 정책과 관련된 기업입니다.",
         "음식료/소비재": "원가, 환율, 소비심리, 수출 확대에 영향을 받는 소비재 기업입니다.",
         "건설/인프라": "부동산 경기, SOC 투자, 원자재 가격에 영향을 받는 건설·인프라 기업입니다.",
+        "기타/개별이슈": "명확한 대형 테마보다는 개별 이슈, 수급, 기업 고유 모멘텀 확인이 필요한 기업입니다.",
         "미분류": "자동 테마 분류가 명확하지 않아 개별 이슈 확인이 필요한 기업입니다.",
     }
 
@@ -1348,9 +1411,136 @@ HTML = """
       .chart-card { border-radius:24px; }
       .name { font-size:25px; }
     }
+
+    /* ----------------------------- */
+    /* 🌅 성일의 AI 주식바람 로딩화면 */
+    /* ----------------------------- */
+    .sunrise-loading{
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      background:linear-gradient(180deg,#fff7d8 0%,#dff6d6 45%,#cfe8ff 100%);
+    }
+    .sunrise-loading.hide{
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .8s ease;
+    }
+    .sun{
+      position:absolute;
+      top:10%;
+      width:140px;
+      height:140px;
+      border-radius:50%;
+      background:radial-gradient(circle,#fff6b0,#ffd76f);
+      box-shadow:0 0 80px rgba(255,220,120,.8);
+      animation:sunGlow 3s ease-in-out infinite alternate;
+    }
+    @keyframes sunGlow{
+      from{ transform:scale(1); }
+      to{ transform:scale(1.08); }
+    }
+    .cloud{
+      position:absolute;
+      width:180px;
+      height:55px;
+      background:rgba(255,255,255,.7);
+      border-radius:999px;
+      filter:blur(1px);
+    }
+    .cloud:before,.cloud:after{
+      content:"";
+      position:absolute;
+      background:rgba(255,255,255,.7);
+      border-radius:50%;
+    }
+    .cloud:before{ width:70px; height:70px; left:20px; top:-30px; }
+    .cloud:after{ width:90px; height:90px; right:20px; top:-45px; }
+    .cloud1{ top:18%; left:-200px; animation:cloudMove 18s linear infinite; }
+    .cloud2{ top:28%; left:-250px; transform:scale(.7); animation:cloudMove 22s linear infinite; }
+    @keyframes cloudMove{
+      from{ left:-250px; }
+      to{ left:110%; }
+    }
+    .leaf{
+      position:absolute;
+      top:22%;
+      left:18%;
+      font-size:32px;
+      animation:leafFloat 4s ease-in-out infinite;
+    }
+    @keyframes leafFloat{
+      0%{ transform:translateY(0px) rotate(0deg); }
+      50%{ transform:translateY(20px) rotate(10deg); }
+      100%{ transform:translateY(0px) rotate(0deg); }
+    }
+    .sunrise-card{
+      position:relative;
+      width:min(86%, 360px);
+      padding:34px 28px;
+      border-radius:30px;
+      text-align:center;
+      background:rgba(255,255,255,.45);
+      backdrop-filter:blur(14px);
+      box-shadow:0 12px 40px rgba(0,0,0,.12);
+      border:1px solid rgba(255,255,255,.7);
+    }
+    .sunrise-card .title{
+      font-size:34px;
+      font-weight:900;
+      line-height:1.3;
+      color:#2f4f2f;
+      margin-bottom:14px;
+    }
+    .sunrise-card .subtitle{
+      font-size:16px;
+      color:#5f6f5f;
+      margin-bottom:26px;
+    }
+    .loading-bar{
+      width:100%;
+      height:12px;
+      border-radius:999px;
+      overflow:hidden;
+      background:rgba(255,255,255,.7);
+      border:1px solid rgba(255,255,255,.9);
+    }
+    .loading-bar span{
+      display:block;
+      width:40%;
+      height:100%;
+      border-radius:999px;
+      background:linear-gradient(90deg,#f6c86c,#9adf8f);
+      animation:loadingMove 1.5s ease-in-out infinite;
+    }
+    @keyframes loadingMove{
+      0%{ margin-left:-40%; }
+      100%{ margin-left:100%; }
+    }
+
   </style>
 </head>
 <body>
+
+  <div id="sunriseLoading" class="sunrise-loading">
+    <div class="sun"></div>
+    <div class="cloud cloud1"></div>
+    <div class="cloud cloud2"></div>
+    <div class="leaf">🍃</div>
+
+    <div class="sunrise-card">
+      <div class="title">성일의 AI 주식바람 🍃</div>
+      <div class="subtitle">오늘 시장의 흐름을 읽는 중...</div>
+      <div class="loading-bar">
+        <span></span>
+      </div>
+    </div>
+  </div>
+
   <main class="app">
     <section class="hero">
       <div class="mini">KOSPI · KOSDAQ AI TREND</div>
