@@ -1182,6 +1182,35 @@ HTML = """
     }
 
 
+
+    .ai-filter-box {
+      background:rgba(255,255,248,.88);
+      border:1px solid rgba(255,255,255,.9);
+      border-radius:24px;
+      padding:16px;
+      margin:14px 0;
+      box-shadow:0 14px 30px rgba(98,126,86,.14);
+    }
+    .ai-filter-buttons {
+      display:grid;
+      grid-template-columns:repeat(6,1fr);
+      gap:8px;
+      margin-top:10px;
+    }
+    .ai-filter-buttons button {
+      margin:0;
+      padding:11px 6px;
+      font-size:13px;
+      border-radius:16px;
+      background:linear-gradient(135deg,#fff3c7,#e6f4dc);
+      color:#2f2a1e;
+      box-shadow:0 8px 18px rgba(98,126,86,.10);
+    }
+    .ai-filter-buttons button.active {
+      background:linear-gradient(135deg,#5d7758,#8aaa73);
+      color:#fffdf4;
+    }
+
     .strategy-card {
       background:rgba(255,255,248,.9);
       border:1px solid rgba(255,255,255,.9);
@@ -1390,6 +1419,7 @@ HTML = """
       .ai-money-buttons { grid-template-columns:1fr 1fr; }
       .ai-pick-grid { grid-template-columns:1fr; }
       .strategy-grid { grid-template-columns:1fr 1fr; }
+      .ai-filter-buttons { grid-template-columns:1fr 1fr 1fr; }
       .tabs { grid-template-columns:repeat(5,1fr); gap:5px; }
       .tab { font-size:11px; padding:9px 3px; }
       .compact-name { font-size:26px; }
@@ -1624,14 +1654,23 @@ HTML = """
       </div>
 
       <div class="ai-sim-actions">
-        <button onclick="multiAiRunPeriod(1)">🌞 1일</button>
-        <button onclick="multiAiRunPeriod(7)">📆 1주일</button>
-        <button onclick="multiAiRunPeriod(30)">🌙 1개월</button>
-        <button onclick="multiAiRunPeriod(60)">🍃 2개월</button>
-        <button onclick="multiAiRunPeriod(365)">🌳 1년</button>
-        <button onclick="multiAiToggleAuto()" id="aiAutoBtn">⏸ 자동운용</button>
-        <button onclick="multiAiRebalance()">🎯 전략별 5종목 갱신</button>
+        <button onclick="multiAiStart()">🚀 5가지 AI 자동운용 시작</button>
+        <button onclick="multiAiRefreshNow()">🔎 지금 시장 재분석</button>
+        <button onclick="multiAiToggleAuto()" id="aiAutoBtn">⏸ 자동운용 켜짐</button>
         <button onclick="multiAiReset()">🔄 초기화</button>
+      </div>
+
+      <div class="ai-filter-box">
+        <div class="detail-title">📊 성과 조회 기간</div>
+        <div class="ai-filter-buttons">
+          <button onclick="setAiViewRange('1D')">1일</button>
+          <button onclick="setAiViewRange('1W')">1주</button>
+          <button onclick="setAiViewRange('1M')">1개월</button>
+          <button onclick="setAiViewRange('2M')">2개월</button>
+          <button onclick="setAiViewRange('1Y')">1년</button>
+          <button onclick="setAiViewRange('ALL')">전체</button>
+        </div>
+        <div id="aiRangeSummary" class="trade-helper">전체 운용 성과를 표시합니다.</div>
       </div>
 
       <div class="ai-portfolio-note" id="aiSimNote">
@@ -2564,69 +2603,48 @@ HTML = """
 
 
 
-    const AI_SIM_KEY = "sungil_multi_ai_strategy_sim_v1";
+
+    const AI_SIM_KEY = "sungil_multi_ai_strategy_sim_v2";
     let aiEquityChart = null;
+    let aiViewRange = "ALL";
 
     const AI_STRATEGIES = {
       aggressive: {
-        name: "공격형 AI",
-        icon: "🔥",
+        name: "공격형 AI", icon: "🔥",
         desc: "AI점수·거래량·단기 상승률이 강한 종목을 과감하게 편입합니다.",
-        cashReserve: 0.05,
-        maxWeight: 0.30,
-        buyScore: 62,
-        sellProfit: 18,
-        stopLoss: -8,
-        style: "momentum"
+        cashReserve: 0.05, maxWeight: 0.30, buyScore: 62, sellProfit: 18, stopLoss: -8, style: "momentum"
       },
       stable: {
-        name: "안정형 AI",
-        icon: "🛡️",
+        name: "안정형 AI", icon: "🛡️",
         desc: "과열 종목을 피하고 점수와 안정성이 균형 잡힌 종목을 분산 운용합니다.",
-        cashReserve: 0.25,
-        maxWeight: 0.18,
-        buyScore: 58,
-        sellProfit: 10,
-        stopLoss: -5,
-        style: "stable"
+        cashReserve: 0.25, maxWeight: 0.18, buyScore: 58, sellProfit: 10, stopLoss: -5, style: "stable"
       },
       theme: {
-        name: "테마추종 AI",
-        icon: "🌊",
+        name: "테마추종 AI", icon: "🌊",
         desc: "강한 테마에 속한 종목을 우선 편입하고 테마 순환을 추적합니다.",
-        cashReserve: 0.10,
-        maxWeight: 0.24,
-        buyScore: 55,
-        sellProfit: 14,
-        stopLoss: -7,
-        style: "theme"
+        cashReserve: 0.10, maxWeight: 0.24, buyScore: 55, sellProfit: 14, stopLoss: -7, style: "theme"
       },
       scalping: {
-        name: "단타형 AI",
-        icon: "⚡",
+        name: "단타형 AI", icon: "⚡",
         desc: "거래량 급증과 단기 탄력이 큰 종목을 빠르게 사고 빠르게 정리합니다.",
-        cashReserve: 0.15,
-        maxWeight: 0.20,
-        buyScore: 50,
-        sellProfit: 6,
-        stopLoss: -3,
-        style: "scalping"
+        cashReserve: 0.15, maxWeight: 0.20, buyScore: 50, sellProfit: 6, stopLoss: -3, style: "scalping"
       },
       value: {
-        name: "가치투자형 AI",
-        icon: "🌳",
+        name: "가치투자형 AI", icon: "🌳",
         desc: "과도한 급등 종목은 피하고 상대적으로 안정적인 저과열 종목을 오래 보유합니다.",
-        cashReserve: 0.20,
-        maxWeight: 0.22,
-        buyScore: 54,
-        sellProfit: 20,
-        stopLoss: -10,
-        style: "value"
+        cashReserve: 0.20, maxWeight: 0.22, buyScore: 54, sellProfit: 20, stopLoss: -10, style: "value"
       }
     };
 
     function todayKey() {
       return new Date().toISOString().slice(0, 10);
+    }
+
+    function daysBetween(dateA, dateB) {
+      if (!dateA || !dateB) return 0;
+      const a = new Date(dateA + "T00:00:00");
+      const b = new Date(dateB + "T00:00:00");
+      return Math.max(0, Math.floor((b - a) / 86400000));
     }
 
     function setAiStartAmount(amount) {
@@ -2677,6 +2695,28 @@ HTML = """
       localStorage.setItem(AI_SIM_KEY, JSON.stringify(sim));
     }
 
+    async function fetchMarketForAi(limit=700) {
+      const loading = document.getElementById("loading");
+      if (loading) loading.style.display = "block";
+
+      const res = await fetch(`/api/analyze?limit=${limit}`);
+      const data = await res.json();
+
+      latestData = data;
+      document.getElementById("analyzedCount").innerText = data.analyzedCount ?? 0;
+      document.getElementById("recommendCount").innerText = (data.recommend || []).length;
+      document.getElementById("watchCount").innerText = (data.watch || []).length;
+
+      if (typeof makeCard === "function") {
+        document.getElementById("recommendList").innerHTML = (data.recommend || []).map(x => makeCard(x, "recommend")).join("");
+        document.getElementById("watchList").innerHTML = (data.watch || []).map(x => makeCard(x, "watch")).join("");
+      }
+      if (typeof renderThemeSummary === "function") renderThemeSummary(data.summary || []);
+
+      if (loading) loading.style.display = "none";
+      return data;
+    }
+
     function getAiCandidates() {
       if (!latestData) return [];
       const arr = []
@@ -2699,28 +2739,17 @@ HTML = """
       const trend = Number(item.trendPower || 0);
       const hasTheme = item.theme && item.theme !== "미분류" && item.theme !== "기타/개별이슈";
 
-      if (s.style === "momentum") {
-        return score + vol * 10 + trend * 8 + Math.min(r5, 25) * 0.9 - (r5 > 45 ? 25 : 0);
-      }
-      if (s.style === "stable") {
-        return score + vol * 4 + (hasTheme ? 7 : 0) - Math.abs(r5) * 0.35 - (r5 > 20 ? 15 : 0);
-      }
-      if (s.style === "theme") {
-        return score + (hasTheme ? 22 : -10) + vol * 6 + trend * 6 + Math.min(r5, 20) * 0.45;
-      }
-      if (s.style === "scalping") {
-        return score * 0.65 + vol * 18 + Math.max(r5, 0) * 1.2 + trend * 4 - (r5 > 35 ? 20 : 0);
-      }
-      if (s.style === "value") {
-        return score + (hasTheme ? 5 : 0) - Math.max(r5, 0) * 0.55 + (r20 < 15 ? 10 : -8) + trend * 3;
-      }
+      if (s.style === "momentum") return score + vol * 10 + trend * 8 + Math.min(r5, 25) * 0.9 - (r5 > 45 ? 25 : 0);
+      if (s.style === "stable") return score + vol * 4 + (hasTheme ? 7 : 0) - Math.abs(r5) * 0.35 - (r5 > 20 ? 15 : 0);
+      if (s.style === "theme") return score + (hasTheme ? 22 : -10) + vol * 6 + trend * 6 + Math.min(r5, 20) * 0.45;
+      if (s.style === "scalping") return score * 0.65 + vol * 18 + Math.max(r5, 0) * 1.2 + trend * 4 - (r5 > 35 ? 20 : 0);
+      if (s.style === "value") return score + (hasTheme ? 5 : 0) - Math.max(r5, 0) * 0.55 + (r20 < 15 ? 10 : -8) + trend * 3;
       return score;
     }
 
     function pickReason(item, strategyKey) {
       const s = AI_STRATEGIES[strategyKey];
-      const reasons = [];
-      reasons.push(`${s.name} 기준으로 선정점수가 높습니다.`);
+      const reasons = [`${s.name} 기준으로 선정점수가 높습니다.`];
       if (item.theme && item.theme !== "미분류" && item.theme !== "기타/개별이슈") reasons.push(`${item.theme} 테마 흐름이 반영되었습니다.`);
       if (Number(item.volumePower || 0) >= 1.5) reasons.push("거래량 강도가 높아 수급 유입 가능성이 있습니다.");
       if (Number(item.return5 || 0) >= 15) reasons.push("단기 상승률이 높아 분할 접근이 필요합니다.");
@@ -2737,14 +2766,9 @@ HTML = """
 
       if (force || !strategy.picks || strategy.picks.length === 0) {
         strategy.picks = ranked.slice(0,5).map(item => ({
-          code:item.code,
-          name:item.name,
-          market:item.market,
-          theme:item.theme,
-          pickPrice:Number(item.price || 0),
-          score:Number(item.score || 0),
-          strategyScore:Number(item.strategyScore || 0),
-          reason:pickReason(item, strategyKey)
+          code:item.code, name:item.name, market:item.market, theme:item.theme,
+          pickPrice:Number(item.price || 0), score:Number(item.score || 0),
+          strategyScore:Number(item.strategyScore || 0), reason:pickReason(item, strategyKey)
         }));
         return strategy;
       }
@@ -2756,14 +2780,9 @@ HTML = """
         .filter(item => !keptCodes.has(item.code))
         .slice(0, 5 - kept.length)
         .map(item => ({
-          code:item.code,
-          name:item.name,
-          market:item.market,
-          theme:item.theme,
-          pickPrice:Number(item.price || 0),
-          score:Number(item.score || 0),
-          strategyScore:Number(item.strategyScore || 0),
-          reason:pickReason(item, strategyKey)
+          code:item.code, name:item.name, market:item.market, theme:item.theme,
+          pickPrice:Number(item.price || 0), score:Number(item.score || 0),
+          strategyScore:Number(item.strategyScore || 0), reason:pickReason(item, strategyKey)
         }));
 
       strategy.picks = kept.concat(fill);
@@ -2793,7 +2812,6 @@ HTML = """
 
       if (profitRate <= s.stopLoss) return {action:"SELL_ALL", weight:1, reason:`손실률 ${profitRate.toFixed(2)}%로 ${s.name} 손절 기준에 도달했습니다.`};
       if (profitRate >= s.sellProfit) return {action:"SELL_HALF", weight:0.5, reason:`수익률 ${profitRate.toFixed(2)}%로 ${s.name} 차익실현 기준에 도달했습니다.`};
-
       if (s.style === "scalping" && r5 > 20) return {action:"SELL_HALF", weight:0.5, reason:"단타형 기준에서 단기 급등 후 절반 차익실현합니다."};
       if (score >= s.buyScore + 15 && vol >= 1.5 && profitRate > -2) return {action:"BUY_MORE", weight:Math.min(0.10, s.maxWeight / 2), reason:`${s.name} 기준에서 추세가 유지되어 소폭 추가매수합니다.`};
 
@@ -2881,28 +2899,119 @@ HTML = """
       return strategy;
     }
 
-    function multiAiStart() {
-      if (!latestData || !latestData.all || latestData.all.length === 0) {
-        alert("먼저 오늘의 추천종목 분석을 실행해주세요.");
+    async function multiAiStart() {
+      const amount = getAiStartAmount();
+      if (!confirm(`5가지 AI 전략을 각각 ${fmtMoney(amount)}으로 시작할까요?\n시작하면 AI가 자동으로 시장 분석을 실행하고 종목을 선정합니다.`)) return;
+
+      try {
+        await fetchMarketForAi(700);
+
+        const sim = defaultStrategyState(amount);
+        sim.started = true;
+        sim.autoRun = true;
+        sim.lastAutoDate = todayKey();
+
+        Object.keys(AI_STRATEGIES).forEach(key => {
+          sim.strategies[key] = updateStrategyPicks(sim.strategies[key], key, true);
+          sim.strategies[key] = runStrategyDay(sim.strategies[key], key, 1);
+          sim.strategies[key].history.unshift({
+            day:1, strategy:AI_STRATEGIES[key].name, type:"자동운용 시작",
+            text:`${AI_STRATEGIES[key].name}이 ${fmtMoney(amount)}으로 시장 분석·5종목 선정·첫 운용을 시작했습니다.`,
+            time:new Date().toLocaleString()
+          });
+        });
+        sim.day = 1;
+
+        saveAiSim(sim);
+        renderAiSim();
+        alert("5가지 AI 자동운용이 시작되었습니다.");
+      } catch (e) {
+        alert("AI 자동운용 시작 중 오류가 발생했습니다: " + e.message);
+      }
+    }
+
+    async function multiAiRefreshNow() {
+      try {
+        await fetchMarketForAi(700);
+        let sim = loadAiSim();
+        if (sim.started) {
+          Object.keys(AI_STRATEGIES).forEach(key => {
+            sim.strategies[key] = updateStrategyPicks(sim.strategies[key], key, true);
+            sim.strategies[key].history.unshift({
+              day:sim.day, strategy:AI_STRATEGIES[key].name, type:"시장 재분석",
+              text:"최신 시장 데이터를 다시 분석하고 전략별 5종목 후보를 갱신했습니다.",
+              time:new Date().toLocaleString()
+            });
+          });
+          saveAiSim(sim);
+        }
+        renderAiSim();
+      } catch (e) {
+        alert("시장 재분석 중 오류가 발생했습니다: " + e.message);
+      }
+    }
+
+    function multiAiRunPeriod(days) {
+      let sim = loadAiSim();
+      if (!sim.started) {
+        alert("먼저 5가지 AI 자동운용 시작을 눌러주세요.");
         return;
       }
-      const amount = getAiStartAmount();
-      if (!confirm(`5가지 AI 전략을 각각 ${fmtMoney(amount)}으로 시작할까요?\\n기존 AI 시뮬레이션은 초기화됩니다.`)) return;
-
-      const sim = defaultStrategyState(amount);
-      sim.started = true;
-      sim.autoRun = true;
-      Object.keys(AI_STRATEGIES).forEach(key => {
-        sim.strategies[key] = updateStrategyPicks(sim.strategies[key], key, true);
-        sim.strategies[key].history.unshift({
-          day:0, strategy:AI_STRATEGIES[key].name, type:"전략 시작",
-          text:`${AI_STRATEGIES[key].name}이 초기 투자금 ${fmtMoney(amount)}으로 5종목을 선정했습니다.`,
-          time:new Date().toLocaleString()
+      const maxDays = Math.min(Number(days || 1), 365);
+      for (let i=0; i<maxDays; i++) {
+        sim.day += 1;
+        Object.keys(AI_STRATEGIES).forEach(key => {
+          sim.strategies[key] = runStrategyDay(sim.strategies[key], key, sim.day);
         });
-      });
+      }
+      sim.lastAutoDate = todayKey();
       saveAiSim(sim);
       renderAiSim();
-      alert("5가지 AI 자동운용이 시작되었습니다.");
+    }
+
+    function multiAiToggleAuto() {
+      const sim = loadAiSim();
+      sim.autoRun = !sim.autoRun;
+      saveAiSim(sim);
+      renderAiSim();
+    }
+
+    async function multiAiAutoRunIfNeeded() {
+      let sim = loadAiSim();
+      if (!sim.started || !sim.autoRun) return;
+
+      try {
+        await fetchMarketForAi(700);
+        const today = todayKey();
+
+        if (!sim.lastAutoDate) {
+          sim.lastAutoDate = today;
+          saveAiSim(sim);
+          renderAiSim();
+          return;
+        }
+
+        const missedDays = daysBetween(sim.lastAutoDate, today);
+        if (missedDays > 0) {
+          const runDays = Math.min(missedDays, 30);
+          for (let i=0; i<runDays; i++) {
+            sim.day += 1;
+            Object.keys(AI_STRATEGIES).forEach(key => {
+              sim.strategies[key] = runStrategyDay(sim.strategies[key], key, sim.day);
+              sim.strategies[key].history.unshift({
+                day:sim.day, strategy:AI_STRATEGIES[key].name, type:"자동 일일운용",
+                text:"앱 접속 시 날짜 변경을 감지해 자동으로 하루 운용했습니다.",
+                time:new Date().toLocaleString()
+              });
+            });
+          }
+          sim.lastAutoDate = today;
+          saveAiSim(sim);
+        }
+        renderAiSim();
+      } catch(e) {
+        renderAiSim();
+      }
     }
 
     function multiAiRebalance() {
@@ -2923,66 +3032,30 @@ HTML = """
       renderAiSim();
     }
 
-    function multiAiRunPeriod(days) {
-      if (!latestData) {
-        alert("먼저 오늘의 추천종목 분석을 실행해 최신 데이터를 불러와주세요.");
-        return;
-      }
-      let sim = loadAiSim();
-      if (!sim.started) {
-        alert("먼저 초기 투자금을 설정하고 5가지 AI 자동운용 시작을 눌러주세요.");
-        return;
-      }
-
-      const maxDays = Math.min(Number(days || 1), 365);
-      for (let i=0; i<maxDays; i++) {
-        sim.day += 1;
-        Object.keys(AI_STRATEGIES).forEach(key => {
-          sim.strategies[key] = runStrategyDay(sim.strategies[key], key, sim.day);
-        });
-      }
-      sim.lastAutoDate = todayKey();
-      saveAiSim(sim);
-      renderAiSim();
-    }
-
-    function multiAiToggleAuto() {
-      const sim = loadAiSim();
-      sim.autoRun = !sim.autoRun;
-      saveAiSim(sim);
-      renderAiSim();
-    }
-
-    function multiAiAutoRunIfNeeded() {
-      if (!latestData) return;
-      let sim = loadAiSim();
-      if (!sim.started || !sim.autoRun) return;
-      const today = todayKey();
-
-      if (!sim.lastAutoDate) {
-        sim.lastAutoDate = today;
-        saveAiSim(sim);
-        return;
-      }
-
-      if (sim.lastAutoDate !== today) {
-        sim.day += 1;
-        Object.keys(AI_STRATEGIES).forEach(key => {
-          sim.strategies[key] = runStrategyDay(sim.strategies[key], key, sim.day);
-          sim.strategies[key].history.unshift({
-            day:sim.day, strategy:AI_STRATEGIES[key].name, type:"자동 일일운용",
-            text:"앱 접속 시 날짜 변경을 감지해 자동으로 하루 운용했습니다.",
-            time:new Date().toLocaleString()
-          });
-        });
-        sim.lastAutoDate = today;
-        saveAiSim(sim);
-      }
-    }
-
     function multiAiReset() {
       if (!confirm("5가지 AI 자동운용 시뮬레이션을 초기화할까요?")) return;
       saveAiSim(defaultStrategyState(getAiStartAmount()));
+      renderAiSim();
+    }
+
+    function filterEquityByRange(eq) {
+      if (!eq || eq.length === 0) return [];
+      const map = { "1D":1, "1W":7, "1M":30, "2M":60, "1Y":365 };
+      if (aiViewRange === "ALL") return eq;
+      const n = map[aiViewRange] || eq.length;
+      return eq.slice(Math.max(0, eq.length - (n + 1)));
+    }
+
+    function rangeReturn(eq) {
+      const filtered = filterEquityByRange(eq);
+      if (filtered.length < 2) return 0;
+      const first = filtered[0].total;
+      const last = filtered[filtered.length - 1].total;
+      return first > 0 ? (last - first) / first * 100 : 0;
+    }
+
+    function setAiViewRange(range) {
+      aiViewRange = range;
       renderAiSim();
     }
 
@@ -2992,7 +3065,9 @@ HTML = """
       if (aiEquityChart) aiEquityChart.destroy();
 
       const keys = Object.keys(AI_STRATEGIES);
-      const maxLen = Math.max(...keys.map(k => (sim.strategies[k]?.equity || []).length), 1);
+      const filteredMap = {};
+      keys.forEach(k => filteredMap[k] = filterEquityByRange(sim.strategies[k]?.equity || []));
+      const maxLen = Math.max(...keys.map(k => filteredMap[k].length), 1);
       const labels = Array.from({length:maxLen}, (_, i) => "D+" + i);
 
       aiEquityChart = new Chart(canvas, {
@@ -3001,7 +3076,7 @@ HTML = """
           labels,
           datasets:keys.map(k => ({
             label:AI_STRATEGIES[k].name,
-            data:(sim.strategies[k]?.equity || []).map(x => x.total),
+            data:filteredMap[k].map(x => x.total),
             tension:0.35,
             fill:false,
             borderWidth:3
@@ -3026,11 +3101,17 @@ HTML = """
       const startInput = document.getElementById("aiStartAmount");
       if (startInput && sim.initialCash) startInput.value = Number(sim.initialCash).toLocaleString();
 
+      document.querySelectorAll(".ai-filter-buttons button").forEach(btn => btn.classList.remove("active"));
+      const rangeLabels = {"1D":"1일", "1W":"1주", "1M":"1개월", "2M":"2개월", "1Y":"1년", "ALL":"전체"};
+      const summaryEl = document.getElementById("aiRangeSummary");
+      if (summaryEl) summaryEl.innerText = `${rangeLabels[aiViewRange] || "전체"} 기준 성과를 표시합니다.`;
+
       const strategyRows = Object.keys(AI_STRATEGIES).map(key => {
         const st = sim.strategies?.[key] || defaultStrategyState(sim.initialCash || 10000000).strategies[key];
         const snap = calcStrategySnapshot(st);
-        return {key, st, snap, meta:AI_STRATEGIES[key]};
-      }).sort((a,b) => b.snap.totalReturn - a.snap.totalReturn);
+        const viewReturn = rangeReturn(st.equity || []);
+        return {key, st, snap, viewReturn, meta:AI_STRATEGIES[key]};
+      }).sort((a,b) => b.viewReturn - a.viewReturn);
 
       const best = strategyRows[0];
       document.getElementById("bestStrategy").innerText = sim.started ? `${best.meta.icon} ${best.meta.name}` : "-";
@@ -3042,9 +3123,9 @@ HTML = """
 
       const note = document.getElementById("aiSimNote");
       if (!sim.started) {
-        note.innerText = "🤖 초기 투자금을 선택하고 5가지 AI 자동운용 시작을 누르면 전략별 시뮬레이션이 시작됩니다.";
+        note.innerText = "🤖 5가지 AI 자동운용 시작을 누르면 AI가 직접 시장 분석·종목 선정·첫 매매를 시작합니다.";
       } else {
-        note.innerText = `🤖 현재 D+${sim.day}일차입니다. 최고 전략은 ${best.meta.name}, 수익률은 ${best.snap.totalReturn.toFixed(2)}%입니다. 자동운용은 ${sim.autoRun ? "켜짐" : "꺼짐"} 상태입니다.`;
+        note.innerText = `🤖 현재 D+${sim.day}일차입니다. ${rangeLabels[aiViewRange]} 기준 최고 전략은 ${best.meta.name}, 수익률은 ${best.viewReturn.toFixed(2)}%입니다. 자동운용은 ${sim.autoRun ? "켜짐" : "꺼짐"} 상태입니다.`;
       }
 
       document.getElementById("strategyRankList").innerHTML = strategyRows.map((row, idx) => `
@@ -3054,7 +3135,7 @@ HTML = """
               <div class="strategy-title">#${idx+1} ${row.meta.icon} ${row.meta.name}</div>
               <div class="strategy-desc">${row.meta.desc}</div>
             </div>
-            <div class="${row.snap.totalReturn >= 0 ? 'strategy-return' : 'strategy-return loss'}">${row.snap.totalReturn.toFixed(2)}%</div>
+            <div class="${row.viewReturn >= 0 ? 'strategy-return' : 'strategy-return loss'}">${row.viewReturn.toFixed(2)}%</div>
           </div>
           <div class="strategy-grid">
             <div><span>총 자산</span><b>${fmtMoney(row.snap.total)}</b></div>
@@ -3098,10 +3179,7 @@ HTML = """
       }).join("");
 
       const logs = [];
-      Object.keys(AI_STRATEGIES).forEach(key => {
-        const h = sim.strategies?.[key]?.history || [];
-        logs.push(...h);
-      });
+      Object.keys(AI_STRATEGIES).forEach(key => logs.push(...(sim.strategies?.[key]?.history || [])));
       logs.sort((a,b) => (b.day || 0) - (a.day || 0));
 
       document.getElementById("aiTradeLog").innerHTML = logs.length === 0
@@ -3147,7 +3225,7 @@ HTML = """
         loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p>";
       }
     }
-    window.addEventListener('load', () => { renderPortfolio(); renderAiSim(); });
+    window.addEventListener('load', () => { renderPortfolio(); renderAiSim(); multiAiAutoRunIfNeeded(); });
   </script>
 
   <script>
