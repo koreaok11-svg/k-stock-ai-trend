@@ -613,190 +613,148 @@ HTML = """
     .profile-box ul { margin:0; padding-left:18px; }
     .profile-box li { margin:5px 0; }
 
+
+    .limit-guide {
+      margin-top:12px;
+      background:linear-gradient(135deg,#fffdf4,#eef8e8);
+      border:1px solid #dfe8c9;
+      border-radius:18px;
+      padding:14px;
+      line-height:1.5;
+      box-shadow:0 8px 18px rgba(98,126,86,.10);
+    }
+    .limit-title {
+      font-weight:900;
+      color:#2f4f2f;
+      font-size:15px;
+      margin-bottom:5px;
+    }
+    .limit-desc {
+      color:#5f6f5f;
+      font-size:13px;
+    }
+
+    .card-summary {
+      cursor:pointer;
+    }
+    .compact-card {
+      padding:18px;
+      margin:14px 0;
+    }
+    .compact-row {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-top:12px;
+    }
+    .compact-left {
+      min-width:0;
+      flex:1;
+    }
+    .compact-name {
+      font-size:27px;
+      font-weight:900;
+      color:#243025;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .compact-sub {
+      margin-top:7px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      align-items:center;
+    }
+    .compact-score {
+      min-width:82px;
+      height:82px;
+      border-radius:24px;
+      background:linear-gradient(135deg,#5d7758,#8aaa73);
+      color:#fffdf4;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 12px 22px rgba(96,130,92,.22);
+    }
+    .compact-score span {
+      font-size:11px;
+      opacity:.9;
+    }
+    .compact-score b {
+      font-size:24px;
+      line-height:1.1;
+    }
+    .quick-metrics {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+      margin-top:14px;
+    }
+    .quick-metrics div {
+      background:rgba(250,248,235,.9);
+      border-radius:15px;
+      padding:10px;
+      text-align:center;
+    }
+    .quick-metrics span {
+      display:block;
+      font-size:11px;
+      color:#6b7280;
+      margin-bottom:4px;
+    }
+    .quick-metrics b {
+      font-size:15px;
+      color:#243025;
+    }
+    .expand-hint {
+      margin-top:12px;
+      text-align:center;
+      font-size:13px;
+      font-weight:900;
+      color:#53724d;
+      background:#eef8e8;
+      border-radius:999px;
+      padding:9px;
+    }
+    .card-detail {
+      display:none;
+      margin-top:14px;
+      animation:detailFade .25s ease;
+    }
+    .card-detail.active {
+      display:block;
+    }
+    @keyframes detailFade {
+      from { opacity:0; transform:translateY(-6px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    @media (max-width:480px) {
+      .compact-name { font-size:26px; }
+      .compact-score {
+        min-width:74px;
+        height:74px;
+        border-radius:22px;
+      }
+      .quick-metrics {
+        grid-template-columns:1fr 1fr 1fr;
+      }
+      .quick-metrics b {
+        font-size:14px;
+      }
+    }
+
     @media (max-width:480px) {
       .trade-grid { grid-template-columns:1fr; }
       .chart-card { border-radius:24px; }
       .name { font-size:25px; }
     }
-
-    /* ----------------------------- */
-    /* 🌅 성일의 AI 주식바람 로딩화면 */
-    /* ----------------------------- */
-    .sunrise-loading{
-      position:fixed;
-      inset:0;
-      z-index:99999;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-      background:
-        linear-gradient(
-          180deg,
-          #fff7d8 0%,
-          #dff6d6 45%,
-          #cfe8ff 100%
-        );
-    }
-
-    .sunrise-loading.hide{
-      opacity:0;
-      pointer-events:none;
-      transition:opacity .8s ease;
-    }
-
-    .sun{
-      position:absolute;
-      top:10%;
-      width:140px;
-      height:140px;
-      border-radius:50%;
-      background:
-        radial-gradient(circle,
-          #fff6b0,
-          #ffd76f
-        );
-      box-shadow:
-        0 0 80px rgba(255,220,120,.8);
-      animation:sunGlow 3s ease-in-out infinite alternate;
-    }
-
-    @keyframes sunGlow{
-      from{ transform:scale(1); }
-      to{ transform:scale(1.08); }
-    }
-
-    .cloud{
-      position:absolute;
-      width:180px;
-      height:55px;
-      background:rgba(255,255,255,.7);
-      border-radius:999px;
-      filter:blur(1px);
-    }
-
-    .cloud:before,
-    .cloud:after{
-      content:"";
-      position:absolute;
-      background:rgba(255,255,255,.7);
-      border-radius:50%;
-    }
-
-    .cloud:before{
-      width:70px;
-      height:70px;
-      left:20px;
-      top:-30px;
-    }
-
-    .cloud:after{
-      width:90px;
-      height:90px;
-      right:20px;
-      top:-45px;
-    }
-
-    .cloud1{
-      top:18%;
-      left:-200px;
-      animation:cloudMove 18s linear infinite;
-    }
-
-    .cloud2{
-      top:28%;
-      left:-250px;
-      transform:scale(.7);
-      animation:cloudMove 22s linear infinite;
-    }
-
-    @keyframes cloudMove{
-      from{ left:-250px; }
-      to{ left:110%; }
-    }
-
-    .leaf{
-      position:absolute;
-      top:22%;
-      left:18%;
-      font-size:32px;
-      animation:leafFloat 4s ease-in-out infinite;
-    }
-
-    @keyframes leafFloat{
-      0%{ transform:translateY(0px) rotate(0deg); }
-      50%{ transform:translateY(20px) rotate(10deg); }
-      100%{ transform:translateY(0px) rotate(0deg); }
-    }
-
-    .sunrise-card{
-      position:relative;
-      width:min(86%, 360px);
-      padding:34px 28px;
-      border-radius:30px;
-      text-align:center;
-      background:rgba(255,255,255,.45);
-      backdrop-filter:blur(14px);
-      box-shadow:0 12px 40px rgba(0,0,0,.12);
-      border:1px solid rgba(255,255,255,.7);
-    }
-
-    .sunrise-card .title{
-      font-size:34px;
-      font-weight:900;
-      line-height:1.3;
-      color:#2f4f2f;
-      margin-bottom:14px;
-    }
-
-    .sunrise-card .subtitle{
-      font-size:16px;
-      color:#5f6f5f;
-      margin-bottom:26px;
-    }
-
-    .loading-bar{
-      width:100%;
-      height:12px;
-      border-radius:999px;
-      overflow:hidden;
-      background:rgba(255,255,255,.7);
-      border:1px solid rgba(255,255,255,.9);
-    }
-
-    .loading-bar span{
-      display:block;
-      width:40%;
-      height:100%;
-      border-radius:999px;
-      background:linear-gradient(90deg,#f6c86c,#9adf8f);
-      animation:loadingMove 1.5s ease-in-out infinite;
-    }
-
-    @keyframes loadingMove{
-      0%{ margin-left:-40%; }
-      100%{ margin-left:100%; }
-    }
-
   </style>
 </head>
 <body>
-
-  <div id="sunriseLoading" class="sunrise-loading">
-    <div class="sun"></div>
-    <div class="cloud cloud1"></div>
-    <div class="cloud cloud2"></div>
-    <div class="leaf">🍃</div>
-
-    <div class="sunrise-card">
-      <div class="title">성일의 AI 주식바람 🍃</div>
-      <div class="subtitle">오늘 시장의 흐름을 읽는 중...</div>
-      <div class="loading-bar">
-        <span></span>
-      </div>
-    </div>
-  </div>
-
   <main class="app">
     <section class="hero">
       <div class="mini">KOSPI · KOSDAQ AI TREND</div>
@@ -811,12 +769,18 @@ HTML = """
 
     <section class="control">
       <label>분석 범위</label>
-      <select id="limit">
+      <select id="limit" onchange="updateLimitGuide()">
         <option value="400">빠른 분석 400개</option>
         <option value="700" selected>기본 분석 700개</option>
         <option value="1200">확장 분석 1200개</option>
         <option value="1600">전체 근접 1600개</option>
       </select>
+
+      <div id="limitGuide" class="limit-guide">
+        <div class="limit-title">📘 기본 분석 700개</div>
+        <div class="limit-desc">속도와 정확도의 균형이 가장 좋은 기본 모드입니다. 매일 확인용으로 추천합니다.</div>
+      </div>
+
       <button onclick="runAnalyze()">🔥 오늘의 추천종목 분석 시작</button>
       <div class="install-tip">아이폰 홈화면에 추가하려면 Safari 하단 공유 버튼 → <b>홈 화면에 추가</b>를 누르세요.</div>
     </section>
@@ -875,6 +839,37 @@ HTML = """
       return `<b class="${cls}">${v}%</b>`;
     }
 
+    function updateLimitGuide() {
+      const value = document.getElementById("limit").value;
+      const guide = {
+        "400": {
+          title: "⚡ 빠른 분석 400개",
+          desc: "주요 종목 중심으로 빠르게 스캔합니다. 출근 전이나 잠깐 확인할 때 좋고, 속도가 가장 빠릅니다."
+        },
+        "700": {
+          title: "📘 기본 분석 700개",
+          desc: "속도와 정확도의 균형이 가장 좋은 기본 모드입니다. 매일 확인용으로 추천합니다."
+        },
+        "1200": {
+          title: "🚀 확장 분석 1200개",
+          desc: "중소형주와 테마주까지 넓게 확인합니다. 숨은 종목과 새로운 테마를 찾고 싶을 때 좋습니다."
+        },
+        "1600": {
+          title: "🌌 전체 근접 1600개",
+          desc: "코스피·코스닥 대부분을 최대한 넓게 분석합니다. 시간이 오래 걸릴 수 있지만 시장 전체 흐름 파악에 좋습니다."
+        }
+      };
+      const item = guide[value] || guide["700"];
+      document.getElementById("limitGuide").innerHTML =
+        `<div class="limit-title">${item.title}</div><div class="limit-desc">${item.desc}</div>`;
+    }
+
+    function toggleCard(id) {
+      const target = document.getElementById(id);
+      if (!target) return;
+      target.classList.toggle("active");
+    }
+
     function badgeLevel(item) {
       if (item.score >= 70) return '<span class="grade strong">강한 후보</span>';
       if (item.score >= 50) return '<span class="grade normal">관심 후보</span>';
@@ -892,60 +887,84 @@ HTML = """
 
     function makeCard(item, type) {
       const rankClass = type === "watch" ? "rank watch-rank" : "rank";
+      const detailId = "card-detail-" + item.code + "-" + item.rank;
 
       return `
-        <div class="card premium-card">
-          <div class="top-line">
-            <span class="${rankClass}">#${item.rank} ${item.category}</span>
-            <span class="market">${item.market}</span>
-            <span class="market">${item.code}</span>
-            ${badgeLevel(item)}
-          </div>
-
-          <div class="name">${item.name}</div>
-          <div class="theme">${item.theme}</div>
-
-          <div class="grid premium-grid">
-            <div class="metric"><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
-            <div class="metric"><span>AI 점수</span><b>${item.score}</b></div>
-            <div class="metric"><span>5일/당일 흐름</span>${fmtRate(item.return5)}</div>
-            <div class="metric"><span>20일 수익률</span>${fmtRate(item.return20)}</div>
-            <div class="metric"><span>거래량강도</span><b>${item.volumePower}</b></div>
-            <div class="metric"><span>추세강도</span><b>${item.trendPower}</b></div>
-          </div>
-
-          <div class="ai-box">
-            <div class="detail-title">🤖 AI 선별 요약</div>
-            <p>${item.opinion}</p>
-          </div>
-
-          <div class="detail-box">
-            <div class="detail-title">✅ 선별 이유</div>
-            <ul>${listHtml(item.reasons)}</ul>
-          </div>
-
-          <div class="detail-box strategy-box">
-            <div class="detail-title">📌 대응 전략</div>
-            <ul>${listHtml(item.strategy)}</ul>
-          </div>
-
-          <div class="detail-box risk-box">
-            <div class="detail-title">⚠️ 주의 포인트</div>
-            <ul>${listHtml(item.risk)}</ul>
-          </div>
-
-          <div class="trade-box">
-            <div class="detail-title">💰 AI 수치화 매매 기준</div>
-            <div class="trade-grid">
-              <div><span>추천매수가</span><b>${fmtMoney(item.tradePlan?.buy)}</b></div>
-              <div><span>1차 매도가</span><b>${fmtMoney(item.tradePlan?.sell1)}</b></div>
-              <div><span>2차 매도가</span><b>${fmtMoney(item.tradePlan?.sell2)}</b></div>
-              <div><span>손절 기준가</span><b>${fmtMoney(item.tradePlan?.stop)}</b></div>
+        <div class="card compact-card premium-card">
+          <div class="card-summary" onclick="toggleCard('${detailId}')">
+            <div class="top-line">
+              <span class="${rankClass}">#${item.rank} ${item.category}</span>
+              <span class="market">${item.market}</span>
+              <span class="market">${item.code}</span>
+              ${badgeLevel(item)}
             </div>
-            <p>${item.tradePlan?.message || ""}</p>
+
+            <div class="compact-row">
+              <div class="compact-left">
+                <div class="compact-name">${item.name}</div>
+                <div class="compact-sub">
+                  <span class="theme">${item.theme}</span>
+                </div>
+              </div>
+
+              <div class="compact-score">
+                <span>AI 점수</span>
+                <b>${item.score}</b>
+              </div>
+            </div>
+
+            <div class="quick-metrics">
+              <div><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
+              <div><span>5일/당일</span>${fmtRate(item.return5)}</div>
+              <div><span>거래량</span><b>${item.volumePower}</b></div>
+            </div>
+
+            <div class="expand-hint">눌러서 AI 상세분석 보기 ⌄</div>
           </div>
 
-          <button class="chart-btn" onclick='showChart(${safeItemForClick(item)})'>📈 차트 보기</button>
+          <div id="${detailId}" class="card-detail">
+            <div class="grid premium-grid">
+              <div class="metric"><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
+              <div class="metric"><span>AI 점수</span><b>${item.score}</b></div>
+              <div class="metric"><span>5일/당일 흐름</span>${fmtRate(item.return5)}</div>
+              <div class="metric"><span>20일 수익률</span>${fmtRate(item.return20)}</div>
+              <div class="metric"><span>거래량강도</span><b>${item.volumePower}</b></div>
+              <div class="metric"><span>추세강도</span><b>${item.trendPower}</b></div>
+            </div>
+
+            <div class="ai-box">
+              <div class="detail-title">🤖 AI 선별 요약</div>
+              <p>${item.opinion}</p>
+            </div>
+
+            <div class="detail-box">
+              <div class="detail-title">✅ 선별 이유</div>
+              <ul>${listHtml(item.reasons)}</ul>
+            </div>
+
+            <div class="detail-box strategy-box">
+              <div class="detail-title">📌 대응 전략</div>
+              <ul>${listHtml(item.strategy)}</ul>
+            </div>
+
+            <div class="detail-box risk-box">
+              <div class="detail-title">⚠️ 주의 포인트</div>
+              <ul>${listHtml(item.risk)}</ul>
+            </div>
+
+            <div class="trade-box">
+              <div class="detail-title">💰 AI 수치화 매매 기준</div>
+              <div class="trade-grid">
+                <div><span>추천매수가</span><b>${fmtMoney(item.tradePlan?.buy)}</b></div>
+                <div><span>1차 매도가</span><b>${fmtMoney(item.tradePlan?.sell1)}</b></div>
+                <div><span>2차 매도가</span><b>${fmtMoney(item.tradePlan?.sell2)}</b></div>
+                <div><span>손절 기준가</span><b>${fmtMoney(item.tradePlan?.stop)}</b></div>
+              </div>
+              <p>${item.tradePlan?.message || ""}</p>
+            </div>
+
+            <button class="chart-btn" onclick='showChart(${safeItemForClick(item)})'>📈 차트 보기</button>
+          </div>
         </div>
       `;
     }
@@ -1061,6 +1080,7 @@ HTML = """
 
 
     async function runAnalyze() {
+      updateLimitGuide();
       const limit = document.getElementById("limit").value;
       const loading = document.getElementById("loading");
       loading.style.display = "block";
@@ -1084,16 +1104,6 @@ HTML = """
         loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p>";
       }
     }
-
-    window.addEventListener("load", () => {
-      setTimeout(() => {
-        const loading = document.getElementById("sunriseLoading");
-        if (loading) {
-          loading.classList.add("hide");
-        }
-      }, 1500);
-    });
-
   </script>
 </body>
 </html>
