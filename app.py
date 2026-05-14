@@ -2703,14 +2703,26 @@ HTML = """
       const data = await res.json();
 
       latestData = data;
-      document.getElementById("analyzedCount").innerText = data.analyzedCount ?? 0;
-      document.getElementById("recommendCount").innerText = (data.recommend || []).length;
-      document.getElementById("watchCount").innerText = (data.watch || []).length;
 
-      if (typeof makeCard === "function") {
-        document.getElementById("recommendList").innerHTML = (data.recommend || []).map(x => makeCard(x, "recommend")).join("");
-        document.getElementById("watchList").innerHTML = (data.watch || []).map(x => makeCard(x, "watch")).join("");
+      const analyzedCountEl = document.getElementById("analyzedCount");
+      const recommendCountEl = document.getElementById("recommendCount");
+      const watchCountEl = document.getElementById("watchCount");
+
+      if (analyzedCountEl) analyzedCountEl.innerText = data.analyzedCount ?? 0;
+      if (recommendCountEl) recommendCountEl.innerText = (data.recommend || []).length;
+      if (watchCountEl) watchCountEl.innerText = (data.watch || []).length;
+
+      const recommendListEl = document.getElementById("recommendList");
+      const watchListEl = document.getElementById("watchList");
+
+      if (typeof makeCard === "function" && recommendListEl) {
+        recommendListEl.innerHTML = (data.recommend || []).map(x => makeCard(x, "recommend")).join("");
       }
+
+      if (typeof makeCard === "function" && watchListEl) {
+        watchListEl.innerHTML = (data.watch || []).map(x => makeCard(x, "watch")).join("");
+      }
+
       if (typeof renderThemeSummary === "function") renderThemeSummary(data.summary || []);
 
       if (loading) loading.style.display = "none";
