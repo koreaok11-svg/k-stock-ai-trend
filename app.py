@@ -911,6 +911,161 @@ HTML = """
       margin:12px 0;
     }
 
+
+    .trade-modal {
+      display:none;
+      position:fixed;
+      inset:0;
+      z-index:100000;
+      background:rgba(36,48,37,.45);
+      backdrop-filter:blur(9px);
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+    }
+    .trade-modal-card {
+      width:min(520px,100%);
+      max-height:88vh;
+      overflow:auto;
+      background:linear-gradient(180deg,#fffdf4,#eef8e8);
+      border:1px solid rgba(255,255,255,.85);
+      border-radius:28px;
+      box-shadow:0 24px 60px rgba(0,0,0,.25);
+      padding:18px;
+    }
+    .trade-modal-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      margin-bottom:12px;
+    }
+    .trade-modal-label {
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:1.2px;
+      color:#6b7f5e;
+    }
+    .trade-modal-head h3 {
+      margin:4px 0 0;
+      font-size:25px;
+      line-height:1.2;
+      color:#243025;
+    }
+    .trade-modal-close {
+      width:auto;
+      margin:0;
+      padding:10px 14px;
+      border-radius:999px;
+      font-size:13px;
+      background:#526b4f;
+      color:white;
+      box-shadow:none;
+    }
+    .trade-summary {
+      background:rgba(255,255,255,.58);
+      border:1px solid #e6e8d4;
+      border-radius:20px;
+      padding:14px;
+      margin:12px 0;
+    }
+    .trade-summary-title {
+      font-weight:900;
+      font-size:22px;
+      margin-bottom:5px;
+      color:#243025;
+    }
+    .trade-summary-sub {
+      color:#6b7280;
+      font-size:13px;
+      line-height:1.45;
+    }
+    .trade-info-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:9px;
+      margin-top:12px;
+    }
+    .trade-info-grid div {
+      background:rgba(250,248,235,.9);
+      border-radius:15px;
+      padding:11px;
+    }
+    .trade-info-grid span {
+      display:block;
+      font-size:12px;
+      color:#6b7280;
+    }
+    .trade-info-grid b {
+      display:block;
+      margin-top:4px;
+      font-size:18px;
+      color:#1f2937;
+    }
+    .trade-input-label {
+      margin:14px 0 7px;
+      font-weight:900;
+      color:#243025;
+    }
+    .trade-input {
+      width:100%;
+      border:1px solid #d7dbc7;
+      background:rgba(255,255,255,.82);
+      border-radius:16px;
+      padding:14px;
+      font-size:20px;
+      font-weight:800;
+      color:#243025;
+      outline:none;
+    }
+    .trade-input:focus {
+      border-color:#7fa36f;
+      box-shadow:0 0 0 4px rgba(127,163,111,.18);
+    }
+    .quick-buttons {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+      margin:10px 0;
+    }
+    .quick-buttons button {
+      margin:0;
+      padding:11px 6px;
+      font-size:13px;
+      border-radius:16px;
+      color:#2f2a1e;
+      background:linear-gradient(135deg,#fff3c7,#e6f4dc);
+      box-shadow:0 8px 18px rgba(98,126,86,.12);
+      border:1px solid rgba(255,255,255,.75);
+    }
+    .trade-preview {
+      margin-top:12px;
+      background:#48634d;
+      color:#fffdf4;
+      border-radius:18px;
+      padding:14px;
+      line-height:1.55;
+      font-size:14px;
+    }
+    .trade-preview b {
+      font-size:18px;
+    }
+    .trade-submit {
+      margin-top:12px;
+      background:linear-gradient(135deg,#6fa87a,#f2c879);
+      color:#243025;
+    }
+    .trade-submit.sell {
+      background:linear-gradient(135deg,#e98b58,#f2c879);
+    }
+    .trade-helper {
+      margin-top:10px;
+      font-size:12px;
+      color:#6b7280;
+      line-height:1.45;
+      text-align:center;
+    }
+
     @media (max-width:480px) {
       .portfolio-grid { grid-template-columns:1fr; }
       .portfolio-actions { grid-template-columns:1fr; }
@@ -1021,6 +1176,21 @@ HTML = """
 
     <div class="footer">K-Stock AI Trend WebApp<br>데이터 제공 상태에 따라 일부 종목은 누락될 수 있습니다.</div>
   </main>
+
+
+  <div id="tradeModal" class="trade-modal" onclick="closeTradeModal(event)">
+    <div class="trade-modal-card" onclick="event.stopPropagation()">
+      <div class="trade-modal-head">
+        <div>
+          <div class="trade-modal-label" id="tradeModalLabel">PAPER TRADE</div>
+          <h3 id="tradeModalTitle">모의투자</h3>
+        </div>
+        <button class="trade-modal-close" onclick="hideTradeModal()">닫기</button>
+      </div>
+
+      <div id="tradeModalBody"></div>
+    </div>
+  </div>
 
   <div id="chartModal" class="chart-modal" onclick="closeChartModal(event)">
     <div class="chart-card" onclick="event.stopPropagation()">
@@ -1313,6 +1483,8 @@ HTML = """
 
 
     const PF_KEY = "sungil_ai_stock_wind_portfolio_v1";
+    let activeTradeItem = null;
+    let activeTradeMode = null;
 
     function defaultPortfolio() {
       return {
@@ -1345,48 +1517,111 @@ HTML = """
       return all.find(x => x.code === code) || null;
     }
 
-    function promptNumber(message, defaultValue) {
-      const raw = prompt(message, defaultValue || "");
-      if (raw === null) return null;
-      const num = Number(String(raw).replaceAll(",", "").trim());
-      if (!Number.isFinite(num) || num <= 0) {
-        alert("올바른 숫자를 입력해주세요.");
-        return null;
+    function parseMoney(v) {
+      return Number(String(v || "").replaceAll(",", "").replaceAll("원", "").trim()) || 0;
+    }
+
+    function setInputValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.value = Math.max(0, Math.floor(value));
+        el.dispatchEvent(new Event("input"));
       }
-      return num;
     }
 
-    function depositCash() {
-      const pf = loadPortfolio();
-      const amount = promptNumber("가상 입금 금액을 입력하세요.", "1000000");
-      if (!amount) return;
-      pf.cash += amount;
-      pf.initialCash += amount;
-      pf.history.unshift({
-        type: "입금",
-        name: "가상 현금",
-        code: "CASH",
-        qty: 0,
-        price: amount,
-        amount: amount,
-        time: new Date().toLocaleString()
-      });
-      savePortfolio(pf);
-      renderPortfolio();
+    function showTradeModal() {
+      document.getElementById("tradeModal").style.display = "flex";
     }
 
-    function withdrawCash() {
+    function hideTradeModal() {
+      document.getElementById("tradeModal").style.display = "none";
+      activeTradeItem = null;
+      activeTradeMode = null;
+    }
+
+    function closeTradeModal(event) {
+      if (event.target.id === "tradeModal") hideTradeModal();
+    }
+
+    function openCashModal(mode) {
+      activeTradeMode = mode;
       const pf = loadPortfolio();
-      const amount = promptNumber("가상 출금 금액을 입력하세요.", "1000000");
-      if (!amount) return;
-      if (amount > pf.cash) {
+      const isDeposit = mode === "deposit";
+      document.getElementById("tradeModalLabel").innerText = isDeposit ? "VIRTUAL DEPOSIT" : "VIRTUAL WITHDRAW";
+      document.getElementById("tradeModalTitle").innerText = isDeposit ? "가상 입금" : "가상 출금";
+
+      document.getElementById("tradeModalBody").innerHTML = `
+        <div class="trade-summary">
+          <div class="trade-summary-title">${isDeposit ? "가상 현금을 충전합니다" : "가상 현금을 출금합니다"}</div>
+          <div class="trade-summary-sub">
+            실제 돈이 이동하지 않는 모의투자 전용 기능입니다.
+          </div>
+          <div class="trade-info-grid">
+            <div><span>현재 가상 현금</span><b>${fmtMoney(pf.cash)}</b></div>
+            <div><span>현재 총 기준금</span><b>${fmtMoney(pf.initialCash)}</b></div>
+          </div>
+        </div>
+
+        <div class="trade-input-label">${isDeposit ? "입금 금액" : "출금 금액"}</div>
+        <input id="cashAmountInput" class="trade-input" inputmode="numeric" value="1000000" oninput="updateCashPreview('${mode}')">
+
+        <div class="quick-buttons">
+          <button onclick="setInputValue('cashAmountInput', 100000)">10만원</button>
+          <button onclick="setInputValue('cashAmountInput', 1000000)">100만원</button>
+          <button onclick="setInputValue('cashAmountInput', 5000000)">500만원</button>
+          <button onclick="setInputValue('cashAmountInput', 10000000)">1000만원</button>
+          <button onclick="setInputValue('cashAmountInput', ${Math.max(0, pf.cash)})">최대</button>
+          <button onclick="setInputValue('cashAmountInput', 0)">지우기</button>
+        </div>
+
+        <div id="cashPreview" class="trade-preview"></div>
+
+        <button class="trade-submit" onclick="confirmCash('${mode}')">${isDeposit ? "➕ 가상 입금 실행" : "➖ 가상 출금 실행"}</button>
+        <div class="trade-helper">입금/출금은 모의투자 기준금과 현금 관리용입니다.</div>
+      `;
+
+      showTradeModal();
+      updateCashPreview(mode);
+    }
+
+    function updateCashPreview(mode) {
+      const pf = loadPortfolio();
+      const amount = parseMoney(document.getElementById("cashAmountInput")?.value);
+      const afterCash = mode === "deposit" ? pf.cash + amount : pf.cash - amount;
+      const afterSeed = mode === "deposit" ? pf.initialCash + amount : pf.initialCash - amount;
+      const warn = mode === "withdraw" && amount > pf.cash ? "<br>⚠️ 보유 현금보다 큰 금액은 출금할 수 없습니다." : "";
+
+      document.getElementById("cashPreview").innerHTML = `
+        선택 금액: <b>${fmtMoney(amount)}</b><br>
+        처리 후 가상 현금: <b>${fmtMoney(afterCash)}</b><br>
+        처리 후 기준금: <b>${fmtMoney(afterSeed)}</b>
+        ${warn}
+      `;
+    }
+
+    function confirmCash(mode) {
+      const pf = loadPortfolio();
+      const amount = parseMoney(document.getElementById("cashAmountInput")?.value);
+      if (!amount || amount <= 0) {
+        alert("금액을 입력해주세요.");
+        return;
+      }
+
+      if (mode === "withdraw" && amount > pf.cash) {
         alert("보유 가상 현금보다 많이 출금할 수 없습니다.");
         return;
       }
-      pf.cash -= amount;
-      pf.initialCash -= amount;
+
+      if (mode === "deposit") {
+        pf.cash += amount;
+        pf.initialCash += amount;
+      } else {
+        pf.cash -= amount;
+        pf.initialCash -= amount;
+      }
+
       pf.history.unshift({
-        type: "출금",
+        type: mode === "deposit" ? "입금" : "출금",
         name: "가상 현금",
         code: "CASH",
         qty: 0,
@@ -1394,8 +1629,18 @@ HTML = """
         amount: amount,
         time: new Date().toLocaleString()
       });
+
       savePortfolio(pf);
+      hideTradeModal();
       renderPortfolio();
+    }
+
+    function depositCash() {
+      openCashModal("deposit");
+    }
+
+    function withdrawCash() {
+      openCashModal("withdraw");
     }
 
     function resetPortfolio() {
@@ -1405,17 +1650,122 @@ HTML = """
     }
 
     function paperBuy(item) {
+      activeTradeItem = item;
+      activeTradeMode = "buy";
       const pf = loadPortfolio();
       const price = Number(item.price || 0);
+
       if (price <= 0) {
         alert("현재가가 없어 매수할 수 없습니다.");
         return;
       }
 
-      const qty = promptNumber(`${item.name} 모의 매수 수량을 입력하세요.\\n현재가: ${fmtPrice(price)}\\n보유 현금: ${fmtMoney(pf.cash)}`, "1");
-      if (!qty) return;
+      document.getElementById("tradeModalLabel").innerText = "PAPER BUY";
+      document.getElementById("tradeModalTitle").innerText = `${item.name} 모의 매수`;
 
+      document.getElementById("tradeModalBody").innerHTML = `
+        <div class="trade-summary">
+          <div class="trade-summary-title">${item.name}</div>
+          <div class="trade-summary-sub">${item.market} · ${item.code} · ${item.theme}</div>
+          <div class="trade-info-grid">
+            <div><span>현재가</span><b>${fmtMoney(price)}</b></div>
+            <div><span>보유 현금</span><b>${fmtMoney(pf.cash)}</b></div>
+            <div><span>추천매수가</span><b>${fmtMoney(item.tradePlan?.buy)}</b></div>
+            <div><span>손절 기준가</span><b>${fmtMoney(item.tradePlan?.stop)}</b></div>
+          </div>
+        </div>
+
+        <div class="trade-input-label">매수 금액</div>
+        <input id="buyAmountInput" class="trade-input" inputmode="numeric" value="${Math.min(1000000, pf.cash)}" oninput="syncBuyQtyFromAmount()">
+
+        <div class="quick-buttons">
+          <button onclick="setBuyAmount(10000)">1만원</button>
+          <button onclick="setBuyAmount(100000)">10만원</button>
+          <button onclick="setBuyAmount(1000000)">100만원</button>
+          <button onclick="setBuyAmount(5000000)">500만원</button>
+          <button onclick="setBuyAmount(${pf.cash})">최대</button>
+          <button onclick="setBuyQty(1)">최소 1주</button>
+        </div>
+
+        <div class="trade-input-label">매수 수량</div>
+        <input id="buyQtyInput" class="trade-input" inputmode="numeric" value="1" oninput="syncBuyAmountFromQty()">
+
+        <div id="buyPreview" class="trade-preview"></div>
+
+        <button class="trade-submit" onclick="confirmPaperBuy()">🟢 모의 매수 실행</button>
+        <div class="trade-helper">수수료와 세금은 제외한 단순 모의투자 계산입니다.</div>
+      `;
+
+      showTradeModal();
+      syncBuyQtyFromAmount();
+    }
+
+    function setBuyAmount(amount) {
+      const pf = loadPortfolio();
+      const safeAmount = Math.min(Number(amount || 0), pf.cash);
+      setInputValue("buyAmountInput", safeAmount);
+      syncBuyQtyFromAmount();
+    }
+
+    function setBuyQty(qty) {
+      setInputValue("buyQtyInput", qty);
+      syncBuyAmountFromQty();
+    }
+
+    function syncBuyQtyFromAmount() {
+      const item = activeTradeItem;
+      if (!item) return;
+      const price = Number(item.price || 0);
+      const amount = parseMoney(document.getElementById("buyAmountInput")?.value);
+      const qty = Math.max(0, Math.floor(amount / price));
+      const qtyInput = document.getElementById("buyQtyInput");
+      if (qtyInput) qtyInput.value = qty;
+      updateBuyPreview();
+    }
+
+    function syncBuyAmountFromQty() {
+      const item = activeTradeItem;
+      if (!item) return;
+      const price = Number(item.price || 0);
+      const qty = parseMoney(document.getElementById("buyQtyInput")?.value);
+      const amountInput = document.getElementById("buyAmountInput");
+      if (amountInput) amountInput.value = Math.floor(price * qty);
+      updateBuyPreview();
+    }
+
+    function updateBuyPreview() {
+      const item = activeTradeItem;
+      const pf = loadPortfolio();
+      if (!item) return;
+      const price = Number(item.price || 0);
+      const qty = parseMoney(document.getElementById("buyQtyInput")?.value);
       const amount = Math.round(price * qty);
+      const afterCash = pf.cash - amount;
+      const warn = amount > pf.cash ? "<br>⚠️ 보유 현금이 부족합니다." : "";
+      const noQty = qty < 1 ? "<br>⚠️ 최소 1주 이상 입력해주세요." : "";
+
+      document.getElementById("buyPreview").innerHTML = `
+        예상 매수 수량: <b>${qty}주</b><br>
+        예상 매수 금액: <b>${fmtMoney(amount)}</b><br>
+        매수 후 현금: <b>${fmtMoney(afterCash)}</b>
+        ${warn}${noQty}
+      `;
+    }
+
+    function confirmPaperBuy() {
+      const item = activeTradeItem;
+      const pf = loadPortfolio();
+      if (!item) return;
+
+      const price = Number(item.price || 0);
+      const qty = parseMoney(document.getElementById("buyQtyInput")?.value);
+      const amount = Math.round(price * qty);
+
+      if (qty < 1) {
+        alert("최소 1주 이상 매수해야 합니다.");
+        return;
+      }
+
       if (amount > pf.cash) {
         alert("가상 현금이 부족합니다.");
         return;
@@ -1452,11 +1802,14 @@ HTML = """
       });
 
       savePortfolio(pf);
-      alert(`${item.name} ${qty}주 모의 매수 완료`);
+      hideTradeModal();
       renderPortfolio();
+      alert(`${item.name} ${qty}주 모의 매수 완료`);
     }
 
     function paperSell(item) {
+      activeTradeItem = item;
+      activeTradeMode = "sell";
       const pf = loadPortfolio();
       const h = pf.holdings[item.code];
       const price = Number(item.price || 0);
@@ -1466,8 +1819,95 @@ HTML = """
         return;
       }
 
-      const qty = promptNumber(`${item.name} 모의 매도 수량을 입력하세요.\\n보유수량: ${h.qty}주\\n현재가: ${fmtPrice(price)}`, String(h.qty));
-      if (!qty) return;
+      document.getElementById("tradeModalLabel").innerText = "PAPER SELL";
+      document.getElementById("tradeModalTitle").innerText = `${item.name} 모의 매도`;
+
+      document.getElementById("tradeModalBody").innerHTML = `
+        <div class="trade-summary">
+          <div class="trade-summary-title">${item.name}</div>
+          <div class="trade-summary-sub">${item.market} · ${item.code} · ${item.theme}</div>
+          <div class="trade-info-grid">
+            <div><span>현재가</span><b>${fmtMoney(price)}</b></div>
+            <div><span>보유 수량</span><b>${h.qty}주</b></div>
+            <div><span>평균단가</span><b>${fmtMoney(h.avgPrice)}</b></div>
+            <div><span>예상수익률</span><b>${(((price - h.avgPrice) / h.avgPrice) * 100).toFixed(2)}%</b></div>
+          </div>
+        </div>
+
+        <div class="trade-input-label">매도 수량</div>
+        <input id="sellQtyInput" class="trade-input" inputmode="numeric" value="${h.qty}" oninput="updateSellPreview()">
+
+        <div class="quick-buttons">
+          <button onclick="setSellPercent(25)">25%</button>
+          <button onclick="setSellPercent(50)">50%</button>
+          <button onclick="setSellPercent(75)">75%</button>
+          <button onclick="setSellPercent(100)">전량</button>
+          <button onclick="setInputValue('sellQtyInput', 1); updateSellPreview();">최소 1주</button>
+          <button onclick="setInputValue('sellQtyInput', 0); updateSellPreview();">지우기</button>
+        </div>
+
+        <div id="sellPreview" class="trade-preview"></div>
+
+        <button class="trade-submit sell" onclick="confirmPaperSell()">🔴 모의 매도 실행</button>
+        <div class="trade-helper">매도 후 실현손익이 거래내역에 저장됩니다.</div>
+      `;
+
+      showTradeModal();
+      updateSellPreview();
+    }
+
+    function setSellPercent(percent) {
+      const pf = loadPortfolio();
+      const h = pf.holdings[activeTradeItem.code];
+      if (!h) return;
+      const qty = Math.max(1, Math.floor(h.qty * percent / 100));
+      setInputValue("sellQtyInput", percent === 100 ? h.qty : qty);
+      updateSellPreview();
+    }
+
+    function updateSellPreview() {
+      const item = activeTradeItem;
+      const pf = loadPortfolio();
+      if (!item) return;
+      const h = pf.holdings[item.code];
+      if (!h) return;
+
+      const price = Number(item.price || h.lastPrice || 0);
+      const qty = parseMoney(document.getElementById("sellQtyInput")?.value);
+      const amount = Math.round(price * qty);
+      const cost = Math.round(h.avgPrice * qty);
+      const profit = amount - cost;
+      const afterQty = h.qty - qty;
+      const warn = qty > h.qty ? "<br>⚠️ 보유 수량보다 많이 매도할 수 없습니다." : "";
+      const noQty = qty < 1 ? "<br>⚠️ 최소 1주 이상 입력해주세요." : "";
+
+      document.getElementById("sellPreview").innerHTML = `
+        예상 매도 수량: <b>${qty}주</b><br>
+        예상 매도 금액: <b>${fmtMoney(amount)}</b><br>
+        예상 실현손익: <b class="${profit >= 0 ? 'red' : 'blue'}">${fmtMoney(profit)}</b><br>
+        매도 후 잔여수량: <b>${afterQty}주</b>
+        ${warn}${noQty}
+      `;
+    }
+
+    function confirmPaperSell() {
+      const item = activeTradeItem;
+      const pf = loadPortfolio();
+      if (!item) return;
+
+      const h = pf.holdings[item.code];
+      const price = Number(item.price || 0);
+      const qty = parseMoney(document.getElementById("sellQtyInput")?.value);
+
+      if (!h || h.qty <= 0) {
+        alert("보유 수량이 없습니다.");
+        return;
+      }
+
+      if (qty < 1) {
+        alert("최소 1주 이상 매도해야 합니다.");
+        return;
+      }
 
       if (qty > h.qty) {
         alert("보유 수량보다 많이 매도할 수 없습니다.");
@@ -1502,8 +1942,9 @@ HTML = """
       });
 
       savePortfolio(pf);
-      alert(`${item.name} ${qty}주 모의 매도 완료\\n손익: ${fmtMoney(profit)}`);
+      hideTradeModal();
       renderPortfolio();
+      alert(`${item.name} ${qty}주 모의 매도 완료\\n손익: ${fmtMoney(profit)}`);
     }
 
     function calcPortfolio() {
@@ -1605,7 +2046,6 @@ HTML = """
           </div>
         `).join("");
     }
-
 
     async function runAnalyze() {
       updateLimitGuide();
