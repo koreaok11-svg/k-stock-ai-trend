@@ -3149,6 +3149,33 @@ HTML = """
     }
     window.addEventListener('load', () => { renderPortfolio(); renderAiSim(); });
   </script>
+
+  <script>
+    // 🌅 성일의 AI 주식바람 로딩화면: 최대 5초 후 강제 종료
+    (function () {
+      function hideSunriseLoading() {
+        const loading = document.getElementById("sunriseLoading");
+        if (!loading) return;
+
+        loading.classList.add("hide");
+
+        setTimeout(() => {
+          if (loading && loading.parentNode) {
+            loading.parentNode.removeChild(loading);
+          }
+        }, 900);
+      }
+
+      // 서버/데이터 로딩이 오래 걸려도 5초 후에는 반드시 앱 화면으로 넘어갑니다.
+      setTimeout(hideSunriseLoading, 5000);
+
+      // 앱이 빨리 준비되면 최소 2.5초 보여준 뒤 자연스럽게 종료
+      window.addEventListener("load", () => {
+        setTimeout(hideSunriseLoading, 2500);
+      });
+    })();
+  </script>
+
 </body>
 </html>
 """
