@@ -1118,6 +1118,88 @@ HTML = """
       margin-top:8px;
     }
 
+
+    .strategy-card {
+      background:rgba(255,255,248,.9);
+      border:1px solid rgba(255,255,255,.9);
+      border-radius:26px;
+      padding:16px;
+      margin:12px 0;
+      box-shadow:0 14px 30px rgba(98,126,86,.16);
+    }
+    .strategy-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .strategy-title {
+      font-size:22px;
+      font-weight:900;
+      color:#243025;
+    }
+    .strategy-desc {
+      margin-top:5px;
+      font-size:13px;
+      color:#6b7280;
+      line-height:1.45;
+    }
+    .strategy-return {
+      padding:9px 12px;
+      border-radius:999px;
+      font-weight:900;
+      background:#e6f4dc;
+      color:#3f6b35;
+      white-space:nowrap;
+    }
+    .strategy-return.loss {
+      background:#fee2e2;
+      color:#991b1b;
+    }
+    .strategy-grid {
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:8px;
+      margin-top:12px;
+    }
+    .strategy-grid div {
+      background:rgba(250,248,235,.9);
+      border-radius:15px;
+      padding:10px;
+      text-align:center;
+    }
+    .strategy-grid span {
+      display:block;
+      font-size:11px;
+      color:#6b7280;
+      margin-bottom:4px;
+    }
+    .strategy-grid b {
+      font-size:15px;
+      color:#243025;
+    }
+    .strategy-stock-list {
+      margin-top:12px;
+      display:grid;
+      gap:8px;
+    }
+    .strategy-stock {
+      background:linear-gradient(135deg,#eef8e8,#fff8df);
+      border:1px solid #dfe8c9;
+      border-radius:16px;
+      padding:11px;
+      line-height:1.45;
+      font-size:14px;
+      color:#374151;
+    }
+    .strategy-stock b {
+      color:#243025;
+      font-size:16px;
+    }
+    .ai-log-card.strategy-log {
+      border-left:6px solid #7fa36f;
+    }
+
     .ai-sim-hero {
       background:
         radial-gradient(circle at 20% 15%, rgba(255,247,168,.55), transparent 26%),
@@ -1244,6 +1326,7 @@ HTML = """
       .ai-sim-actions { grid-template-columns:1fr 1fr; }
       .ai-money-buttons { grid-template-columns:1fr 1fr; }
       .ai-pick-grid { grid-template-columns:1fr; }
+      .strategy-grid { grid-template-columns:1fr 1fr; }
       .tabs { grid-template-columns:repeat(5,1fr); gap:5px; }
       .tab { font-size:11px; padding:9px 3px; }
       .compact-name { font-size:26px; }
@@ -1319,23 +1402,23 @@ HTML = """
     <section id="theme" class="section"><h2>📊 테마별 흐름</h2><div id="themeList" class="theme-box"></div></section>
 
     <section id="aiSim" class="section">
-      <h2>🤖 AI 자동투자 시뮬레이션</h2>
+      <h2>🤖 AI 전략별 자동운용 시뮬레이션</h2>
 
       <div class="ai-sim-hero">
-        <div class="portfolio-mini">AI AUTONOMOUS PAPER TRADING</div>
-        <h3>AI가 5개 종목으로 직접 투자합니다 🍃</h3>
-        <p>AI가 추천 종목 5개를 고르고, 매일 가상 매수·매도 판단을 내려 수익과 손실을 시뮬레이션합니다.</p>
+        <div class="portfolio-mini">5 AI STRATEGY AUTO TRADING</div>
+        <h3>5명의 AI가 각자 다른 전략으로 투자합니다 🍃</h3>
+        <p>공격형·안정형·테마추종·단타형·가치투자형 AI가 각각 5개 종목을 운용하고 수익률을 비교합니다.</p>
 
         <div class="portfolio-grid">
-          <div><span>AI 총 자산</span><b id="aiTotal">-</b></div>
-          <div><span>AI 현금</span><b id="aiCash">-</b></div>
-          <div><span>AI 수익률</span><b id="aiReturn">-</b></div>
+          <div><span>최고 전략</span><b id="bestStrategy">-</b></div>
+          <div><span>운용 경과</span><b id="multiAiDay">-</b></div>
+          <div><span>자동운용</span><b id="multiAiStatus">-</b></div>
         </div>
       </div>
 
       <div class="ai-start-box">
-        <div class="detail-title">💰 AI 초기 투자금 설정</div>
-        <p>AI가 운용할 가상 투자금을 선택한 뒤 시작하세요. 시작 후 AI가 5개 종목을 선정하고 운용을 시작합니다.</p>
+        <div class="detail-title">💰 전략별 초기 투자금 설정</div>
+        <p>각 AI 전략마다 동일한 가상 투자금으로 시작합니다. 시작 후 앱 접속 시 날짜가 바뀌면 자동으로 1일 운용됩니다.</p>
 
         <div class="ai-money-buttons">
           <button onclick="setAiStartAmount(1000000)">100만원</button>
@@ -1346,37 +1429,40 @@ HTML = """
 
         <input id="aiStartAmount" class="trade-input ai-start-input" inputmode="numeric" value="10000000">
 
-        <button class="ai-start-btn" onclick="aiStartSimulation()">🚀 AI 자동운용 시작</button>
+        <button class="ai-start-btn" onclick="multiAiStart()">🚀 5가지 AI 자동운용 시작</button>
         <div class="trade-helper">기존 AI 시뮬레이션이 있으면 새 투자금 기준으로 초기화 후 다시 시작됩니다.</div>
       </div>
 
       <div class="ai-sim-actions">
-        <button onclick="aiPickFive()">🎯 5종목 갱신</button>
-        <button onclick="aiRunPeriod(1)">🌞 1일</button>
-        <button onclick="aiRunPeriod(7)">📆 1주일</button>
-        <button onclick="aiRunPeriod(30)">🌙 1개월</button>
-        <button onclick="aiRunPeriod(60)">🍃 2개월</button>
-        <button onclick="aiRunPeriod(365)">🌳 1년</button>
-        <button onclick="toggleAiAutoRun()" id="aiAutoBtn">⏸ 자동운용</button>
-        <button onclick="aiResetSim()">🔄 초기화</button>
+        <button onclick="multiAiRunPeriod(1)">🌞 1일</button>
+        <button onclick="multiAiRunPeriod(7)">📆 1주일</button>
+        <button onclick="multiAiRunPeriod(30)">🌙 1개월</button>
+        <button onclick="multiAiRunPeriod(60)">🍃 2개월</button>
+        <button onclick="multiAiRunPeriod(365)">🌳 1년</button>
+        <button onclick="multiAiToggleAuto()" id="aiAutoBtn">⏸ 자동운용</button>
+        <button onclick="multiAiRebalance()">🎯 전략별 5종목 갱신</button>
+        <button onclick="multiAiReset()">🔄 초기화</button>
       </div>
 
       <div class="ai-portfolio-note" id="aiSimNote">
-        🤖 분석을 먼저 실행한 뒤 AI 5종목 선정을 눌러주세요.
+        🤖 초기 투자금을 선택하고 5가지 AI 자동운용 시작을 눌러주세요.
       </div>
 
       <div class="ai-chart-card">
-        <div class="detail-title">📈 AI 자산 추이</div>
+        <div class="detail-title">📈 전략별 자산 추이</div>
         <canvas id="aiEquityChart"></canvas>
       </div>
 
-      <h2>🎯 AI 선택 5종목</h2>
-      <div id="aiPickList"></div>
+      <h2>🏆 전략별 수익률 비교</h2>
+      <div id="strategyRankList"></div>
 
-      <h2>💼 AI 보유 포트폴리오</h2>
-      <div id="aiHoldingList"></div>
+      <h2>🎯 전략별 선택 5종목</h2>
+      <div id="strategyPickList"></div>
 
-      <h2>🧾 AI 매매 판단 기록</h2>
+      <h2>💼 전략별 보유 포트폴리오</h2>
+      <div id="strategyHoldingList"></div>
+
+      <h2>🧾 AI 실시간 운용 로그</h2>
       <div id="aiTradeLog"></div>
     </section>
 
@@ -2287,40 +2373,70 @@ HTML = """
 
 
 
-    const AI_SIM_KEY = "sungil_ai_auto_invest_sim_v2";
+
+    const AI_SIM_KEY = "sungil_multi_ai_strategy_sim_v1";
     let aiEquityChart = null;
+
+    const AI_STRATEGIES = {
+      aggressive: {
+        name: "공격형 AI",
+        icon: "🔥",
+        desc: "AI점수·거래량·단기 상승률이 강한 종목을 과감하게 편입합니다.",
+        cashReserve: 0.05,
+        maxWeight: 0.30,
+        buyScore: 62,
+        sellProfit: 18,
+        stopLoss: -8,
+        style: "momentum"
+      },
+      stable: {
+        name: "안정형 AI",
+        icon: "🛡️",
+        desc: "과열 종목을 피하고 점수와 안정성이 균형 잡힌 종목을 분산 운용합니다.",
+        cashReserve: 0.25,
+        maxWeight: 0.18,
+        buyScore: 58,
+        sellProfit: 10,
+        stopLoss: -5,
+        style: "stable"
+      },
+      theme: {
+        name: "테마추종 AI",
+        icon: "🌊",
+        desc: "강한 테마에 속한 종목을 우선 편입하고 테마 순환을 추적합니다.",
+        cashReserve: 0.10,
+        maxWeight: 0.24,
+        buyScore: 55,
+        sellProfit: 14,
+        stopLoss: -7,
+        style: "theme"
+      },
+      scalping: {
+        name: "단타형 AI",
+        icon: "⚡",
+        desc: "거래량 급증과 단기 탄력이 큰 종목을 빠르게 사고 빠르게 정리합니다.",
+        cashReserve: 0.15,
+        maxWeight: 0.20,
+        buyScore: 50,
+        sellProfit: 6,
+        stopLoss: -3,
+        style: "scalping"
+      },
+      value: {
+        name: "가치투자형 AI",
+        icon: "🌳",
+        desc: "과도한 급등 종목은 피하고 상대적으로 안정적인 저과열 종목을 오래 보유합니다.",
+        cashReserve: 0.20,
+        maxWeight: 0.22,
+        buyScore: 54,
+        sellProfit: 20,
+        stopLoss: -10,
+        style: "value"
+      }
+    };
 
     function todayKey() {
       return new Date().toISOString().slice(0, 10);
-    }
-
-    function defaultAiSim(amount=10000000) {
-      amount = Number(amount || 10000000);
-      return {
-        cash: amount,
-        initialCash: amount,
-        day: 0,
-        picks: [],
-        holdings: {},
-        history: [],
-        equity: [{day: 0, total: amount, cash: amount, returnRate: 0}],
-        autoRun: true,
-        started: false,
-        lastAutoDate: null
-      };
-    }
-
-    function loadAiSim() {
-      try {
-        const saved = localStorage.getItem(AI_SIM_KEY);
-        return saved ? JSON.parse(saved) : defaultAiSim();
-      } catch(e) {
-        return defaultAiSim();
-      }
-    }
-
-    function saveAiSim(sim) {
-      localStorage.setItem(AI_SIM_KEY, JSON.stringify(sim));
     }
 
     function setAiStartAmount(amount) {
@@ -2334,142 +2450,142 @@ HTML = """
       return amount > 0 ? amount : 10000000;
     }
 
-    function aiStartSimulation() {
-      if (!latestData || !latestData.all || latestData.all.length === 0) {
-        alert("먼저 오늘의 추천종목 분석을 실행해주세요.");
-        return;
-      }
-
-      const amount = getAiStartAmount();
-
-      if (!confirm(`AI 자동운용을 ${fmtMoney(amount)}으로 시작할까요?\\n기존 AI 시뮬레이션은 초기화됩니다.`)) {
-        return;
-      }
-
-      let sim = defaultAiSim(amount);
-      sim.started = true;
-      sim.autoRun = true;
-      sim = updateAiPicks(sim, true);
-      sim.history.unshift({
-        day: sim.day,
-        type: "AI 자동운용 시작",
-        text: `초기 투자금 ${fmtMoney(amount)}으로 AI 자동운용을 시작했습니다. AI가 5개 종목을 선정하고 매일 조건에 따라 운용합니다.`,
-        time: new Date().toLocaleString()
+    function defaultStrategyState(amount) {
+      const strategies = {};
+      Object.keys(AI_STRATEGIES).forEach(key => {
+        strategies[key] = {
+          key,
+          cash: amount,
+          initialCash: amount,
+          picks: [],
+          holdings: {},
+          history: [],
+          equity: [{day:0, total:amount, cash:amount, returnRate:0}]
+        };
       });
 
-      saveAiSim(sim);
-      renderAiSim();
-      alert("AI 자동운용이 시작되었습니다.");
+      return {
+        started: false,
+        autoRun: true,
+        day: 0,
+        initialCash: amount,
+        lastAutoDate: null,
+        strategies
+      };
     }
 
-    function aiScoreForPick(item) {
-      const score = Number(item.score || 0);
-      const r5 = Number(item.return5 || 0);
-      const vol = Number(item.volumePower || 0);
-      const themeBonus = item.theme && item.theme !== "미분류" ? 8 : 0;
-      const overheatPenalty = r5 >= 25 ? 18 : r5 >= 15 ? 8 : 0;
-      return score + vol * 6 + themeBonus - overheatPenalty;
+    function loadAiSim() {
+      try {
+        const saved = localStorage.getItem(AI_SIM_KEY);
+        return saved ? JSON.parse(saved) : defaultStrategyState(10000000);
+      } catch(e) {
+        return defaultStrategyState(10000000);
+      }
     }
 
-    function aiPickReason(item) {
-      const reasons = [];
-      if (item.theme && item.theme !== "미분류") reasons.push(`${item.theme} 테마에 포함되어 시장 흐름과 연결성이 있습니다.`);
-      if (Number(item.score) >= 70) reasons.push("AI 점수가 높아 가격 흐름과 거래량 조건이 우수합니다.");
-      if (Number(item.volumePower) >= 1.5) reasons.push("거래량 강도가 높아 수급 유입 가능성이 있습니다.");
-      if (Number(item.return5) >= 15) reasons.push("최근 상승률이 높아 매수 시점은 분할 접근이 필요합니다.");
-      if (reasons.length === 0) reasons.push("종합 점수와 테마 분포를 기준으로 포트폴리오 균형 차원에서 선정되었습니다.");
-      return reasons.join(" ");
+    function saveAiSim(sim) {
+      localStorage.setItem(AI_SIM_KEY, JSON.stringify(sim));
     }
 
     function getAiCandidates() {
       if (!latestData) return [];
-      const candidates = []
+      const arr = []
         .concat(latestData.recommend || [])
         .concat(latestData.watch || [])
         .concat(latestData.all || []);
-
       const unique = {};
-      candidates.forEach(item => {
-        if (!unique[item.code]) unique[item.code] = item;
+      arr.forEach(x => {
+        if (!unique[x.code]) unique[x.code] = x;
       });
-
-      return Object.values(unique)
-        .map(item => ({...item, aiPickScore: aiScoreForPick(item)}))
-        .sort((a,b) => b.aiPickScore - a.aiPickScore);
+      return Object.values(unique);
     }
 
-    function updateAiPicks(sim, force=false) {
+    function strategyScore(item, strategyKey) {
+      const s = AI_STRATEGIES[strategyKey];
+      const score = Number(item.score || 0);
+      const r5 = Number(item.return5 || 0);
+      const r20 = Number(item.return20 || 0);
+      const vol = Number(item.volumePower || 0);
+      const trend = Number(item.trendPower || 0);
+      const hasTheme = item.theme && item.theme !== "미분류" && item.theme !== "기타/개별이슈";
+
+      if (s.style === "momentum") {
+        return score + vol * 10 + trend * 8 + Math.min(r5, 25) * 0.9 - (r5 > 45 ? 25 : 0);
+      }
+      if (s.style === "stable") {
+        return score + vol * 4 + (hasTheme ? 7 : 0) - Math.abs(r5) * 0.35 - (r5 > 20 ? 15 : 0);
+      }
+      if (s.style === "theme") {
+        return score + (hasTheme ? 22 : -10) + vol * 6 + trend * 6 + Math.min(r5, 20) * 0.45;
+      }
+      if (s.style === "scalping") {
+        return score * 0.65 + vol * 18 + Math.max(r5, 0) * 1.2 + trend * 4 - (r5 > 35 ? 20 : 0);
+      }
+      if (s.style === "value") {
+        return score + (hasTheme ? 5 : 0) - Math.max(r5, 0) * 0.55 + (r20 < 15 ? 10 : -8) + trend * 3;
+      }
+      return score;
+    }
+
+    function pickReason(item, strategyKey) {
+      const s = AI_STRATEGIES[strategyKey];
+      const reasons = [];
+      reasons.push(`${s.name} 기준으로 선정점수가 높습니다.`);
+      if (item.theme && item.theme !== "미분류" && item.theme !== "기타/개별이슈") reasons.push(`${item.theme} 테마 흐름이 반영되었습니다.`);
+      if (Number(item.volumePower || 0) >= 1.5) reasons.push("거래량 강도가 높아 수급 유입 가능성이 있습니다.");
+      if (Number(item.return5 || 0) >= 15) reasons.push("단기 상승률이 높아 분할 접근이 필요합니다.");
+      return reasons.join(" ");
+    }
+
+    function updateStrategyPicks(strategy, strategyKey, force=false) {
       const candidates = getAiCandidates();
-      if (candidates.length === 0) return sim;
+      if (candidates.length === 0) return strategy;
 
-      const currentCodes = new Set((sim.picks || []).map(x => x.code));
-      const top = candidates.slice(0, 5);
+      const ranked = candidates
+        .map(item => ({...item, strategyScore: strategyScore(item, strategyKey)}))
+        .sort((a,b) => b.strategyScore - a.strategyScore);
 
-      if (force || !sim.picks || sim.picks.length === 0) {
-        sim.picks = top.map(item => ({
-          code: item.code,
-          name: item.name,
-          market: item.market,
-          theme: item.theme,
-          pickPrice: Number(item.price || 0),
-          score: Number(item.score || 0),
-          aiPickScore: Number(item.aiPickScore || 0),
-          reason: aiPickReason(item)
+      if (force || !strategy.picks || strategy.picks.length === 0) {
+        strategy.picks = ranked.slice(0,5).map(item => ({
+          code:item.code,
+          name:item.name,
+          market:item.market,
+          theme:item.theme,
+          pickPrice:Number(item.price || 0),
+          score:Number(item.score || 0),
+          strategyScore:Number(item.strategyScore || 0),
+          reason:pickReason(item, strategyKey)
         }));
-        return sim;
+        return strategy;
       }
 
-      // 매일 시장 점수에 따라 후보 5개를 자연스럽게 갱신합니다.
-      // 단, 보유 종목은 갑자기 사라지지 않도록 우선 유지합니다.
-      const holdingCodes = new Set(Object.keys(sim.holdings || {}));
-      const kept = (sim.picks || []).filter(p => holdingCodes.has(p.code)).slice(0, 5);
+      const holdingCodes = new Set(Object.keys(strategy.holdings || {}));
+      const kept = (strategy.picks || []).filter(p => holdingCodes.has(p.code)).slice(0,5);
       const keptCodes = new Set(kept.map(x => x.code));
-      const fill = candidates
+      const fill = ranked
         .filter(item => !keptCodes.has(item.code))
         .slice(0, 5 - kept.length)
         .map(item => ({
-          code: item.code,
-          name: item.name,
-          market: item.market,
-          theme: item.theme,
-          pickPrice: Number(item.price || 0),
-          score: Number(item.score || 0),
-          aiPickScore: Number(item.aiPickScore || 0),
-          reason: aiPickReason(item)
+          code:item.code,
+          name:item.name,
+          market:item.market,
+          theme:item.theme,
+          pickPrice:Number(item.price || 0),
+          score:Number(item.score || 0),
+          strategyScore:Number(item.strategyScore || 0),
+          reason:pickReason(item, strategyKey)
         }));
 
-      sim.picks = kept.concat(fill);
-      return sim;
-    }
-
-    function aiPickFive() {
-      if (!latestData || !latestData.all || latestData.all.length === 0) {
-        alert("먼저 추천종목 분석을 실행해주세요.");
-        return;
-      }
-
-      let sim = loadAiSim();
-      if (!sim || !sim.equity) sim = defaultAiSim(getAiStartAmount());
-      if (!sim.started) sim.started = true;
-      sim = updateAiPicks(sim, true);
-
-      sim.history.unshift({
-        day: sim.day,
-        type: "AI 5종목 선정/갱신",
-        text: `AI가 ${sim.picks.map(x => x.name).join(", ")} 5개 종목을 선정했습니다. 시장 점수 변화에 따라 5개 종목은 고정이 아니라 갱신될 수 있습니다.`,
-        time: new Date().toLocaleString()
-      });
-
-      saveAiSim(sim);
-      renderAiSim();
-      alert("AI가 5개 종목을 선정/갱신했습니다.");
+      strategy.picks = kept.concat(fill);
+      return strategy;
     }
 
     function getLiveItemForAi(pick) {
       return getCurrentItem(pick.code) || pick;
     }
 
-    function aiDecision(item, holding) {
+    function strategyDecision(item, holding, strategyKey) {
+      const s = AI_STRATEGIES[strategyKey];
       const score = Number(item.score || 0);
       const r5 = Number(item.return5 || 0);
       const vol = Number(item.volumePower || 0);
@@ -2477,171 +2593,26 @@ HTML = """
       const profitRate = holding && holding.avgPrice > 0 ? ((price - holding.avgPrice) / holding.avgPrice * 100) : 0;
 
       if (!holding || holding.qty <= 0) {
-        if (score >= 65 && r5 < 25 && vol >= 1.0) return {action:"BUY", weight:0.20, reason:"AI 점수와 거래량이 양호하고 과열이 심하지 않아 신규 편입합니다."};
-        if (score >= 50 && vol >= 1.5) return {action:"BUY", weight:0.12, reason:"점수는 중간 이상이며 거래량이 강해 소액 편입합니다."};
-        return {action:"WAIT", weight:0, reason:"현재는 신규 매수 조건이 부족하여 관찰합니다."};
-      }
-
-      if (profitRate <= -6) return {action:"SELL_ALL", weight:1, reason:`손실률 ${profitRate.toFixed(2)}%로 손절 기준에 접근해 전량 정리합니다.`};
-      if (profitRate >= 12 || r5 >= 30) return {action:"SELL_HALF", weight:0.5, reason:`수익률 ${profitRate.toFixed(2)}% 또는 단기 과열 구간으로 절반 차익실현합니다.`};
-      if (score >= 75 && profitRate > -3 && vol >= 1.4) return {action:"BUY_MORE", weight:0.10, reason:"추세와 거래량이 유지되어 비중을 소폭 늘립니다."};
-      return {action:"HOLD", weight:0, reason:"보유 조건은 유지되지만 추가 매수/매도 신호는 강하지 않습니다."};
-    }
-
-    function aiRunSingleDay(sim, silent=false) {
-      if (!sim.picks || sim.picks.length === 0) {
-        sim = updateAiPicks(sim, true);
-      }
-
-      // 매일 시작 시 후보 5개 갱신
-      sim = updateAiPicks(sim, false);
-
-      sim.day += 1;
-      const logs = [];
-
-      sim.picks.forEach(pick => {
-        const item = getLiveItemForAi(pick);
-        const code = pick.code;
-        const price = Number(item.price || pick.pickPrice || 0);
-        if (price <= 0) return;
-
-        const holding = sim.holdings[code];
-        const decision = aiDecision(item, holding);
-
-        if (decision.action === "BUY" || decision.action === "BUY_MORE") {
-          const budget = Math.floor(sim.initialCash * decision.weight);
-          const spend = Math.min(sim.cash, budget);
-          const qty = Math.floor(spend / price);
-
-          if (qty >= 1) {
-            const amount = qty * price;
-            const h = sim.holdings[code] || {
-              code: code,
-              name: pick.name,
-              market: pick.market,
-              theme: pick.theme,
-              qty: 0,
-              avgPrice: 0,
-              invested: 0,
-              lastPrice: price
-            };
-            const newQty = h.qty + qty;
-            const newInvested = h.invested + amount;
-            h.qty = newQty;
-            h.invested = newInvested;
-            h.avgPrice = Math.round(newInvested / newQty);
-            h.lastPrice = price;
-            sim.holdings[code] = h;
-            sim.cash -= amount;
-            logs.push({day: sim.day, type: decision.action === "BUY" ? "AI 매수" : "AI 추가매수", name: pick.name, code, qty, price, amount, text: decision.reason, time: new Date().toLocaleString()});
-          } else {
-            logs.push({day: sim.day, type: "AI 관찰", name: pick.name, code, text: "현금 부족 또는 1주 미만 금액으로 매수하지 않았습니다.", time: new Date().toLocaleString()});
-          }
-        } else if ((decision.action === "SELL_ALL" || decision.action === "SELL_HALF") && holding && holding.qty > 0) {
-          const qty = decision.action === "SELL_ALL" ? holding.qty : Math.max(1, Math.floor(holding.qty / 2));
-          const amount = Math.round(price * qty);
-          const cost = Math.round(holding.avgPrice * qty);
-          const profit = amount - cost;
-          holding.qty -= qty;
-          holding.invested -= cost;
-
-          if (holding.qty <= 0) delete sim.holdings[code];
-          else {
-            holding.avgPrice = Math.round(holding.invested / holding.qty);
-            holding.lastPrice = price;
-            sim.holdings[code] = holding;
-          }
-          sim.cash += amount;
-          logs.push({day: sim.day, type: decision.action === "SELL_ALL" ? "AI 전량매도" : "AI 절반매도", name: pick.name, code, qty, price, amount, profit, text: decision.reason, time: new Date().toLocaleString()});
-        } else {
-          logs.push({day: sim.day, type: decision.action === "WAIT" ? "AI 관찰" : "AI 보유", name: pick.name, code, text: decision.reason, time: new Date().toLocaleString()});
+        if (score >= s.buyScore && vol >= 0.8) {
+          if (s.style === "stable" && r5 > 20) return {action:"WAIT", weight:0, reason:"안정형 기준에서 단기 과열이라 신규 매수를 보류합니다."};
+          if (s.style === "value" && r5 > 25) return {action:"WAIT", weight:0, reason:"가치투자형 기준에서 상승 부담이 커 관찰합니다."};
+          return {action:"BUY", weight:s.maxWeight, reason:`${s.name} 조건에서 신규 매수 기준을 충족했습니다.`};
         }
-      });
-
-      sim.history = logs.concat(sim.history || []);
-      const snapshot = calcAiSimSnapshot(sim);
-      sim.equity.push({day: sim.day, total: snapshot.total, cash: sim.cash, returnRate: snapshot.totalReturn});
-      return sim;
-    }
-
-    function aiRunDay() {
-      aiRunPeriod(1);
-    }
-
-    function aiRunPeriod(days) {
-      if (!latestData) {
-        alert("먼저 오늘의 추천종목 분석을 실행해 최신 현재가를 불러와주세요.");
-        return;
+        return {action:"WAIT", weight:0, reason:`${s.name} 기준에서 아직 신규 매수 신호가 약합니다.`};
       }
 
-      let sim = loadAiSim();
-      if (!sim.started) {
-        alert("먼저 AI 초기 투자금을 설정하고 'AI 자동운용 시작'을 눌러주세요.");
-        return;
-      }
-      if (!sim.picks || sim.picks.length === 0) {
-        sim = updateAiPicks(sim, true);
-      }
+      if (profitRate <= s.stopLoss) return {action:"SELL_ALL", weight:1, reason:`손실률 ${profitRate.toFixed(2)}%로 ${s.name} 손절 기준에 도달했습니다.`};
+      if (profitRate >= s.sellProfit) return {action:"SELL_HALF", weight:0.5, reason:`수익률 ${profitRate.toFixed(2)}%로 ${s.name} 차익실현 기준에 도달했습니다.`};
 
-      const maxDays = Math.min(Number(days || 1), 365);
-      for (let i = 0; i < maxDays; i++) {
-        sim = aiRunSingleDay(sim, true);
-      }
+      if (s.style === "scalping" && r5 > 20) return {action:"SELL_HALF", weight:0.5, reason:"단타형 기준에서 단기 급등 후 절반 차익실현합니다."};
+      if (score >= s.buyScore + 15 && vol >= 1.5 && profitRate > -2) return {action:"BUY_MORE", weight:Math.min(0.10, s.maxWeight / 2), reason:`${s.name} 기준에서 추세가 유지되어 소폭 추가매수합니다.`};
 
-      sim.lastAutoDate = todayKey();
-      saveAiSim(sim);
-      renderAiSim();
+      return {action:"HOLD", weight:0, reason:`${s.name} 기준에서 보유가 적절합니다.`};
     }
 
-    function aiRunFiveDays() {
-      aiRunPeriod(5);
-    }
-
-    function toggleAiAutoRun() {
-      const sim = loadAiSim();
-      sim.autoRun = !sim.autoRun;
-      saveAiSim(sim);
-      renderAiSim();
-    }
-
-    function aiAutoRunIfNeeded() {
-      if (!latestData) return;
-      let sim = loadAiSim();
-      if (!sim.started) return;
-      if (!sim.autoRun) return;
-      const today = todayKey();
-
-      if (!sim.lastAutoDate) {
-        sim.lastAutoDate = today;
-        saveAiSim(sim);
-        return;
-      }
-
-      if (sim.lastAutoDate !== today) {
-        if (!sim.picks || sim.picks.length === 0) {
-          sim = updateAiPicks(sim, true);
-        }
-        sim = aiRunSingleDay(sim, true);
-        sim.lastAutoDate = today;
-        sim.history.unshift({
-          day: sim.day,
-          type: "AI 자동 일일운용",
-          text: "앱 접속 시 날짜가 바뀐 것을 확인해 AI가 하루 운용을 자동 실행했습니다.",
-          time: new Date().toLocaleString()
-        });
-        saveAiSim(sim);
-      }
-    }
-
-    function aiResetSim() {
-      if (!confirm("AI 자동투자 시뮬레이션을 초기화할까요?")) return;
-      saveAiSim(defaultAiSim());
-      renderAiSim();
-    }
-
-    function calcAiSimSnapshot(sim) {
+    function calcStrategySnapshot(strategy) {
       let stockValue = 0;
-      const holdings = Object.values(sim.holdings || {});
+      const holdings = Object.values(strategy.holdings || {});
       holdings.forEach(h => {
         const item = getCurrentItem(h.code);
         const currentPrice = item ? Number(item.price || h.lastPrice || h.avgPrice) : Number(h.lastPrice || h.avgPrice);
@@ -2651,29 +2622,207 @@ HTML = """
         h.returnRate = h.invested > 0 ? (h.profit / h.invested * 100) : 0;
         stockValue += h.value;
       });
-      const total = sim.cash + stockValue;
-      const totalReturn = sim.initialCash > 0 ? ((total - sim.initialCash) / sim.initialCash * 100) : 0;
-      return {holdings, stockValue, total, totalReturn};
+      const total = strategy.cash + stockValue;
+      const totalReturn = strategy.initialCash > 0 ? ((total - strategy.initialCash) / strategy.initialCash * 100) : 0;
+      return {holdings, total, stockValue, totalReturn};
+    }
+
+    function runStrategyDay(strategy, strategyKey, globalDay) {
+      strategy = updateStrategyPicks(strategy, strategyKey, false);
+      const s = AI_STRATEGIES[strategyKey];
+      const logs = [];
+
+      (strategy.picks || []).forEach(pick => {
+        const item = getLiveItemForAi(pick);
+        const price = Number(item.price || pick.pickPrice || 0);
+        if (price <= 0) return;
+
+        const holding = strategy.holdings[pick.code];
+        const decision = strategyDecision(item, holding, strategyKey);
+
+        if (decision.action === "BUY" || decision.action === "BUY_MORE") {
+          const maxInvest = Math.floor(strategy.initialCash * decision.weight);
+          const reserve = Math.floor(strategy.initialCash * s.cashReserve);
+          const spend = Math.min(strategy.cash - reserve, maxInvest);
+          const qty = Math.floor(spend / price);
+
+          if (qty >= 1 && spend > 0) {
+            const amount = qty * price;
+            const h = strategy.holdings[pick.code] || {
+              code:pick.code, name:pick.name, market:pick.market, theme:pick.theme,
+              qty:0, avgPrice:0, invested:0, lastPrice:price
+            };
+            const newQty = h.qty + qty;
+            const newInvested = h.invested + amount;
+            h.qty = newQty;
+            h.invested = newInvested;
+            h.avgPrice = Math.round(newInvested / newQty);
+            h.lastPrice = price;
+            strategy.holdings[pick.code] = h;
+            strategy.cash -= amount;
+            logs.push({day:globalDay, strategy:s.name, type:decision.action === "BUY" ? "매수" : "추가매수", name:pick.name, code:pick.code, qty, price, amount, text:decision.reason, time:new Date().toLocaleString()});
+          } else {
+            logs.push({day:globalDay, strategy:s.name, type:"관찰", name:pick.name, code:pick.code, text:"현금 비중 또는 최소 1주 조건 때문에 매수하지 않았습니다.", time:new Date().toLocaleString()});
+          }
+        } else if ((decision.action === "SELL_ALL" || decision.action === "SELL_HALF") && holding && holding.qty > 0) {
+          const qty = decision.action === "SELL_ALL" ? holding.qty : Math.max(1, Math.floor(holding.qty / 2));
+          const amount = Math.round(price * qty);
+          const cost = Math.round(holding.avgPrice * qty);
+          const profit = amount - cost;
+
+          holding.qty -= qty;
+          holding.invested -= cost;
+          if (holding.qty <= 0) delete strategy.holdings[pick.code];
+          else {
+            holding.avgPrice = Math.round(holding.invested / holding.qty);
+            holding.lastPrice = price;
+            strategy.holdings[pick.code] = holding;
+          }
+          strategy.cash += amount;
+          logs.push({day:globalDay, strategy:s.name, type:decision.action === "SELL_ALL" ? "전량매도" : "절반매도", name:pick.name, code:pick.code, qty, price, amount, profit, text:decision.reason, time:new Date().toLocaleString()});
+        } else {
+          logs.push({day:globalDay, strategy:s.name, type:decision.action === "WAIT" ? "관찰" : "보유", name:pick.name, code:pick.code, text:decision.reason, time:new Date().toLocaleString()});
+        }
+      });
+
+      const snap = calcStrategySnapshot(strategy);
+      strategy.equity.push({day:globalDay, total:snap.total, cash:strategy.cash, returnRate:snap.totalReturn});
+      strategy.history = logs.concat(strategy.history || []);
+      return strategy;
+    }
+
+    function multiAiStart() {
+      if (!latestData || !latestData.all || latestData.all.length === 0) {
+        alert("먼저 오늘의 추천종목 분석을 실행해주세요.");
+        return;
+      }
+      const amount = getAiStartAmount();
+      if (!confirm(`5가지 AI 전략을 각각 ${fmtMoney(amount)}으로 시작할까요?\\n기존 AI 시뮬레이션은 초기화됩니다.`)) return;
+
+      const sim = defaultStrategyState(amount);
+      sim.started = true;
+      sim.autoRun = true;
+      Object.keys(AI_STRATEGIES).forEach(key => {
+        sim.strategies[key] = updateStrategyPicks(sim.strategies[key], key, true);
+        sim.strategies[key].history.unshift({
+          day:0, strategy:AI_STRATEGIES[key].name, type:"전략 시작",
+          text:`${AI_STRATEGIES[key].name}이 초기 투자금 ${fmtMoney(amount)}으로 5종목을 선정했습니다.`,
+          time:new Date().toLocaleString()
+        });
+      });
+      saveAiSim(sim);
+      renderAiSim();
+      alert("5가지 AI 자동운용이 시작되었습니다.");
+    }
+
+    function multiAiRebalance() {
+      const sim = loadAiSim();
+      if (!sim.started) {
+        alert("먼저 AI 자동운용을 시작해주세요.");
+        return;
+      }
+      Object.keys(AI_STRATEGIES).forEach(key => {
+        sim.strategies[key] = updateStrategyPicks(sim.strategies[key], key, true);
+        sim.strategies[key].history.unshift({
+          day:sim.day, strategy:AI_STRATEGIES[key].name, type:"5종목 갱신",
+          text:"최신 시장 점수를 기준으로 전략별 5종목을 갱신했습니다.",
+          time:new Date().toLocaleString()
+        });
+      });
+      saveAiSim(sim);
+      renderAiSim();
+    }
+
+    function multiAiRunPeriod(days) {
+      if (!latestData) {
+        alert("먼저 오늘의 추천종목 분석을 실행해 최신 데이터를 불러와주세요.");
+        return;
+      }
+      let sim = loadAiSim();
+      if (!sim.started) {
+        alert("먼저 초기 투자금을 설정하고 5가지 AI 자동운용 시작을 눌러주세요.");
+        return;
+      }
+
+      const maxDays = Math.min(Number(days || 1), 365);
+      for (let i=0; i<maxDays; i++) {
+        sim.day += 1;
+        Object.keys(AI_STRATEGIES).forEach(key => {
+          sim.strategies[key] = runStrategyDay(sim.strategies[key], key, sim.day);
+        });
+      }
+      sim.lastAutoDate = todayKey();
+      saveAiSim(sim);
+      renderAiSim();
+    }
+
+    function multiAiToggleAuto() {
+      const sim = loadAiSim();
+      sim.autoRun = !sim.autoRun;
+      saveAiSim(sim);
+      renderAiSim();
+    }
+
+    function multiAiAutoRunIfNeeded() {
+      if (!latestData) return;
+      let sim = loadAiSim();
+      if (!sim.started || !sim.autoRun) return;
+      const today = todayKey();
+
+      if (!sim.lastAutoDate) {
+        sim.lastAutoDate = today;
+        saveAiSim(sim);
+        return;
+      }
+
+      if (sim.lastAutoDate !== today) {
+        sim.day += 1;
+        Object.keys(AI_STRATEGIES).forEach(key => {
+          sim.strategies[key] = runStrategyDay(sim.strategies[key], key, sim.day);
+          sim.strategies[key].history.unshift({
+            day:sim.day, strategy:AI_STRATEGIES[key].name, type:"자동 일일운용",
+            text:"앱 접속 시 날짜 변경을 감지해 자동으로 하루 운용했습니다.",
+            time:new Date().toLocaleString()
+          });
+        });
+        sim.lastAutoDate = today;
+        saveAiSim(sim);
+      }
+    }
+
+    function multiAiReset() {
+      if (!confirm("5가지 AI 자동운용 시뮬레이션을 초기화할까요?")) return;
+      saveAiSim(defaultStrategyState(getAiStartAmount()));
+      renderAiSim();
     }
 
     function renderAiEquityChart(sim) {
       const canvas = document.getElementById("aiEquityChart");
       if (!canvas) return;
-      const eq = sim.equity || [];
       if (aiEquityChart) aiEquityChart.destroy();
 
+      const keys = Object.keys(AI_STRATEGIES);
+      const maxLen = Math.max(...keys.map(k => (sim.strategies[k]?.equity || []).length), 1);
+      const labels = Array.from({length:maxLen}, (_, i) => "D+" + i);
+
       aiEquityChart = new Chart(canvas, {
-        type: "line",
-        data: {
-          labels: eq.map(x => "D+" + x.day),
-          datasets: [{ label: "AI 총 자산", data: eq.map(x => x.total), tension: 0.35, fill: true, borderWidth: 3 }]
+        type:"line",
+        data:{
+          labels,
+          datasets:keys.map(k => ({
+            label:AI_STRATEGIES[k].name,
+            data:(sim.strategies[k]?.equity || []).map(x => x.total),
+            tension:0.35,
+            fill:false,
+            borderWidth:3
+          }))
         },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { maxTicksLimit: 7 } },
-            y: { ticks: { callback: value => Number(value).toLocaleString() } }
+        options:{
+          responsive:true,
+          plugins:{legend:{display:true}},
+          scales:{
+            x:{ticks:{maxTicksLimit:7}},
+            y:{ticks:{callback:value => Number(value).toLocaleString()}}
           }
         }
       });
@@ -2681,94 +2830,95 @@ HTML = """
 
     function renderAiSim() {
       const sim = loadAiSim();
-      const snap = calcAiSimSnapshot(sim);
-
-      const totalEl = document.getElementById("aiTotal");
+      const totalEl = document.getElementById("bestStrategy");
       if (!totalEl) return;
 
       const startInput = document.getElementById("aiStartAmount");
       if (startInput && sim.initialCash) startInput.value = Number(sim.initialCash).toLocaleString();
 
-      document.getElementById("aiTotal").innerText = fmtMoney(snap.total);
-      document.getElementById("aiCash").innerText = fmtMoney(sim.cash);
-      document.getElementById("aiReturn").innerHTML = `<span class="${snap.totalReturn >= 0 ? 'red' : 'blue'}">${snap.totalReturn.toFixed(2)}%</span>`;
+      const strategyRows = Object.keys(AI_STRATEGIES).map(key => {
+        const st = sim.strategies?.[key] || defaultStrategyState(sim.initialCash || 10000000).strategies[key];
+        const snap = calcStrategySnapshot(st);
+        return {key, st, snap, meta:AI_STRATEGIES[key]};
+      }).sort((a,b) => b.snap.totalReturn - a.snap.totalReturn);
+
+      const best = strategyRows[0];
+      document.getElementById("bestStrategy").innerText = sim.started ? `${best.meta.icon} ${best.meta.name}` : "-";
+      document.getElementById("multiAiDay").innerText = sim.started ? `D+${sim.day}` : "-";
+      document.getElementById("multiAiStatus").innerText = sim.autoRun ? "ON" : "OFF";
 
       const autoBtn = document.getElementById("aiAutoBtn");
       if (autoBtn) autoBtn.innerText = sim.autoRun ? "⏸ 자동운용 켜짐" : "▶️ 자동운용 꺼짐";
 
-      const pickList = document.getElementById("aiPickList");
-      if (!sim.picks || sim.picks.length === 0) {
-        pickList.innerHTML = `<div class="empty-box">아직 AI가 5종목을 선정하지 않았습니다.<br>먼저 추천종목 분석 후 <b>AI 5종목 선정</b>을 눌러주세요.</div>`;
-      } else {
-        pickList.innerHTML = sim.picks.map((pick, idx) => {
-          const item = getLiveItemForAi(pick);
-          const holding = sim.holdings[pick.code];
-          const decision = aiDecision(item, holding);
-          const dClass = decision.action.includes("SELL") ? "ai-decision sell" : decision.action.includes("HOLD") || decision.action.includes("WAIT") ? "ai-decision hold" : "ai-decision";
-          const actionText = {BUY:"매수 후보", BUY_MORE:"추가매수", SELL_ALL:"전량매도", SELL_HALF:"절반매도", HOLD:"보유", WAIT:"관찰"}[decision.action] || decision.action;
-
-          return `
-            <div class="ai-pick-card">
-              <div class="ai-pick-head">
-                <div>
-                  <div class="ai-pick-name">#${idx + 1} ${pick.name}</div>
-                  <div class="ai-pick-meta">${pick.market} · ${pick.code} · ${pick.theme}</div>
-                </div>
-                <span class="${dClass}">${actionText}</span>
-              </div>
-              <div class="ai-pick-grid">
-                <div><span>현재가</span><b>${fmtPrice(item.price || pick.pickPrice)}</b></div>
-                <div><span>AI점수</span><b>${item.score || pick.score}</b></div>
-                <div><span>선정점수</span><b>${Number(pick.aiPickScore || 0).toFixed(1)}</b></div>
-              </div>
-              <div class="ai-reason-box">
-                <b>선정 이유</b><br>${pick.reason}<br><br>
-                <b>오늘 판단</b><br>${decision.reason}
-              </div>
-            </div>
-          `;
-        }).join("");
-      }
-
-      const holdingList = document.getElementById("aiHoldingList");
-      if (snap.holdings.length === 0) {
-        holdingList.innerHTML = `<div class="empty-box">AI가 아직 보유한 종목이 없습니다.<br><b>1일/1주일/1개월 운용</b>을 누르면 AI가 조건에 따라 매수합니다.</div>`;
-      } else {
-        holdingList.innerHTML = snap.holdings.map(h => `
-          <div class="holding-card">
-            <div class="holding-head">
-              <div>
-                <div class="holding-name">${h.name}</div>
-                <div class="holding-meta">${h.market} · ${h.code} · ${h.theme}</div>
-              </div>
-              <div class="${h.profit >= 0 ? 'holding-profit' : 'holding-profit loss'}">${h.returnRate.toFixed(2)}%</div>
-            </div>
-            <div class="holding-grid">
-              <div><span>보유수량</span><b>${h.qty}주</b></div>
-              <div><span>평균단가</span><b>${fmtMoney(h.avgPrice)}</b></div>
-              <div><span>현재가</span><b>${fmtMoney(h.currentPrice)}</b></div>
-              <div><span>평가손익</span><b class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</b></div>
-            </div>
-          </div>
-        `).join("");
-      }
-
       const note = document.getElementById("aiSimNote");
       if (!sim.started) {
-        note.innerText = "🤖 초기 투자금을 선택하고 AI 자동운용 시작을 누르면 시뮬레이션이 시작됩니다.";
-      } else if (sim.picks.length === 0) {
-        note.innerText = "🤖 AI가 아직 5종목을 선정하지 않았습니다. 5종목 선정/갱신을 눌러주세요. 5종목은 시장 점수에 따라 갱신됩니다.";
+        note.innerText = "🤖 초기 투자금을 선택하고 5가지 AI 자동운용 시작을 누르면 전략별 시뮬레이션이 시작됩니다.";
       } else {
-        const best = snap.holdings.length ? [...snap.holdings].sort((a,b) => b.returnRate - a.returnRate)[0] : null;
-        note.innerText = `🤖 AI 운용 ${sim.day}일차입니다. 초기 투자금은 ${fmtMoney(sim.initialCash)}이고 현재 수익률은 ${snap.totalReturn.toFixed(2)}%입니다. 자동운용은 ${sim.autoRun ? "켜짐" : "꺼짐"} 상태입니다. ${best ? "가장 좋은 보유 종목은 " + best.name + "입니다." : "아직 보유 종목이 없거나 매수 조건을 기다리는 중입니다."}`;
+        note.innerText = `🤖 현재 D+${sim.day}일차입니다. 최고 전략은 ${best.meta.name}, 수익률은 ${best.snap.totalReturn.toFixed(2)}%입니다. 자동운용은 ${sim.autoRun ? "켜짐" : "꺼짐"} 상태입니다.`;
       }
 
-      const history = sim.history || [];
-      document.getElementById("aiTradeLog").innerHTML = history.length === 0
-        ? `<div class="empty-box">AI 매매 기록이 없습니다.</div>`
-        : history.slice(0, 60).map(h => `
-          <div class="ai-log-card">
-            <b>D+${h.day} · ${h.type}</b> ${h.name ? "· " + h.name + " (" + h.code + ")" : ""}<br>
+      document.getElementById("strategyRankList").innerHTML = strategyRows.map((row, idx) => `
+        <div class="strategy-card">
+          <div class="strategy-head">
+            <div>
+              <div class="strategy-title">#${idx+1} ${row.meta.icon} ${row.meta.name}</div>
+              <div class="strategy-desc">${row.meta.desc}</div>
+            </div>
+            <div class="${row.snap.totalReturn >= 0 ? 'strategy-return' : 'strategy-return loss'}">${row.snap.totalReturn.toFixed(2)}%</div>
+          </div>
+          <div class="strategy-grid">
+            <div><span>총 자산</span><b>${fmtMoney(row.snap.total)}</b></div>
+            <div><span>현금</span><b>${fmtMoney(row.st.cash)}</b></div>
+            <div><span>보유</span><b>${row.snap.holdings.length}종목</b></div>
+            <div><span>주식평가</span><b>${fmtMoney(row.snap.stockValue)}</b></div>
+          </div>
+        </div>
+      `).join("");
+
+      document.getElementById("strategyPickList").innerHTML = Object.keys(AI_STRATEGIES).map(key => {
+        const st = sim.strategies?.[key] || {};
+        const meta = AI_STRATEGIES[key];
+        const picks = st.picks || [];
+        return `
+          <div class="strategy-card">
+            <div class="strategy-title">${meta.icon} ${meta.name} 선택 5종목</div>
+            <div class="strategy-desc">${meta.desc}</div>
+            <div class="strategy-stock-list">
+              ${picks.length ? picks.map((p,i) => {
+                const live = getLiveItemForAi(p);
+                return `<div class="strategy-stock"><b>#${i+1} ${p.name}</b><br>${p.market} · ${p.code} · ${p.theme}<br>현재가 ${fmtPrice(live.price || p.pickPrice)} · 선정점수 ${Number(p.strategyScore || 0).toFixed(1)}<br>${p.reason}</div>`;
+              }).join("") : `<div class="empty-box">아직 선정 종목이 없습니다.</div>`}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      document.getElementById("strategyHoldingList").innerHTML = Object.keys(AI_STRATEGIES).map(key => {
+        const st = sim.strategies?.[key] || {};
+        const meta = AI_STRATEGIES[key];
+        const snap = calcStrategySnapshot(st);
+        return `
+          <div class="strategy-card">
+            <div class="strategy-title">${meta.icon} ${meta.name} 보유 현황</div>
+            <div class="strategy-stock-list">
+              ${snap.holdings.length ? snap.holdings.map(h => `<div class="strategy-stock"><b>${h.name}</b> ${h.returnRate.toFixed(2)}%<br>${h.market} · ${h.code} · ${h.theme}<br>수량 ${h.qty}주 · 평균 ${fmtMoney(h.avgPrice)} · 현재 ${fmtMoney(h.currentPrice)} · 손익 <span class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</span></div>`).join("") : `<div class="empty-box">보유 종목이 없습니다.</div>`}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const logs = [];
+      Object.keys(AI_STRATEGIES).forEach(key => {
+        const h = sim.strategies?.[key]?.history || [];
+        logs.push(...h);
+      });
+      logs.sort((a,b) => (b.day || 0) - (a.day || 0));
+
+      document.getElementById("aiTradeLog").innerHTML = logs.length === 0
+        ? `<div class="empty-box">AI 운용 로그가 없습니다.</div>`
+        : logs.slice(0,80).map(h => `
+          <div class="ai-log-card strategy-log">
+            <b>D+${h.day} · ${h.strategy || ""} · ${h.type}</b> ${h.name ? "· " + h.name + " (" + h.code + ")" : ""}<br>
             ${h.qty ? `수량 ${h.qty}주 · 단가 ${fmtMoney(h.price)} · 금액 ${fmtMoney(h.amount)}<br>` : ""}
             ${h.profit !== undefined ? `실현손익 <b class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</b><br>` : ""}
             ${h.text || ""}
@@ -2800,7 +2950,7 @@ HTML = """
         document.getElementById("themeList").innerHTML = renderThemeList(data);
         loading.style.display = "none";
         renderPortfolio();
-        aiAutoRunIfNeeded();
+        multiAiAutoRunIfNeeded();
         renderAiSim();
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (e) {
