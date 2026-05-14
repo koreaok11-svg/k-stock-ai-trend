@@ -515,7 +515,7 @@ HTML = """
     .loading { display:none; background:white; border-radius:22px; padding:22px; text-align:center; margin:14px 0; box-shadow:0 8px 22px rgba(0,0,0,.08); }
     .spinner { width:42px; height:42px; border:5px solid #e5e7eb; border-top-color:#7fa36f; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 12px; }
     @keyframes spin { to { transform:rotate(360deg); } }
-    .tabs { position:sticky; top:0; z-index:20; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; background:rgba(255,250,240,.82); backdrop-filter:blur(12px); padding:10px 0; margin-top:10px; }
+    .tabs { position:sticky; top:0; z-index:20; display:grid; grid-template-columns:repeat(4,1fr); gap:8px; background:rgba(255,250,240,.82); backdrop-filter:blur(12px); padding:10px 0; margin-top:10px; }
     .tab { background:rgba(255,255,248,.9); color:#63705f; border-radius:999px; padding:10px 8px; font-weight:900; font-size:13px; text-align:center; border:1px solid rgba(180,200,160,.45); }
     .tab.active { background:linear-gradient(135deg,#526b4f,#7fa36f); color:#fffdf5; }
     h2 { font-size:25px; margin:24px 0 12px; }
@@ -732,7 +732,190 @@ HTML = """
       to { opacity:1; transform:translateY(0); }
     }
 
+
+    .portfolio-hero {
+      background:linear-gradient(135deg,#6fa87a,#8fbf91,#f2c879);
+      color:#23301f;
+      border-radius:30px;
+      padding:22px;
+      box-shadow:0 18px 40px rgba(105,140,92,.24);
+      border:1px solid rgba(255,255,255,.75);
+      margin:14px 0;
+    }
+    .portfolio-mini {
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:1.3px;
+      opacity:.75;
+    }
+    .portfolio-hero h3 {
+      margin:8px 0 8px;
+      font-size:26px;
+      line-height:1.2;
+    }
+    .portfolio-hero p {
+      margin:0 0 16px;
+      font-size:14px;
+      line-height:1.55;
+      color:#344834;
+    }
+    .portfolio-grid {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:9px;
+    }
+    .portfolio-grid div {
+      background:rgba(255,255,255,.45);
+      border-radius:18px;
+      padding:12px 8px;
+      text-align:center;
+      backdrop-filter:blur(10px);
+    }
+    .portfolio-grid span {
+      display:block;
+      font-size:11px;
+      color:#4f604a;
+      margin-bottom:4px;
+    }
+    .portfolio-grid b {
+      display:block;
+      font-size:17px;
+      color:#243025;
+    }
+    .portfolio-actions {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+      margin:12px 0;
+    }
+    .portfolio-actions button {
+      font-size:13px;
+      padding:12px 8px;
+      margin:0;
+      border-radius:16px;
+    }
+    .ai-portfolio-note {
+      background:#48634d;
+      color:#fffdf4;
+      border-radius:20px;
+      padding:14px;
+      line-height:1.6;
+      font-size:14px;
+      margin:14px 0;
+    }
+    .holding-card, .history-card {
+      background:rgba(255,255,248,.88);
+      border:1px solid rgba(255,255,255,.9);
+      box-shadow:0 14px 30px rgba(98,126,86,.16);
+      backdrop-filter:blur(12px);
+      border-radius:24px;
+      padding:16px;
+      margin:12px 0;
+    }
+    .holding-head {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .holding-name {
+      font-size:23px;
+      font-weight:900;
+      color:#243025;
+    }
+    .holding-meta {
+      margin-top:4px;
+      font-size:12px;
+      color:#6b7280;
+    }
+    .holding-profit {
+      padding:8px 11px;
+      border-radius:999px;
+      font-size:13px;
+      font-weight:900;
+      background:#e6f4dc;
+      color:#3f6b35;
+      white-space:nowrap;
+    }
+    .holding-profit.loss {
+      background:#fee2e2;
+      color:#991b1b;
+    }
+    .holding-grid {
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:9px;
+      margin-top:12px;
+    }
+    .holding-grid div {
+      background:rgba(250,248,235,.9);
+      border-radius:15px;
+      padding:11px;
+    }
+    .holding-grid span {
+      display:block;
+      font-size:12px;
+      color:#6b7280;
+    }
+    .holding-grid b {
+      display:block;
+      margin-top:4px;
+      font-size:17px;
+    }
+    .trade-actions {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-top:12px;
+    }
+    .trade-actions button {
+      margin:0;
+      padding:12px;
+      font-size:14px;
+      border-radius:16px;
+    }
+    .paper-trade-box {
+      margin-top:12px;
+      background:linear-gradient(135deg,#eef8e8,#fff8df);
+      border:1px solid #dfe8c9;
+      border-radius:20px;
+      padding:14px;
+    }
+    .paper-trade-buttons {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-top:10px;
+    }
+    .paper-trade-buttons button {
+      margin:0;
+      padding:12px;
+      font-size:14px;
+      border-radius:16px;
+    }
+    .history-card {
+      font-size:14px;
+      line-height:1.5;
+    }
+    .history-card b {
+      font-size:16px;
+    }
+    .empty-box {
+      background:rgba(255,255,248,.82);
+      border:1px dashed #d6d8c0;
+      border-radius:22px;
+      padding:20px;
+      text-align:center;
+      color:#6b7280;
+      line-height:1.6;
+      margin:12px 0;
+    }
+
     @media (max-width:480px) {
+      .portfolio-grid { grid-template-columns:1fr; }
+      .portfolio-actions { grid-template-columns:1fr; }
+      .tabs { grid-template-columns:repeat(4,1fr); gap:6px; }
+      .tab { font-size:12px; padding:9px 4px; }
       .compact-name { font-size:26px; }
       .compact-score {
         min-width:74px;
@@ -797,11 +980,44 @@ HTML = """
       <div class="tab active" onclick="showTab('recommend', this)">🔥 추천</div>
       <div class="tab" onclick="showTab('watch', this)">👀 관심</div>
       <div class="tab" onclick="showTab('theme', this)">📊 테마</div>
+      <div class="tab" onclick="showTab('portfolio', this); renderPortfolio();">💼 모의</div>
     </div>
 
     <section id="recommend" class="section active"><h2>🔥 추천종목 TOP10</h2><div id="recommendList"></div></section>
     <section id="watch" class="section"><h2>👀 관심종목 TOP30</h2><div id="watchList"></div></section>
     <section id="theme" class="section"><h2>📊 테마별 흐름</h2><div id="themeList" class="theme-box"></div></section>
+
+    <section id="portfolio" class="section">
+      <h2>💼 성일의 AI 모의투자</h2>
+
+      <div class="portfolio-hero">
+        <div class="portfolio-mini">SUNGIN AI PAPER TRADING</div>
+        <h3>가상의 돈으로 투자 연습하기 🍃</h3>
+        <p>실제 돈이 아닌 모의 자산으로 추천종목을 매수·매도하고, 수익률을 확인할 수 있습니다.</p>
+
+        <div class="portfolio-grid">
+          <div><span>총 자산</span><b id="pfTotal">-</b></div>
+          <div><span>가상 현금</span><b id="pfCash">-</b></div>
+          <div><span>총 수익률</span><b id="pfReturn">-</b></div>
+        </div>
+      </div>
+
+      <div class="portfolio-actions">
+        <button onclick="depositCash()">➕ 가상 입금</button>
+        <button onclick="withdrawCash()">➖ 가상 출금</button>
+        <button onclick="resetPortfolio()">🔄 초기화</button>
+      </div>
+
+      <div class="ai-portfolio-note" id="pfAiNote">
+        🤖 AI 모의투자 비서가 보유 종목과 수익률을 분석해줍니다.
+      </div>
+
+      <h2>📌 보유 종목</h2>
+      <div id="holdingList"></div>
+
+      <h2>🧾 거래 내역</h2>
+      <div id="tradeHistory"></div>
+    </section>
 
     <div class="footer">K-Stock AI Trend WebApp<br>데이터 제공 상태에 따라 일부 종목은 누락될 수 있습니다.</div>
   </main>
@@ -963,6 +1179,14 @@ HTML = """
               <p>${item.tradePlan?.message || ""}</p>
             </div>
 
+            <div class="paper-trade-box">
+              <div class="detail-title">💼 모의투자</div>
+              <div class="paper-trade-buttons">
+                <button onclick='paperBuy(${safeItemForClick(item)})'>🟢 모의 매수</button>
+                <button onclick='paperSell(${safeItemForClick(item)})'>🔴 모의 매도</button>
+              </div>
+            </div>
+
             <button class="chart-btn" onclick='showChart(${safeItemForClick(item)})'>📈 차트 보기</button>
           </div>
         </div>
@@ -1042,6 +1266,14 @@ HTML = """
             <ul>${listHtml(p.cautions)}</ul>
           </div>
 
+          <div class="paper-trade-box">
+            <div class="detail-title">💼 모의투자</div>
+            <div class="paper-trade-buttons">
+              <button onclick='paperBuy(${safeItemForClick(item)})'>🟢 모의 매수</button>
+              <button onclick='paperSell(${safeItemForClick(item)})'>🔴 모의 매도</button>
+            </div>
+          </div>
+
           <button class="chart-btn" onclick='showChart(${safeItemForClick(item)})'>📈 차트 보기</button>
         </div>
       `;
@@ -1079,6 +1311,302 @@ HTML = """
     }
 
 
+
+    const PF_KEY = "sungil_ai_stock_wind_portfolio_v1";
+
+    function defaultPortfolio() {
+      return {
+        cash: 10000000,
+        initialCash: 10000000,
+        holdings: {},
+        history: []
+      };
+    }
+
+    function loadPortfolio() {
+      try {
+        const saved = localStorage.getItem(PF_KEY);
+        return saved ? JSON.parse(saved) : defaultPortfolio();
+      } catch(e) {
+        return defaultPortfolio();
+      }
+    }
+
+    function savePortfolio(pf) {
+      localStorage.setItem(PF_KEY, JSON.stringify(pf));
+    }
+
+    function getCurrentItem(code) {
+      if (!latestData) return null;
+      const all = []
+        .concat(latestData.recommend || [])
+        .concat(latestData.watch || [])
+        .concat(latestData.all || []);
+      return all.find(x => x.code === code) || null;
+    }
+
+    function promptNumber(message, defaultValue) {
+      const raw = prompt(message, defaultValue || "");
+      if (raw === null) return null;
+      const num = Number(String(raw).replaceAll(",", "").trim());
+      if (!Number.isFinite(num) || num <= 0) {
+        alert("올바른 숫자를 입력해주세요.");
+        return null;
+      }
+      return num;
+    }
+
+    function depositCash() {
+      const pf = loadPortfolio();
+      const amount = promptNumber("가상 입금 금액을 입력하세요.", "1000000");
+      if (!amount) return;
+      pf.cash += amount;
+      pf.initialCash += amount;
+      pf.history.unshift({
+        type: "입금",
+        name: "가상 현금",
+        code: "CASH",
+        qty: 0,
+        price: amount,
+        amount: amount,
+        time: new Date().toLocaleString()
+      });
+      savePortfolio(pf);
+      renderPortfolio();
+    }
+
+    function withdrawCash() {
+      const pf = loadPortfolio();
+      const amount = promptNumber("가상 출금 금액을 입력하세요.", "1000000");
+      if (!amount) return;
+      if (amount > pf.cash) {
+        alert("보유 가상 현금보다 많이 출금할 수 없습니다.");
+        return;
+      }
+      pf.cash -= amount;
+      pf.initialCash -= amount;
+      pf.history.unshift({
+        type: "출금",
+        name: "가상 현금",
+        code: "CASH",
+        qty: 0,
+        price: amount,
+        amount: amount,
+        time: new Date().toLocaleString()
+      });
+      savePortfolio(pf);
+      renderPortfolio();
+    }
+
+    function resetPortfolio() {
+      if (!confirm("모의투자 데이터를 초기화할까요?")) return;
+      savePortfolio(defaultPortfolio());
+      renderPortfolio();
+    }
+
+    function paperBuy(item) {
+      const pf = loadPortfolio();
+      const price = Number(item.price || 0);
+      if (price <= 0) {
+        alert("현재가가 없어 매수할 수 없습니다.");
+        return;
+      }
+
+      const qty = promptNumber(`${item.name} 모의 매수 수량을 입력하세요.\\n현재가: ${fmtPrice(price)}\\n보유 현금: ${fmtMoney(pf.cash)}`, "1");
+      if (!qty) return;
+
+      const amount = Math.round(price * qty);
+      if (amount > pf.cash) {
+        alert("가상 현금이 부족합니다.");
+        return;
+      }
+
+      const h = pf.holdings[item.code] || {
+        code: item.code,
+        name: item.name,
+        market: item.market,
+        theme: item.theme,
+        qty: 0,
+        avgPrice: 0,
+        invested: 0
+      };
+
+      const newQty = h.qty + qty;
+      const newInvested = h.invested + amount;
+      h.qty = newQty;
+      h.invested = newInvested;
+      h.avgPrice = Math.round(newInvested / newQty);
+      h.lastPrice = price;
+      h.theme = item.theme;
+
+      pf.holdings[item.code] = h;
+      pf.cash -= amount;
+      pf.history.unshift({
+        type: "매수",
+        name: item.name,
+        code: item.code,
+        qty: qty,
+        price: price,
+        amount: amount,
+        time: new Date().toLocaleString()
+      });
+
+      savePortfolio(pf);
+      alert(`${item.name} ${qty}주 모의 매수 완료`);
+      renderPortfolio();
+    }
+
+    function paperSell(item) {
+      const pf = loadPortfolio();
+      const h = pf.holdings[item.code];
+      const price = Number(item.price || 0);
+
+      if (!h || h.qty <= 0) {
+        alert("보유 수량이 없습니다.");
+        return;
+      }
+
+      const qty = promptNumber(`${item.name} 모의 매도 수량을 입력하세요.\\n보유수량: ${h.qty}주\\n현재가: ${fmtPrice(price)}`, String(h.qty));
+      if (!qty) return;
+
+      if (qty > h.qty) {
+        alert("보유 수량보다 많이 매도할 수 없습니다.");
+        return;
+      }
+
+      const amount = Math.round(price * qty);
+      const cost = Math.round(h.avgPrice * qty);
+      const profit = amount - cost;
+
+      h.qty -= qty;
+      h.invested -= cost;
+
+      if (h.qty <= 0) {
+        delete pf.holdings[item.code];
+      } else {
+        h.avgPrice = Math.round(h.invested / h.qty);
+        h.lastPrice = price;
+        pf.holdings[item.code] = h;
+      }
+
+      pf.cash += amount;
+      pf.history.unshift({
+        type: "매도",
+        name: item.name,
+        code: item.code,
+        qty: qty,
+        price: price,
+        amount: amount,
+        profit: profit,
+        time: new Date().toLocaleString()
+      });
+
+      savePortfolio(pf);
+      alert(`${item.name} ${qty}주 모의 매도 완료\\n손익: ${fmtMoney(profit)}`);
+      renderPortfolio();
+    }
+
+    function calcPortfolio() {
+      const pf = loadPortfolio();
+      let stockValue = 0;
+      let invested = 0;
+      const holdings = Object.values(pf.holdings || {});
+
+      holdings.forEach(h => {
+        const item = getCurrentItem(h.code);
+        const currentPrice = item ? Number(item.price || h.lastPrice || h.avgPrice) : Number(h.lastPrice || h.avgPrice);
+        h.currentPrice = currentPrice;
+        h.value = Math.round(currentPrice * h.qty);
+        h.profit = Math.round((currentPrice - h.avgPrice) * h.qty);
+        h.returnRate = h.invested > 0 ? (h.profit / h.invested * 100) : 0;
+        stockValue += h.value;
+        invested += h.invested;
+      });
+
+      const total = pf.cash + stockValue;
+      const totalReturn = pf.initialCash > 0 ? ((total - pf.initialCash) / pf.initialCash * 100) : 0;
+
+      return { pf, holdings, stockValue, invested, total, totalReturn };
+    }
+
+    function makePortfolioNote(holdings, totalReturn) {
+      if (holdings.length === 0) {
+        return "🤖 성일님, 아직 보유 종목이 없습니다. 추천 종목에서 모의 매수를 눌러 투자 연습을 시작해보세요 🍃";
+      }
+
+      const best = [...holdings].sort((a,b) => b.returnRate - a.returnRate)[0];
+      const worst = [...holdings].sort((a,b) => a.returnRate - b.returnRate)[0];
+
+      let msg = `🤖 현재 총 수익률은 ${totalReturn.toFixed(2)}%입니다. `;
+      if (totalReturn > 0) msg += "전체 흐름은 양호합니다. ";
+      else if (totalReturn < 0) msg += "방어적인 점검이 필요합니다. ";
+      else msg += "아직 본격적인 수익 변동은 크지 않습니다. ";
+
+      msg += `가장 좋은 종목은 ${best.name}(${best.returnRate.toFixed(2)}%)입니다. `;
+      if (worst && worst.returnRate < 0) {
+        msg += `${worst.name}은 손실 구간이므로 손절 기준과 테마 지속 여부를 확인하세요.`;
+      } else {
+        msg += "보유 종목의 거래량과 테마 흐름을 함께 확인하면 좋습니다.";
+      }
+      return msg;
+    }
+
+    function renderPortfolio() {
+      const { pf, holdings, total, totalReturn } = calcPortfolio();
+
+      const totalEl = document.getElementById("pfTotal");
+      if (!totalEl) return;
+
+      document.getElementById("pfTotal").innerText = fmtMoney(total);
+      document.getElementById("pfCash").innerText = fmtMoney(pf.cash);
+      document.getElementById("pfReturn").innerHTML = `<span class="${totalReturn >= 0 ? 'red' : 'blue'}">${totalReturn.toFixed(2)}%</span>`;
+      document.getElementById("pfAiNote").innerText = makePortfolioNote(holdings, totalReturn);
+
+      const holdingList = document.getElementById("holdingList");
+      if (holdings.length === 0) {
+        holdingList.innerHTML = `<div class="empty-box">아직 보유 종목이 없습니다.<br>추천/관심 종목을 열고 <b>모의 매수</b>를 눌러보세요.</div>`;
+      } else {
+        holdingList.innerHTML = holdings.map(h => {
+          const cls = h.profit >= 0 ? "holding-profit" : "holding-profit loss";
+          const currentItem = getCurrentItem(h.code) || h;
+          return `
+            <div class="holding-card">
+              <div class="holding-head">
+                <div>
+                  <div class="holding-name">${h.name}</div>
+                  <div class="holding-meta">${h.market} · ${h.code} · ${h.theme || "미분류"}</div>
+                </div>
+                <div class="${cls}">${h.returnRate.toFixed(2)}%</div>
+              </div>
+              <div class="holding-grid">
+                <div><span>보유수량</span><b>${h.qty}주</b></div>
+                <div><span>평균단가</span><b>${fmtMoney(h.avgPrice)}</b></div>
+                <div><span>현재가</span><b>${fmtMoney(h.currentPrice)}</b></div>
+                <div><span>평가손익</span><b class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</b></div>
+              </div>
+              <div class="trade-actions">
+                <button onclick='paperBuy(${safeItemForClick(currentItem)})'>🟢 추가 매수</button>
+                <button onclick='paperSell(${safeItemForClick(currentItem)})'>🔴 매도</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      const history = pf.history || [];
+      document.getElementById("tradeHistory").innerHTML = history.length === 0
+        ? `<div class="empty-box">거래 내역이 없습니다.</div>`
+        : history.slice(0, 30).map(h => `
+          <div class="history-card">
+            <b>${h.type}</b> · ${h.name} ${h.code !== "CASH" ? "(" + h.code + ")" : ""}<br>
+            ${h.qty ? `수량 ${h.qty}주 · 단가 ${fmtMoney(h.price)} · 금액 ${fmtMoney(h.amount)}` : `금액 ${fmtMoney(h.amount)}`}
+            ${h.profit !== undefined ? `<br>실현손익 <b class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</b>` : ""}
+            <br><span style="color:#6b7280">${h.time}</span>
+          </div>
+        `).join("");
+    }
+
+
     async function runAnalyze() {
       updateLimitGuide();
       const limit = document.getElementById("limit").value;
@@ -1099,11 +1627,13 @@ HTML = """
         document.getElementById("watchList").innerHTML = data.watch.map(item => makeCard(item, "watch")).join("");
         document.getElementById("themeList").innerHTML = renderThemeList(data);
         loading.style.display = "none";
+        renderPortfolio();
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (e) {
         loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p>";
       }
     }
+    window.addEventListener('load', () => { renderPortfolio(); });
   </script>
 </body>
 </html>
