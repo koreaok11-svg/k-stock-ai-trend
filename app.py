@@ -140,7 +140,7 @@ def classify_theme(name):
         for keyword in keywords:
             if keyword in name:
                 return theme
-    return "미분류"
+    return "기타/개별이슈"
 
 
 def get_market_df(limit=700):
