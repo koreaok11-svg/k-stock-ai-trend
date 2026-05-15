@@ -4,6 +4,7 @@ from datetime import datetime
 import pandas as pd
 import yfinance as yf
 import FinanceDataReader as fdr
+import requests
 from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
@@ -209,6 +210,72 @@ def classify_theme(name):
             if keyword in name:
                 return theme
     return "기타/개별이슈"
+
+
+
+def get_naver_realtime_price(code):
+    """
+    네이버 금융 시세 페이지에서 현재가를 가져옵니다.
+    FDR StockListing의 Close가 지연/전일 기준으로 보일 때 보정용으로 사용합니다.
+    """
+    try:
+        code = str(code).zfill(6)
+        url = f"https://finance.naver.com/item/main.naver?code={code}"
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://finance.naver.com/"
+        }
+        r = requests.get(url, headers=headers, timeout=3)
+        if r.status_code != 200:
+            return None
+
+        text = r.text
+
+        # 현재가 영역: <p class="no_today"><span class="blind">1,903,000</span>
+        m = re.search(r'<p class="no_today">[\s\S]*?<span class="blind">([\d,]+)</span>', text)
+        if not m:
+            # 보조 패턴
+            m = re.search(r'현재가[\s\S]{0,500}?<span class="blind">([\d,]+)</span>', text)
+
+        if not m:
+            return None
+
+        price = int(m.group(1).replace(",", ""))
+        return price if price > 0 else None
+    except Exception:
+        return None
+
+
+def apply_realtime_prices(df, top_n=160):
+    """
+    분석 속도를 위해 전체 종목이 아니라 거래대금/시총 상위 일부만 실시간 보정합니다.
+    추천/관심 후보군의 현재가 정확도를 높이는 목적입니다.
+    """
+    if df is None or df.empty:
+        return df
+
+    try:
+        target = df.sort_values(["Amount", "Marcap"], ascending=False).head(top_n).index
+    except Exception:
+        target = df.head(top_n).index
+
+    for i in target:
+        try:
+            code = str(df.at[i, "Code"]).zfill(6)
+            live_price = get_naver_realtime_price(code)
+            if live_price and live_price > 0:
+                old_price = float(df.at[i, "Close"] or 0)
+                df.at[i, "Close"] = live_price
+
+                # 기존 Close가 전일/지연가라면 당일 등락률도 보정
+                if old_price > 0:
+                    df.at[i, "liveGap"] = round(((live_price - old_price) / old_price) * 100, 2)
+                else:
+                    df.at[i, "liveGap"] = 0
+        except Exception:
+            continue
+
+    return df
 
 
 def get_market_df(limit=700):
@@ -474,6 +541,10 @@ def api_analyze():
     df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
     df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
     df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+    df["liveGap"] = 0
+
+    # FDR 현재가가 지연/전일 기준으로 보일 수 있어 네이버 금융 현재가로 보정
+    df = apply_realtime_prices(df, top_n=160)
 
     df["theme"] = df["Name"].apply(classify_theme)
     df["themeWeight"] = df["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
@@ -508,6 +579,8 @@ def api_analyze():
             "name": str(row["Name"]),
             "theme": str(row["theme"]),
             "price": float(row["Close"]),
+            "priceSource": "Naver/FDR 보정",
+            "liveGap": round(float(row.get("liveGap", 0)), 2),
             "return5": round(float(row["dayChange"]), 2),
             "return20": 0,
             "volumePower": round(float(row["volumeScore"] / 50), 2),
@@ -871,6 +944,7 @@ function fmtProfitMoney(v) {
       color:#6b7280;
       margin-bottom:4px;
     }
+    .quick-metrics small{display:block;font-size:10px;color:#7b866f;margin-top:3px;}
     .quick-metrics b {
       font-size:15px;
       color:#243025;
@@ -2079,7 +2153,7 @@ function fmtProfitMoney(v) {
             </div>
 
             <div class="quick-metrics">
-              <div><span>현재가</span><b>${fmtPrice(item.price)}</b></div>
+              <div><span>현재가</span><b>${fmtPrice(item.price)}</b><small>${item.priceSource || ""}</small></div>
               <div><span>5일/당일</span>${fmtRate(item.return5)}</div>
               <div><span>거래량</span><b>${item.volumePower}</b></div>
             </div>
