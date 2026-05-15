@@ -2,7 +2,7 @@ import os
 import json
 import math
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, timedelta, timezone
 
 import pandas as pd
 import numpy as np
@@ -829,6 +829,277 @@ def api_realtime_prices():
             "timezone": "KST",
             "count": 0,
             "prices": {}
+        }, 200)
+
+
+
+@app.route("/api/backtest")
+def api_backtest():
+    """
+    최근 1년 기준 5가지 AI 전략 백테스트.
+    실제 매매가 아닌 과거 가격 기반 시뮬레이션입니다.
+    """
+    def json_response(payload, status=200):
+        return Response(
+            json.dumps(safe_json(payload), ensure_ascii=False),
+            status=status,
+            mimetype="application/json; charset=utf-8"
+        )
+
+    try:
+        initial_cash = safe_float(request.args.get("cash", 10000000), 10000000)
+        period_days = int(safe_float(request.args.get("days", 365), 365))
+        period_days = max(30, min(period_days, 365))
+
+        end = now_kst()
+        start = end - pd.DateOffset(days=period_days + 45)
+
+        df = get_market_df()
+        if df is None or df.empty:
+            raise Exception("시장 데이터를 가져오지 못했습니다.")
+
+        df = df.copy()
+        df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
+        df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+        df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
+        df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+        df = df[df["Close"] > 0]
+        df = df.sort_values(["Amount", "Marcap"], ascending=False).head(70)
+
+        candidates = []
+        for _, row in df.iterrows():
+            code = str(row.get("Code", "")).zfill(6)
+            name = str(row.get("Name", ""))
+            if not code or code == "000000":
+                continue
+            candidates.append({
+                "code": code,
+                "name": name,
+                "market": str(row.get("Market", "")),
+                "theme": normalize_output_theme(classify_theme(name)),
+                "basePrice": safe_float(row.get("Close", 0)),
+                "amount": safe_float(row.get("Amount", 0)),
+                "volume": safe_float(row.get("Volume", 0)),
+                "marcap": safe_float(row.get("Marcap", 0))
+            })
+
+        strategies = {
+            "aggressive": {"name": "공격형 AI", "icon": "🔥", "desc": "상승률과 거래대금이 강한 종목을 적극 편입합니다.", "take": 0.12, "stop": -0.07, "max_hold": 18, "slots": 5, "cash_ratio": 0.05},
+            "stable": {"name": "안정형 AI", "icon": "🛡️", "desc": "변동성이 낮고 흐름이 안정적인 종목을 분산 편입합니다.", "take": 0.08, "stop": -0.045, "max_hold": 28, "slots": 5, "cash_ratio": 0.25},
+            "theme": {"name": "테마추종 AI", "icon": "🌊", "desc": "강한 테마에 속한 종목을 우선 편입하고 테마 순환을 추적합니다.", "take": 0.10, "stop": -0.06, "max_hold": 20, "slots": 5, "cash_ratio": 0.10},
+            "scalping": {"name": "단타형 AI", "icon": "⚡", "desc": "짧은 익절·손절 기준으로 빠르게 회전합니다.", "take": 0.045, "stop": -0.025, "max_hold": 7, "slots": 5, "cash_ratio": 0.15},
+            "value": {"name": "가치투자형 AI", "icon": "🌳", "desc": "과열 종목을 피하고 안정적인 흐름을 오래 보유합니다.", "take": 0.16, "stop": -0.10, "max_hold": 55, "slots": 5, "cash_ratio": 0.20}
+        }
+
+        price_data = {}
+        for c in candidates[:55]:
+            try:
+                data = fdr.DataReader(c["code"], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
+                if data is None or data.empty or len(data) < 35:
+                    continue
+                data = data.reset_index()
+                data["Close"] = pd.to_numeric(data["Close"], errors="coerce").ffill().fillna(0)
+                data["Volume"] = pd.to_numeric(data.get("Volume", 0), errors="coerce").fillna(0)
+                data = data[data["Close"] > 0]
+                if len(data) >= 35:
+                    price_data[c["code"]] = {"info": c, "data": data}
+            except Exception:
+                continue
+
+        if not price_data:
+            raise Exception("백테스트용 가격 데이터를 가져오지 못했습니다.")
+
+        all_dates = sorted(list(set().union(*[set(v["data"]["Date"].dt.strftime("%Y-%m-%d")) for v in price_data.values()])))
+        all_dates = all_dates[-period_days:]
+
+        def price_on(code, date):
+            d = price_data[code]["data"]
+            rows = d[d["Date"].dt.strftime("%Y-%m-%d") <= date]
+            if rows.empty:
+                return None
+            return safe_float(rows.iloc[-1]["Close"])
+
+        def momentum_score(code, date, strategy_key):
+            d = price_data[code]["data"]
+            rows = d[d["Date"].dt.strftime("%Y-%m-%d") <= date].tail(25)
+            if len(rows) < 12:
+                return -999
+
+            p0 = safe_float(rows.iloc[-1]["Close"])
+            p5 = safe_float(rows.iloc[-6]["Close"]) if len(rows) >= 6 else p0
+            p20 = safe_float(rows.iloc[0]["Close"])
+            v_now = safe_float(rows.iloc[-5:]["Volume"].mean())
+            v_old = safe_float(rows.iloc[:-5]["Volume"].mean()) if len(rows) > 6 else v_now
+
+            r5 = (p0 - p5) / p5 if p5 > 0 else 0
+            r20 = (p0 - p20) / p20 if p20 > 0 else 0
+            vol_power = v_now / v_old if v_old > 0 else 1
+            info = price_data[code]["info"]
+            theme_bonus = 0.08 if info["theme"] not in ["기타/개별이슈", "미분류"] else -0.03
+            base = r5 * 1.6 + r20 * 0.7 + min(vol_power, 3) * 0.08 + theme_bonus
+
+            if strategy_key == "aggressive":
+                return base + r5 * 1.2 + min(vol_power, 3) * 0.12
+            if strategy_key == "stable":
+                volatility = safe_float(rows["Close"].pct_change().std())
+                return base - volatility * 4 - max(r5 - 0.15, 0) * 2
+            if strategy_key == "theme":
+                return base + theme_bonus * 2 + r20 * 0.5
+            if strategy_key == "scalping":
+                return r5 * 2.8 + min(vol_power, 4) * 0.18 - max(r20 - 0.4, 0)
+            if strategy_key == "value":
+                return base - max(r5 - 0.20, 0) * 1.5 + (0.08 if r20 < 0.25 else -0.03)
+            return base
+
+        def run_strategy(strategy_key, cfg):
+            cash = initial_cash
+            holdings = {}
+            trades = []
+            equity = []
+            wins = 0
+            losses = 0
+            peak = initial_cash
+            max_dd = 0
+
+            for day_idx, date in enumerate(all_dates):
+                for code in list(holdings.keys()):
+                    h = holdings[code]
+                    p = price_on(code, date)
+                    if not p:
+                        continue
+
+                    ret = (p - h["avg"]) / h["avg"] if h["avg"] > 0 else 0
+                    hold_days = day_idx - h["buy_day"]
+                    sell_reason = None
+
+                    if ret >= cfg["take"]:
+                        sell_reason = "익절"
+                    elif ret <= cfg["stop"]:
+                        sell_reason = "손절"
+                    elif hold_days >= cfg["max_hold"]:
+                        sell_reason = "기간청산"
+
+                    if sell_reason:
+                        qty = h["qty"]
+                        amount = qty * p * 0.9975
+                        pnl = amount - h["cost"]
+                        cash += amount
+                        if pnl >= 0:
+                            wins += 1
+                        else:
+                            losses += 1
+                        trades.append({
+                            "date": date, "type": sell_reason, "name": h["name"], "code": code,
+                            "price": round(p, 0), "qty": qty, "pnl": round(pnl, 0),
+                            "returnRate": round(ret * 100, 2)
+                        })
+                        del holdings[code]
+
+                available_slots = cfg["slots"] - len(holdings)
+                if available_slots > 0 and day_idx > 25:
+                    ranked = []
+                    for code in price_data.keys():
+                        if code in holdings:
+                            continue
+                        p = price_on(code, date)
+                        if not p:
+                            continue
+                        score = momentum_score(code, date, strategy_key)
+                        ranked.append((score, code, p))
+
+                    ranked.sort(reverse=True)
+                    reserve = initial_cash * cfg["cash_ratio"]
+                    invest_per_slot = max(0, (cash - reserve) / max(available_slots, 1))
+
+                    for score, code, p in ranked[:available_slots]:
+                        if cash <= reserve or score <= 0:
+                            continue
+                        invest = min(invest_per_slot, cash - reserve)
+                        qty = int(invest // p)
+                        if qty <= 0:
+                            continue
+                        cost = qty * p * 1.0025
+                        if cost > cash:
+                            continue
+
+                        info = price_data[code]["info"]
+                        cash -= cost
+                        holdings[code] = {
+                            "code": code, "name": info["name"], "theme": info["theme"],
+                            "qty": qty, "avg": p, "cost": cost,
+                            "buy_day": day_idx, "buy_date": date
+                        }
+                        trades.append({
+                            "date": date, "type": "매수", "name": info["name"], "code": code,
+                            "price": round(p, 0), "qty": qty,
+                            "score": round(score, 3), "theme": info["theme"]
+                        })
+
+                stock_value = 0
+                for code, h in holdings.items():
+                    p = price_on(code, date)
+                    if p:
+                        stock_value += h["qty"] * p
+
+                total = cash + stock_value
+                peak = max(peak, total)
+                dd = (total - peak) / peak if peak > 0 else 0
+                max_dd = min(max_dd, dd)
+                equity.append({
+                    "date": date, "day": len(equity), "total": round(total, 0),
+                    "returnRate": round((total - initial_cash) / initial_cash * 100, 2)
+                })
+
+            final_total = equity[-1]["total"] if equity else initial_cash
+            total_return = (final_total - initial_cash) / initial_cash * 100
+            total_trades = wins + losses
+            win_rate = wins / total_trades * 100 if total_trades > 0 else 0
+
+            current_holdings = []
+            for code, h in holdings.items():
+                p = price_on(code, all_dates[-1])
+                if not p:
+                    continue
+                pnl = h["qty"] * p - h["cost"]
+                current_holdings.append({
+                    "name": h["name"], "code": code, "theme": h["theme"],
+                    "qty": h["qty"], "avg": round(h["avg"], 0),
+                    "current": round(p, 0), "pnl": round(pnl, 0),
+                    "returnRate": round((p - h["avg"]) / h["avg"] * 100, 2)
+                })
+
+            return {
+                "key": strategy_key, "name": cfg["name"], "icon": cfg["icon"], "desc": cfg["desc"],
+                "finalTotal": round(final_total, 0), "returnRate": round(total_return, 2),
+                "maxDrawdown": round(max_dd * 100, 2), "winRate": round(win_rate, 2),
+                "wins": wins, "losses": losses, "tradeCount": len(trades),
+                "equity": equity, "holdings": current_holdings, "recentTrades": trades[-25:][::-1]
+            }
+
+        results = [run_strategy(key, cfg) for key, cfg in strategies.items()]
+        results.sort(key=lambda x: x["returnRate"], reverse=True)
+        best = results[0]
+
+        notes = {
+            "scalping": "단기 회전 전략이 우세했습니다. 빠른 익절·손절 기준이 유리했던 구간입니다.",
+            "theme": "테마 순환 추적 전략이 우세했습니다. 강한 섹터 중심 대응이 유리했습니다.",
+            "stable": "안정형 전략이 우세했습니다. 변동성 관리와 분산이 중요했던 구간입니다.",
+            "aggressive": "공격형 전략이 우세했습니다. 강한 상승 종목을 과감히 편입하는 전략이 유리했습니다.",
+            "value": "가치투자형 전략이 우세했습니다. 과열을 피하고 길게 보유하는 전략이 유리했습니다."
+        }
+
+        return json_response({
+            "ok": True, "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "periodDays": period_days, "initialCash": initial_cash,
+            "best": best, "marketNote": notes.get(best["key"], "최근 기간 전략별 성과를 비교했습니다."),
+            "results": results
+        })
+
+    except Exception as e:
+        return json_response({
+            "ok": False, "error": str(e), "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "periodDays": 0, "initialCash": 0, "best": {},
+            "marketNote": "백테스트 중 오류가 발생했습니다.", "results": []
         }, 200)
 
 
@@ -2041,6 +2312,29 @@ function fmtProfitMoney(v) {
       to { box-shadow:0 0 18px rgba(220,38,38,.28); }
     }
 
+
+    .backtest-hero {
+      background:linear-gradient(135deg,#5d7758,#8aaa73,#f2c879);
+      color:#fffdf4;
+      border-radius:30px;
+      padding:26px;
+      margin:18px 0;
+      box-shadow:0 18px 40px rgba(98,126,86,.22);
+    }
+    .backtest-hero h3 {
+      font-size:30px;
+      margin:10px 0;
+      line-height:1.25;
+    }
+    .backtest-hero p {
+      font-size:16px;
+      opacity:.92;
+      line-height:1.6;
+    }
+    .backtest-card {
+      border-left:6px solid rgba(127,163,111,.35);
+    }
+
   </style>
 </head>
 <body>
@@ -2191,6 +2485,58 @@ function fmtProfitMoney(v) {
       <h2>🧾 AI 실시간 운용 로그</h2>
       <div id="aiTradeLog"></div>
     </section>
+
+    
+    <section id="backtest" class="section">
+      <h2>🧪 AI 전략 백테스트</h2>
+
+      <div class="backtest-hero">
+        <div class="mini-label">1 YEAR STRATEGY SIMULATION</div>
+        <h3>지난 시장에서 어떤 AI 전략이 가장 강했는지 검증합니다</h3>
+        <p>최근 1년 국내 주식시장 데이터를 기반으로 5가지 AI 전략의 매수·매도 성과를 비교합니다.</p>
+      </div>
+
+      <div class="ai-filter-box">
+        <div class="detail-title">💰 백테스트 초기금액</div>
+        <div class="quick-amounts">
+          <button onclick="setBacktestCash(1000000)">100만원</button>
+          <button onclick="setBacktestCash(10000000)">1000만원</button>
+          <button onclick="setBacktestCash(50000000)">5000만원</button>
+          <button onclick="setBacktestCash(100000000)">1억원</button>
+        </div>
+        <input id="backtestCash" class="trade-input" value="10,000,000">
+      </div>
+
+      <div class="ai-filter-box">
+        <div class="detail-title">📆 검증 기간</div>
+        <div class="ai-filter-buttons">
+          <button onclick="runBacktest(90)">3개월</button>
+          <button onclick="runBacktest(180)">6개월</button>
+          <button onclick="runBacktest(365)">1년</button>
+        </div>
+      </div>
+
+      <button class="primary-btn" onclick="runBacktest(365)">🧪 1년 백테스트 시작</button>
+
+      <div id="backtestStatus" class="ai-portfolio-note">아직 백테스트를 실행하지 않았습니다.</div>
+
+      <div class="chart-card">
+        <h3>📈 전략별 자산 곡선</h3>
+        <canvas id="backtestChart"></canvas>
+      </div>
+
+      <h2>🏆 AI 전략 리그전</h2>
+      <div id="backtestRankList"></div>
+
+      <h2>📌 최적 매수·매도 힌트</h2>
+      <div id="backtestInsight" class="detail-box">
+        백테스트 실행 후 전략별로 유리했던 매수·매도 조건을 표시합니다.
+      </div>
+
+      <h2>🧾 최근 가상 매매 로그</h2>
+      <div id="backtestTradeLog"></div>
+    </section>
+
 
     <section id="portfolio" class="section">
       <h2>💼 성일의 AI 모의투자</h2>
@@ -4063,6 +4409,162 @@ function fmtProfitMoney(v) {
         startRealtimeAutoUpdate();
         updateRealtimePrices(true);
       }
+    }
+
+
+
+    let backtestChart = null;
+    let latestBacktest = null;
+
+    function setBacktestCash(amount) {
+      const el = document.getElementById("backtestCash");
+      if (el) el.value = Number(amount).toLocaleString();
+    }
+
+    function getBacktestCash() {
+      const el = document.getElementById("backtestCash");
+      return parseMoney(el ? el.value : 10000000) || 10000000;
+    }
+
+    async function runBacktest(days=365) {
+      const status = document.getElementById("backtestStatus");
+      if (status) status.innerText = "🧪 백테스트 실행 중입니다. 과거 가격 데이터를 불러오고 전략별 매매를 계산합니다...";
+
+      try {
+        const cash = getBacktestCash();
+        const res = await fetch(`/api/backtest?days=${days}&cash=${cash}`, { cache: "no-store" });
+        const raw = await res.text();
+
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch(e) {
+          console.log("backtest non-json", raw.slice(0, 500));
+          throw new Error("백테스트 서버 응답이 JSON 형식이 아닙니다.");
+        }
+
+        if (!data.ok) throw new Error(data.error || "백테스트 오류");
+
+        latestBacktest = data;
+        renderBacktest(data);
+      } catch(e) {
+        console.log("runBacktest error", e);
+        if (status) status.innerText = "⚠️ 백테스트 오류: " + e.message;
+      }
+    }
+
+    function renderBacktest(data) {
+      const status = document.getElementById("backtestStatus");
+      const best = data.best || {};
+
+      if (status) {
+        status.innerText = `🏆 최근 ${data.periodDays}일 기준 최고 전략은 ${best.icon || ""} ${best.name || "-"}입니다. 수익률 ${Number(best.returnRate || 0).toFixed(2)}%, 최대낙폭 ${Number(best.maxDrawdown || 0).toFixed(2)}%입니다. ${data.marketNote || ""}`;
+      }
+
+      renderBacktestChart(data);
+      renderBacktestRank(data);
+      renderBacktestInsight(data);
+      renderBacktestTrades(data);
+    }
+
+    function renderBacktestChart(data) {
+      const canvas = document.getElementById("backtestChart");
+      if (!canvas) return;
+      if (backtestChart) backtestChart.destroy();
+
+      const results = data.results || [];
+      const maxLen = Math.max(...results.map(r => (r.equity || []).length), 1);
+      const labels = Array.from({length:maxLen}, (_, i) => "D+" + i);
+
+      backtestChart = new Chart(canvas, {
+        type: "line",
+        data: {
+          labels,
+          datasets: results.map(r => ({
+            label: `${r.icon} ${r.name}`,
+            data: (r.equity || []).map(x => x.total),
+            tension: 0.35,
+            borderWidth: 3,
+            fill: false
+          }))
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: true } },
+          scales: {
+            x: { ticks: { maxTicksLimit: 7 } },
+            y: { ticks: { callback: value => Number(value).toLocaleString() } }
+          }
+        }
+      });
+    }
+
+    function renderBacktestRank(data) {
+      const el = document.getElementById("backtestRankList");
+      if (!el) return;
+
+      const results = data.results || [];
+      el.innerHTML = results.map((r, idx) => `
+        <div class="strategy-card backtest-card">
+          <div class="strategy-head">
+            <div>
+              <div class="strategy-title">#${idx + 1} ${r.icon} ${r.name}</div>
+              <div class="strategy-desc">${r.desc}</div>
+            </div>
+            <div class="${Number(r.returnRate) >= 0 ? 'strategy-return' : 'strategy-return loss'}">${Number(r.returnRate || 0).toFixed(2)}%</div>
+          </div>
+          <div class="strategy-grid">
+            <div><span>최종자산</span><b>${fmtMoney(r.finalTotal)}</b></div>
+            <div><span>승률</span><b>${Number(r.winRate || 0).toFixed(1)}%</b></div>
+            <div><span>최대낙폭</span><b class="blue">${Number(r.maxDrawdown || 0).toFixed(2)}%</b></div>
+            <div><span>매매횟수</span><b>${r.tradeCount || 0}회</b></div>
+            <div><span>승/패</span><b>${r.wins || 0}/${r.losses || 0}</b></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderBacktestInsight(data) {
+      const el = document.getElementById("backtestInsight");
+      if (!el) return;
+
+      const best = data.best || {};
+      let guide = "";
+
+      if (best.key === "scalping") {
+        guide = `<b>⚡ 단타형이 우세한 구간입니다.</b><ul><li>거래량이 평소보다 급증한 종목을 우선 확인합니다.</li><li>익절은 짧게, 손절은 더 짧게 잡는 방식이 유리했습니다.</li><li>오른 종목을 오래 들고 가기보다 빠른 회전이 중요합니다.</li></ul>`;
+      } else if (best.key === "theme") {
+        guide = `<b>🌊 테마추종형이 우세한 구간입니다.</b><ul><li>강한 테마 안에서 1등 종목과 후발 종목을 함께 확인합니다.</li><li>테마 평균점수가 높아질 때 편입하고 약해지면 축소하는 방식이 좋습니다.</li><li>종목보다 섹터 흐름을 먼저 봅니다.</li></ul>`;
+      } else if (best.key === "aggressive") {
+        guide = `<b>🔥 공격형이 우세한 구간입니다.</b><ul><li>AI점수, 거래량, 단기 상승률이 동시에 강한 종목을 우선 편입합니다.</li><li>수익률은 높지만 낙폭도 커질 수 있어 분할매수가 중요합니다.</li><li>손절 기준을 반드시 둬야 합니다.</li></ul>`;
+      } else if (best.key === "stable") {
+        guide = `<b>🛡️ 안정형이 우세한 구간입니다.</b><ul><li>과열 종목보다 점수와 안정성이 균형 잡힌 종목이 유리했습니다.</li><li>현금 비중을 남기고 분산하는 방식이 손실 방어에 좋습니다.</li><li>급등주 추격보다 눌림 후 재상승 확인이 중요합니다.</li></ul>`;
+      } else {
+        guide = `<b>🌳 가치투자형이 우세한 구간입니다.</b><ul><li>과열 구간을 피하고 안정적인 추세 종목을 오래 보유하는 방식이 유리했습니다.</li><li>단기 수익보다 최대낙폭 관리와 보유 기간이 중요했습니다.</li><li>실적·업종·테마 안정성이 함께 필요합니다.</li></ul>`;
+      }
+
+      el.innerHTML = guide;
+    }
+
+    function renderBacktestTrades(data) {
+      const el = document.getElementById("backtestTradeLog");
+      if (!el) return;
+
+      const best = data.best || {};
+      const trades = best.recentTrades || [];
+      if (!trades.length) {
+        el.innerHTML = `<div class="empty-box">매매 로그가 없습니다.</div>`;
+        return;
+      }
+
+      el.innerHTML = trades.map(t => `
+        <div class="ai-log-card">
+          <b>${t.date} · ${t.type}</b> · ${t.name} (${t.code})<br>
+          수량 ${t.qty || "-"}주 · 가격 ${fmtMoney(t.price || 0)}
+          ${t.pnl !== undefined ? `<br>손익 <b class="${Number(t.pnl) >= 0 ? 'red' : 'blue'}">${fmtProfitMoney(t.pnl)}</b> · 수익률 ${Number(t.returnRate || 0).toFixed(2)}%` : ""}
+          ${t.theme ? `<br>테마 ${t.theme}` : ""}
+        </div>
+      `).join("");
     }
 
 
