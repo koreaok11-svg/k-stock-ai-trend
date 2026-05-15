@@ -439,6 +439,13 @@ def index():
     return render_template_string(HTML)
 
 
+
+def normalize_output_theme(theme):
+    if theme in [None, "", "미분류"]:
+        return "기타/개별이슈"
+    return theme
+
+
 @app.route("/api/analyze")
 def api_analyze():
     limit = int(request.args.get("limit", "700"))
@@ -603,7 +610,8 @@ HTML = """
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#6fa87a">
   <title>K-Stock AI Trend</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
     
     function normalizeThemeClient(item) {
       if (!item) return item;
@@ -2182,6 +2190,7 @@ function fmtProfitMoney(v) {
 
 
     function makeThemeStockCard(item) {
+      item = normalizeThemeClient(item);
       const p = item.companyProfile || {};
       return `
         <div class="theme-stock-card">
@@ -2234,7 +2243,8 @@ function fmtProfitMoney(v) {
 
     function renderThemeList(data) {
       const groups = data.themeGroups || {};
-      return data.summary.map(t => {
+      const summary = data.summary || [];
+      return summary.map(t => {
         const key = btoa(unescape(encodeURIComponent(t.theme))).replace(/=/g, "");
         const items = groups[t.theme] || [];
         const stockHtml = items.map(item => makeThemeStockCard(item)).join("");
@@ -3563,6 +3573,21 @@ function fmtProfitMoney(v) {
       try {
         const res = await fetch(`/api/analyze?limit=${limit}`);
         const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || "API 분석 오류");
+        }
+
+        data.recommend = data.recommend || [];
+        data.watch = data.watch || [];
+        data.all = data.all || [];
+        data.summary = data.summary || [];
+        data.themeGroups = data.themeGroups || {};
+
+        data.recommend = data.recommend.map(normalizeThemeClient);
+        data.watch = data.watch.map(normalizeThemeClient);
+        data.all = data.all.map(normalizeThemeClient);
+
         latestData = data;
         document.getElementById("analyzedCount").innerText = data.analyzedCount || 0;
         document.getElementById("recommendList").innerHTML = data.recommend.map(item => makeCard(item, "recommend")).join("");
@@ -3574,7 +3599,8 @@ function fmtProfitMoney(v) {
         renderAiSim();
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (e) {
-        loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p>";
+        console.log("runAnalyze error", e);
+        loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p><small style='color:#6b7280'>" + (e.message || "") + "</small>";
       }
     }
     window.addEventListener('load', () => { renderPortfolio(); renderAiSim(); multiAiAutoRunIfNeeded(); });
