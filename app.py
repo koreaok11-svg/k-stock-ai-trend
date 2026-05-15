@@ -282,7 +282,7 @@ def get_naver_realtime_price(code):
             "User-Agent": "Mozilla/5.0",
             "Referer": "https://finance.naver.com/"
         }
-        r = requests.get(url, headers=headers, timeout=1.0)
+        r = requests.get(url, headers=headers, timeout=0.5)
         if r.status_code != 200:
             return None
 
@@ -574,7 +574,7 @@ def normalize_output_theme(theme):
 def api_analyze():
     try:
         limit = int(request.args.get("limit", "700"))
-        limit = max(100, min(limit, 1600))
+        limit = max(100, min(limit, 700))
 
         df = get_market_df(limit=limit)
 
@@ -637,7 +637,7 @@ def api_analyze():
                 "name": str(row["Name"]),
                 "theme": str(row["theme"]),
                 "price": safe_float(row["Close"]),
-                "priceSource": "Naver/FDR 보정",
+                "priceSource": "FDR 안정 기준",
                 "liveGap": round(safe_float(row.get("liveGap", 0)), 2),
                 "return5": round(safe_float(row["dayChange"]), 2),
                 "return20": 0,
@@ -658,7 +658,7 @@ def api_analyze():
 
         # 추천/관심 상위 후보만 네이버 현재가로 빠르게 보정합니다.
         # 전체 1600개에 적용하면 분석 시간이 길어져 JSON 대신 Render 오류 HTML이 반환될 수 있습니다.
-        for item in records[:30]:
+        for item in records[:0]:
             try:
                 live_price = get_naver_realtime_price(item["code"])
                 if live_price and live_price > 0:
@@ -2188,7 +2188,7 @@ function fmtProfitMoney(v) {
         },
         "1600": {
           title: "🌌 전체 근접 1600개",
-          desc: "코스피·코스닥 대부분을 최대한 넓게 분석합니다. 시간이 오래 걸릴 수 있지만 시장 전체 흐름 파악에 좋습니다."
+          desc: "코스피·코스닥 대부분을 넓게 보는 모드입니다. Render 무료 서버에서는 안정화를 위해 실제 분석은 최대 700개로 자동 보정됩니다."
         }
       };
       const item = guide[value] || guide["700"];
@@ -3754,7 +3754,7 @@ function fmtProfitMoney(v) {
           data = JSON.parse(rawText);
         } catch(parseError) {
           console.log("API returned non-JSON:", rawText.slice(0, 500));
-          throw new Error("서버가 JSON이 아닌 응답을 반환했습니다. Render Logs에서 실제 오류를 확인해 주세요.");
+          throw new Error("서버 응답이 지연되었거나 Render가 HTML 오류 페이지를 반환했습니다. 안정 모드로 다시 실행해 주세요.");
         }
 
         if (!res.ok || data.error) {
