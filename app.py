@@ -529,7 +529,18 @@ HTML = """
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#6fa87a">
   <title>K-Stock AI Trend</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js">
+    function fmtProfitMoney(v) {
+      const n = Number(v || 0);
+      if (n === 0) return "0원";
+      return (n > 0 ? "+" : "-") + Math.abs(Math.round(n)).toLocaleString() + "원";
+    }
+
+    function profitClass(v) {
+      return Number(v || 0) >= 0 ? "red" : "blue";
+    }
+
+</script>
   <style>
     :root { --bg:#fffaf0; --card:#fff; --text:#243025; --sub:#6b7280; --blue:#2563eb; --red:#dc2626; --dark:#48634d; --line:#e5e7eb; --yellow:#fffbeb; }
     * { box-sizing:border-box; }
@@ -1869,6 +1880,19 @@ HTML = """
   </div>
 
   <script>
+
+    /* PROFIT_HELPER_SAFE */
+    function fmtProfitMoney(v) {
+      const n = Number(v || 0);
+      if (n === 0) return "0원";
+      return (n > 0 ? "+" : "-") + Math.abs(Math.round(n)).toLocaleString() + "원";
+    }
+
+    function profitClass(v) {
+      return Number(v || 0) >= 0 ? "red" : "blue";
+    }
+
+
     let stockChart = null;
     let latestData = null;
 
@@ -2703,7 +2727,7 @@ HTML = """
           <div class="history-card">
             <b>${h.type}</b> · ${h.name} ${h.code !== "CASH" ? "(" + h.code + ")" : ""}<br>
             ${h.qty ? `수량 ${h.qty}주 · 단가 ${fmtMoney(h.price)} · 금액 ${fmtMoney(h.amount)}` : `금액 ${fmtMoney(h.amount)}`}
-            ${h.profit !== undefined ? `<br>실현손익 <b class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</b>` : ""}
+            ${h.profit !== undefined ? `<br>실현손익 <b class="${profitClass(h.profit)}">${fmtProfitMoney(h.profit)}</b>` : ""}
             <br><span style="color:#6b7280">${h.time}</span>
           </div>
         `).join("");
@@ -3427,13 +3451,17 @@ HTML = """
           <div class="ai-log-card strategy-log">
             <b>D+${h.day} · ${h.strategy || ""} · ${h.type}</b> ${h.name ? "· " + h.name + " (" + h.code + ")" : ""}<br>
             ${h.qty ? `수량 ${h.qty}주 · 단가 ${fmtMoney(h.price)} · 금액 ${fmtMoney(h.amount)}<br>` : ""}
-            ${h.profit !== undefined ? `실현손익 <b class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</b><br>` : ""}
+            ${h.profit !== undefined ? `실현손익 <b class="${profitClass(h.profit)}">${fmtProfitMoney(h.profit)}</b><br>` : ""}
             ${h.text || ""}
             <br><span style="color:#6b7280">${h.time}</span>
           </div>
         `).join("");
 
-      renderAiEquityChart(sim);
+      try {
+        renderAiEquityChart(sim);
+      } catch(e) {
+        console.log("chart render skipped", e);
+      }
     }
 
     async function runAnalyze() {
