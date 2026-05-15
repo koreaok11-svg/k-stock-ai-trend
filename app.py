@@ -582,7 +582,7 @@ def normalize_output_theme(theme):
 def api_analyze():
     try:
         limit = int(request.args.get("limit", "700"))
-        limit = max(100, min(limit, 700))
+        limit = max(100, min(limit, 400))
 
         df = get_market_df(limit=limit)
 
@@ -665,7 +665,7 @@ def api_analyze():
             records.append(item)
 
         # 추천/관심 상위 후보만 네이버 현재가로 빠르게 보정합니다.
-        # 전체 1600개에 적용하면 분석 시간이 길어져 JSON 대신 Render 오류 HTML이 반환될 수 있습니다.
+        # 전체 400개에 적용하면 분석 시간이 길어져 JSON 대신 Render 오류 HTML이 반환될 수 있습니다.
         for item in records[:0]:
             try:
                 live_price = get_naver_realtime_price(item["code"])
@@ -1100,6 +1100,340 @@ def api_backtest():
             "ok": False, "error": str(e), "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "periodDays": 0, "initialCash": 0, "best": {},
             "marketNote": "백테스트 중 오류가 발생했습니다.", "results": []
+        }, 200)
+
+
+
+@app.route("/api/scalping_learn")
+def api_scalping_learn():
+    """
+    단타형 실전 AI 학습모드.
+    최근 1년/6개월 데이터를 기준으로 여러 익절/손절/보유기간 조건을 자동 탐색하고,
+    최근 1개월 가상 운용 결과와 오늘 후보 3~5개를 반환합니다.
+    """
+    def json_response(payload, status=200):
+        return Response(
+            json.dumps(safe_json(payload), ensure_ascii=False),
+            status=status,
+            mimetype="application/json; charset=utf-8"
+        )
+
+    try:
+        initial_cash = safe_float(request.args.get("cash", 10000000), 10000000)
+        days = int(safe_float(request.args.get("days", 365), 365))
+        days = max(90, min(days, 365))
+
+        end = now_kst()
+        start = end - pd.DateOffset(days=days + 45)
+
+        df = get_market_df()
+        if df is None or df.empty:
+            raise Exception("시장 데이터를 가져오지 못했습니다.")
+
+        df = df.copy()
+        df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
+        df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+        df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
+        df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+        df = df[df["Close"] > 0]
+
+        # Render 무료 서버 안정화: 거래대금/시총 상위 45개만 학습 후보
+        df = df.sort_values(["Amount", "Marcap"], ascending=False).head(45)
+
+        candidates = []
+        for _, row in df.iterrows():
+            code = str(row.get("Code", "")).zfill(6)
+            name = str(row.get("Name", ""))
+            if not code or code == "000000":
+                continue
+            candidates.append({
+                "code": code,
+                "name": name,
+                "market": str(row.get("Market", "")),
+                "theme": normalize_output_theme(classify_theme(name)),
+                "amount": safe_float(row.get("Amount", 0)),
+                "marcap": safe_float(row.get("Marcap", 0))
+            })
+
+        price_data = {}
+        for c in candidates:
+            try:
+                data = fdr.DataReader(c["code"], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
+                if data is None or data.empty or len(data) < 45:
+                    continue
+                data = data.reset_index()
+                data["Close"] = pd.to_numeric(data["Close"], errors="coerce").ffill().fillna(0)
+                data["Volume"] = pd.to_numeric(data.get("Volume", 0), errors="coerce").fillna(0)
+                data = data[data["Close"] > 0]
+                if len(data) >= 45:
+                    price_data[c["code"]] = {"info": c, "data": data}
+            except Exception:
+                continue
+
+        if not price_data:
+            raise Exception("학습용 가격 데이터를 가져오지 못했습니다.")
+
+        all_dates = sorted(list(set().union(*[set(v["data"]["Date"].dt.strftime("%Y-%m-%d")) for v in price_data.values()])))
+        all_dates = all_dates[-days:]
+
+        def price_on(code, date):
+            d = price_data[code]["data"]
+            rows = d[d["Date"].dt.strftime("%Y-%m-%d") <= date]
+            if rows.empty:
+                return None
+            return safe_float(rows.iloc[-1]["Close"])
+
+        def scalp_score(code, date, min_r5=0.03, vol_mult=1.2):
+            d = price_data[code]["data"]
+            rows = d[d["Date"].dt.strftime("%Y-%m-%d") <= date].tail(25)
+            if len(rows) < 12:
+                return -999
+
+            p0 = safe_float(rows.iloc[-1]["Close"])
+            p3 = safe_float(rows.iloc[-4]["Close"]) if len(rows) >= 4 else p0
+            p5 = safe_float(rows.iloc[-6]["Close"]) if len(rows) >= 6 else p0
+            p20 = safe_float(rows.iloc[0]["Close"])
+
+            v_now = safe_float(rows.iloc[-3:]["Volume"].mean())
+            v_old = safe_float(rows.iloc[:-3]["Volume"].mean()) if len(rows) > 6 else v_now
+
+            r3 = (p0 - p3) / p3 if p3 > 0 else 0
+            r5 = (p0 - p5) / p5 if p5 > 0 else 0
+            r20 = (p0 - p20) / p20 if p20 > 0 else 0
+            vol_power = v_now / v_old if v_old > 0 else 1
+
+            info = price_data[code]["info"]
+            theme_bonus = 0.05 if info["theme"] not in ["기타/개별이슈", "미분류"] else -0.02
+
+            # 단타 필터: 너무 약하면 제외, 과열은 감점
+            if r5 < min_r5:
+                return -999
+            if vol_power < vol_mult:
+                return -999
+
+            overheat_penalty = max(r20 - 0.45, 0) * 1.5
+            return r3 * 2.2 + r5 * 2.8 + min(vol_power, 4) * 0.18 + theme_bonus - overheat_penalty
+
+        def simulate(params, sim_dates):
+            cash = initial_cash
+            holdings = {}
+            trades = []
+            equity = []
+            wins = 0
+            losses = 0
+            peak = initial_cash
+            max_dd = 0
+
+            take = params["take"]
+            stop = params["stop"]
+            max_hold = params["max_hold"]
+            min_r5 = params["min_r5"]
+            vol_mult = params["vol_mult"]
+            slots = 4
+
+            for day_idx, date in enumerate(sim_dates):
+                # 매도
+                for code in list(holdings.keys()):
+                    h = holdings[code]
+                    p = price_on(code, date)
+                    if not p:
+                        continue
+
+                    ret = (p - h["avg"]) / h["avg"] if h["avg"] > 0 else 0
+                    hold_days = day_idx - h["buy_day"]
+                    reason = None
+
+                    if ret >= take:
+                        reason = "익절"
+                    elif ret <= stop:
+                        reason = "손절"
+                    elif hold_days >= max_hold:
+                        reason = "시간청산"
+
+                    if reason:
+                        amount = h["qty"] * p * 0.9975
+                        pnl = amount - h["cost"]
+                        cash += amount
+                        if pnl >= 0:
+                            wins += 1
+                        else:
+                            losses += 1
+                        trades.append({
+                            "date": date, "type": reason, "name": h["name"], "code": code,
+                            "price": round(p, 0), "qty": h["qty"], "pnl": round(pnl, 0),
+                            "returnRate": round(ret * 100, 2), "theme": h["theme"]
+                        })
+                        del holdings[code]
+
+                # 매수
+                slots_left = slots - len(holdings)
+                if slots_left > 0 and day_idx > 25:
+                    ranked = []
+                    for code in price_data.keys():
+                        if code in holdings:
+                            continue
+                        p = price_on(code, date)
+                        if not p:
+                            continue
+                        score = scalp_score(code, date, min_r5=min_r5, vol_mult=vol_mult)
+                        if score > 0:
+                            ranked.append((score, code, p))
+
+                    ranked.sort(reverse=True)
+                    reserve = initial_cash * 0.18
+                    invest_per = max(0, (cash - reserve) / max(slots_left, 1))
+
+                    for score, code, p in ranked[:slots_left]:
+                        if cash <= reserve:
+                            break
+
+                        invest = min(invest_per, cash - reserve)
+                        qty = int(invest // p)
+                        if qty <= 0:
+                            continue
+
+                        cost = qty * p * 1.0025
+                        if cost > cash:
+                            continue
+
+                        info = price_data[code]["info"]
+                        cash -= cost
+                        holdings[code] = {
+                            "code": code, "name": info["name"], "theme": info["theme"],
+                            "qty": qty, "avg": p, "cost": cost, "buy_day": day_idx
+                        }
+                        trades.append({
+                            "date": date, "type": "매수", "name": info["name"], "code": code,
+                            "price": round(p, 0), "qty": qty, "score": round(score, 3), "theme": info["theme"]
+                        })
+
+                stock_value = 0
+                for code, h in holdings.items():
+                    p = price_on(code, date)
+                    if p:
+                        stock_value += h["qty"] * p
+
+                total = cash + stock_value
+                peak = max(peak, total)
+                dd = (total - peak) / peak if peak > 0 else 0
+                max_dd = min(max_dd, dd)
+
+                equity.append({
+                    "date": date, "day": len(equity), "total": round(total, 0),
+                    "returnRate": round((total - initial_cash) / initial_cash * 100, 2)
+                })
+
+            final_total = equity[-1]["total"] if equity else initial_cash
+            total_return = (final_total - initial_cash) / initial_cash * 100
+            closed = wins + losses
+            win_rate = wins / closed * 100 if closed > 0 else 0
+
+            return {
+                "params": params,
+                "finalTotal": round(final_total, 0),
+                "returnRate": round(total_return, 2),
+                "maxDrawdown": round(max_dd * 100, 2),
+                "winRate": round(win_rate, 2),
+                "wins": wins,
+                "losses": losses,
+                "tradeCount": len(trades),
+                "equity": equity,
+                "trades": trades
+            }
+
+        # 자동 조건 탐색
+        param_grid = []
+        for take in [0.035, 0.045, 0.06, 0.08]:
+            for stop in [-0.018, -0.025, -0.035]:
+                for max_hold in [3, 5, 7, 10]:
+                    for min_r5 in [0.025, 0.04, 0.06]:
+                        param_grid.append({
+                            "take": take, "stop": stop, "max_hold": max_hold,
+                            "min_r5": min_r5, "vol_mult": 1.2
+                        })
+
+        learn_dates = all_dates[:-22] if len(all_dates) > 80 else all_dates
+        test_dates = all_dates[-22:] if len(all_dates) > 40 else all_dates[-20:]
+
+        results = []
+        for params in param_grid[:144]:
+            r = simulate(params, learn_dates)
+            # 수익률, 승률, 낙폭을 함께 보는 점수
+            score = r["returnRate"] * 0.55 + r["winRate"] * 0.25 + r["maxDrawdown"] * 0.45
+            if r["tradeCount"] < 5:
+                score -= 20
+            r["learnScore"] = round(score, 2)
+            results.append(r)
+
+        results.sort(key=lambda x: x["learnScore"], reverse=True)
+        best_params = results[0]["params"]
+
+        # 최근 1개월 검증
+        month_result = simulate(best_params, test_dates)
+
+        # 오늘 후보 3~5개 산출
+        last_date = all_dates[-1]
+        picks = []
+        for code in price_data.keys():
+            p = price_on(code, last_date)
+            if not p:
+                continue
+            s = scalp_score(code, last_date, min_r5=best_params["min_r5"], vol_mult=best_params["vol_mult"])
+            if s <= 0:
+                continue
+            info = price_data[code]["info"]
+            picks.append({
+                "code": code, "name": info["name"], "market": info["market"], "theme": info["theme"],
+                "price": round(p, 0), "score": round(s * 100, 2),
+                "buyZone": round(p * 0.995, 0),
+                "target": round(p * (1 + best_params["take"]), 0),
+                "stop": round(p * (1 + best_params["stop"]), 0),
+                "maxHold": best_params["max_hold"],
+                "reason": "최근 단기 상승률과 거래량 조건이 학습된 단타 기준을 통과했습니다."
+            })
+
+        picks.sort(key=lambda x: x["score"], reverse=True)
+        picks = picks[:5]
+
+        return json_response({
+            "ok": True,
+            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "initialCash": initial_cash,
+            "learnDays": len(learn_dates),
+            "testDays": len(test_dates),
+            "bestParams": best_params,
+            "bestLearn": {
+                "returnRate": results[0]["returnRate"],
+                "winRate": results[0]["winRate"],
+                "maxDrawdown": results[0]["maxDrawdown"],
+                "tradeCount": results[0]["tradeCount"],
+                "learnScore": results[0]["learnScore"]
+            },
+            "monthResult": month_result,
+            "picks": picks,
+            "topConditions": [
+                {
+                    "rank": i + 1,
+                    "params": r["params"],
+                    "returnRate": r["returnRate"],
+                    "winRate": r["winRate"],
+                    "maxDrawdown": r["maxDrawdown"],
+                    "tradeCount": r["tradeCount"],
+                    "learnScore": r["learnScore"]
+                }
+                for i, r in enumerate(results[:5])
+            ],
+            "message": "단타형 AI가 최근 시장에서 승률과 수익률이 가장 좋았던 조건을 자동 탐색했습니다."
+        })
+
+    except Exception as e:
+        return json_response({
+            "ok": False,
+            "error": str(e),
+            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "picks": [],
+            "topConditions": [],
+            "monthResult": {"equity": [], "trades": []}
         }, 200)
 
 
@@ -2335,6 +2669,71 @@ function fmtProfitMoney(v) {
       border-left:6px solid rgba(127,163,111,.35);
     }
 
+
+    .scalping-hero {
+      background:linear-gradient(135deg,#335c43,#75a874,#f2c879);
+      color:#fffdf4;
+      border-radius:30px;
+      padding:28px;
+      margin:18px 0;
+      box-shadow:0 18px 42px rgba(69,104,72,.24);
+    }
+    .scalping-hero h3 {
+      font-size:30px;
+      margin:10px 0;
+      line-height:1.25;
+    }
+    .scalping-hero p {
+      font-size:16px;
+      opacity:.94;
+      line-height:1.65;
+    }
+    .scalp-action-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin:16px 0;
+    }
+    .primary-btn.sub {
+      background:linear-gradient(135deg,#8aaa73,#f2c879);
+    }
+    .scalp-condition-main {
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:10px;
+      margin:12px 0;
+    }
+    .scalp-condition-main div {
+      background:#f7f7ed;
+      border-radius:18px;
+      padding:14px;
+      text-align:center;
+      border:1px solid rgba(127,163,111,.25);
+    }
+    .scalp-condition-main span {
+      display:block;
+      color:#6b7280;
+      font-size:12px;
+      margin-bottom:5px;
+    }
+    .scalp-condition-main b {
+      font-size:20px;
+      color:#263629;
+    }
+    .scalp-pick-card {
+      border-left:6px solid rgba(242,170,76,.65);
+    }
+    .small-notice {
+      margin-top:22px;
+      font-size:14px;
+    }
+    @media(max-width:720px) {
+      .scalp-action-grid,
+      .scalp-condition-main {
+        grid-template-columns:1fr 1fr;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -2370,13 +2769,13 @@ function fmtProfitMoney(v) {
       <label>분석 범위</label>
       <select id="limit" onchange="updateLimitGuide()">
         <option value="400">빠른 분석 400개</option>
-        <option value="700" selected>기본 분석 700개</option>
-        <option value="1200">확장 분석 1200개</option>
-        <option value="1600">전체 근접 1600개</option>
+        <option value="400" selected>기본 분석 400개</option>
+        <option value="1200">확장 분석 400개</option>
+        <option value="1600">확장 분석 400개</option>
       </select>
 
       <div id="limitGuide" class="limit-guide">
-        <div class="limit-title">📘 기본 분석 700개</div>
+        <div class="limit-title">📘 기본 분석 400개</div>
         <div class="limit-desc">속도와 정확도의 균형이 가장 좋은 기본 모드입니다. 매일 확인용으로 추천합니다.</div>
       </div>
 
@@ -2385,6 +2784,7 @@ function fmtProfitMoney(v) {
     </section>
 
     <div class="notice">⚠️ 투자 판단 보조용입니다. 실제 매수·매도는 본인 판단과 손절 기준이 필요합니다.</div>
+<div class="trade-helper">최종 경량 버전: 무료 Render 안정화를 위해 단타형 실전 AI 학습모드에 집중했습니다.</div>
 <div id="realtimeBadge" class="realtime-badge">⚪ 실시간 자동갱신 OFF</div>
 <div class="trade-helper realtime-note">※ 표시 시간은 한국시간(KST)입니다. Naver 현재가 실패 종목은 FDR 최근가로 보조 표시됩니다.</div>
 
@@ -2398,177 +2798,67 @@ function fmtProfitMoney(v) {
       <div class="tab active" onclick="showTab('recommend', this)">🔥 추천</div>
       <div class="tab" onclick="showTab('watch', this)">👀 관심</div>
       <div class="tab" onclick="showTab('theme', this)">📊 테마</div>
-      <div class="tab" onclick="showTab('portfolio', this); renderPortfolio();">💼 모의</div>
-      <div class="tab" onclick="showTab('aiSim', this); renderAiSim();">🤖 AI</div>
+      <div class="tab" onclick="showTab('scalpingAi', this)">⚡ 단타AI</div>
     </div>
 
     <section id="recommend" class="section active"><h2>🔥 추천종목 TOP10</h2><div id="recommendList"></div></section>
     <section id="watch" class="section"><h2>👀 관심종목 TOP30</h2><div id="watchList"></div></section>
     <section id="theme" class="section"><h2>📊 테마별 흐름</h2><div id="themeList" class="theme-box"></div><div class="trade-helper">상위 테마 최대 16개까지 표시됩니다.</div></section>
 
-    <section id="aiSim" class="section">
-      <h2>🤖 AI 전략별 자동운용 시뮬레이션</h2>
 
-      <div class="ai-sim-hero">
-        <div class="portfolio-mini">5 AI STRATEGY AUTO TRADING</div>
-        <h3>5명의 AI가 각자 다른 전략으로 투자합니다 🍃</h3>
-        <p>공격형·안정형·테마추종·단타형·가치투자형 AI가 각각 5개 종목을 운용하고 수익률을 비교합니다.</p>
+    <section id="scalpingAi" class="section">
+      <h2>⚡ 실전형 단타 AI 학습모드</h2>
 
-        <div class="portfolio-grid">
-          <div><span>최고 전략</span><b id="bestStrategy">-</b></div>
-          <div><span>운용 경과</span><b id="multiAiDay">-</b></div>
-          <div><span>자동운용</span><b id="multiAiStatus">-</b></div>
-        </div>
-      </div>
-
-      <div class="ai-start-box">
-        <div class="detail-title">💰 전략별 초기 투자금 설정</div>
-        <p>각 AI 전략마다 동일한 가상 투자금으로 시작합니다. 시작 후 앱 접속 시 날짜가 바뀌면 자동으로 1일 운용됩니다.</p>
-
-        <div class="ai-money-buttons">
-          <button onclick="setAiStartAmount(1000000)">100만원</button>
-          <button onclick="setAiStartAmount(10000000)">1000만원</button>
-          <button onclick="setAiStartAmount(50000000)">5000만원</button>
-          <button onclick="setAiStartAmount(100000000)">1억원</button>
-        </div>
-
-        <input id="aiStartAmount" class="trade-input ai-start-input" inputmode="numeric" value="10000000">
-
-        <button class="ai-start-btn" onclick="multiAiStart()">🚀 5가지 AI 자동운용 시작</button>
-        <div class="trade-helper">기존 AI 시뮬레이션이 있으면 새 투자금 기준으로 초기화 후 다시 시작됩니다.</div>
-      </div>
-
-      <div class="ai-sim-actions">
-        <button onclick="multiAiStart()">🚀 5가지 AI 자동운용 시작</button>
-        <button onclick="updateRealtimePrices(false)">🔄 실시간 Naver/FDR 갱신</button>
-        <button onclick="multiAiToggleAuto()" id="aiAutoBtn">⏸ 자동운용 켜짐</button>
-        <button onclick="multiAiReset()">🔄 초기화</button>
-      </div>
-
-      
-      <div class="ai-sim-actions realtime-actions">
-        <button onclick="updateRealtimePrices(false)">🔄 실시간 Naver/FDR 갱신</button>
-        <button onclick="toggleRealtimeAutoUpdate()">🔴 30초 자동갱신</button>
+      <div class="scalping-hero">
+        <div class="mini-label">SCALPING AI LEARNING MODE</div>
+        <h3>최근 1년 승률이 가장 좋았던 단타 조건을 자동 탐색합니다</h3>
+        <p>
+          Render 무료 서버에 맞게 단일 전략에 집중합니다. 과거 1년 데이터를 바탕으로 익절·손절·보유기간 조건을 학습하고,
+          최근 1개월 가상 운용 결과와 오늘의 3~5개 후보를 보여줍니다.
+        </p>
       </div>
 
       <div class="ai-filter-box">
-        <div class="detail-title">📊 성과 조회 기간</div>
-        <div class="ai-filter-buttons">
-          <button onclick="setAiViewRange('1D')">1일</button>
-          <button onclick="setAiViewRange('1W')">1주</button>
-          <button onclick="setAiViewRange('1M')">1개월</button>
-          <button onclick="setAiViewRange('2M')">2개월</button>
-          <button onclick="setAiViewRange('1Y')">1년</button>
-          <button onclick="setAiViewRange('ALL')">전체</button>
-        </div>
-        <div id="aiRangeSummary" class="trade-helper">전체 운용 성과를 표시합니다.</div>
-      </div>
-
-      <div class="ai-portfolio-note" id="aiSimNote">
-        🤖 초기 투자금을 선택하고 5가지 AI 자동운용 시작을 눌러주세요.
-      </div>
-
-      <div class="ai-chart-card">
-        <div class="detail-title">📈 전략별 자산 추이</div>
-        <canvas id="aiEquityChart"></canvas>
-      </div>
-
-      <h2>🏆 전략별 수익률 비교</h2>
-      <div id="strategyRankList"></div>
-
-      <h2>🎯 전략별 선택 5종목</h2>
-      <div id="strategyPickList"></div>
-
-      <h2>💼 전략별 보유 포트폴리오</h2>
-      <div id="strategyHoldingList"></div>
-
-      <h2>🧾 AI 실시간 운용 로그</h2>
-      <div id="aiTradeLog"></div>
-    </section>
-
-    
-    <section id="backtest" class="section">
-      <h2>🧪 AI 전략 백테스트</h2>
-
-      <div class="backtest-hero">
-        <div class="mini-label">1 YEAR STRATEGY SIMULATION</div>
-        <h3>지난 시장에서 어떤 AI 전략이 가장 강했는지 검증합니다</h3>
-        <p>최근 1년 국내 주식시장 데이터를 기반으로 5가지 AI 전략의 매수·매도 성과를 비교합니다.</p>
-      </div>
-
-      <div class="ai-filter-box">
-        <div class="detail-title">💰 백테스트 초기금액</div>
+        <div class="detail-title">💰 가상 학습 투자금</div>
         <div class="quick-amounts">
-          <button onclick="setBacktestCash(1000000)">100만원</button>
-          <button onclick="setBacktestCash(10000000)">1000만원</button>
-          <button onclick="setBacktestCash(50000000)">5000만원</button>
-          <button onclick="setBacktestCash(100000000)">1억원</button>
+          <button onclick="setScalpCash(1000000)">100만원</button>
+          <button onclick="setScalpCash(10000000)">1000만원</button>
+          <button onclick="setScalpCash(50000000)">5000만원</button>
+          <button onclick="setScalpCash(100000000)">1억원</button>
         </div>
-        <input id="backtestCash" class="trade-input" value="10,000,000">
+        <input id="scalpCash" class="trade-input" value="10,000,000">
       </div>
 
-      <div class="ai-filter-box">
-        <div class="detail-title">📆 검증 기간</div>
-        <div class="ai-filter-buttons">
-          <button onclick="runBacktest(90)">3개월</button>
-          <button onclick="runBacktest(180)">6개월</button>
-          <button onclick="runBacktest(365)">1년</button>
-        </div>
+      <div class="scalp-action-grid">
+        <button class="primary-btn" onclick="runScalpingLearn(365)">🧠 1년 조건 학습 시작</button>
+        <button class="primary-btn sub" onclick="runScalpingLearn(180)">⚡ 6개월 빠른 학습</button>
       </div>
 
-      <button class="primary-btn" onclick="runBacktest(365)">🧪 1년 백테스트 시작</button>
-
-      <div id="backtestStatus" class="ai-portfolio-note">아직 백테스트를 실행하지 않았습니다.</div>
+      <div id="scalpStatus" class="ai-portfolio-note">
+        아직 학습을 시작하지 않았습니다. 먼저 1년 조건 학습을 실행해 주세요.
+      </div>
 
       <div class="chart-card">
-        <h3>📈 전략별 자산 곡선</h3>
-        <canvas id="backtestChart"></canvas>
+        <h3>📈 최근 1개월 단타 AI 가상 운용 곡선</h3>
+        <canvas id="scalpChart"></canvas>
       </div>
 
-      <h2>🏆 AI 전략 리그전</h2>
-      <div id="backtestRankList"></div>
-
-      <h2>📌 최적 매수·매도 힌트</h2>
-      <div id="backtestInsight" class="detail-box">
-        백테스트 실행 후 전략별로 유리했던 매수·매도 조건을 표시합니다.
+      <h2>🏆 AI가 찾은 최적 단타 조건</h2>
+      <div id="scalpBestBox" class="detail-box">
+        학습 실행 후 최적 익절/손절/보유기간/승률이 표시됩니다.
       </div>
 
-      <h2>🧾 최근 가상 매매 로그</h2>
-      <div id="backtestTradeLog"></div>
+      <h2>🎯 오늘의 단타 후보 3~5종목</h2>
+      <div id="scalpPickList"></div>
+
+      <h2>🧾 최근 1개월 가상 매매 로그</h2>
+      <div id="scalpTradeLog"></div>
+
+      <div class="notice small-notice">
+        ⚠️ 이 기능은 실전 매매 신호가 아니라 과거 데이터 기반 학습/검증 도구입니다. 실제 매수·매도는 반드시 본인 판단과 손절 기준이 필요합니다.
+      </div>
     </section>
 
-
-    <section id="portfolio" class="section">
-      <h2>💼 성일의 AI 모의투자</h2>
-
-      <div class="portfolio-hero">
-        <div class="portfolio-mini">SUNGIN AI PAPER TRADING</div>
-        <h3>가상의 돈으로 투자 연습하기 🍃</h3>
-        <p>실제 돈이 아닌 모의 자산으로 추천종목을 매수·매도하고, 수익률을 확인할 수 있습니다.</p>
-
-        <div class="portfolio-grid">
-          <div><span>총 자산</span><b id="pfTotal">-</b></div>
-          <div><span>가상 현금</span><b id="pfCash">-</b></div>
-          <div><span>총 수익률</span><b id="pfReturn">-</b></div>
-        </div>
-      </div>
-
-      <div class="portfolio-actions">
-        <button onclick="depositCash()">➕ 가상 입금</button>
-        <button onclick="withdrawCash()">➖ 가상 출금</button>
-        <button onclick="resetPortfolio()">🔄 초기화</button>
-      </div>
-
-      <div class="ai-portfolio-note" id="pfAiNote">
-        🤖 AI 모의투자 비서가 보유 종목과 수익률을 분석해줍니다.
-      </div>
-
-      <h2>📌 보유 종목</h2>
-      <div id="holdingList"></div>
-
-      <h2>🧾 거래 내역</h2>
-      <div id="tradeHistory"></div>
-    </section>
 
     <div class="footer">K-Stock AI Trend WebApp<br>데이터 제공 상태에 따라 일부 종목은 누락될 수 있습니다.</div>
   </main>
@@ -2656,16 +2946,16 @@ function fmtProfitMoney(v) {
           desc: "주요 종목 중심으로 빠르게 스캔합니다. 출근 전이나 잠깐 확인할 때 좋고, 속도가 가장 빠릅니다."
         },
         "700": {
-          title: "📘 기본 분석 700개",
+          title: "📘 기본 분석 400개",
           desc: "속도와 정확도의 균형이 가장 좋은 기본 모드입니다. 매일 확인용으로 추천합니다."
         },
         "1200": {
-          title: "🚀 확장 분석 1200개",
+          title: "🚀 확장 분석 400개",
           desc: "중소형주와 테마주까지 넓게 확인합니다. 숨은 종목과 새로운 테마를 찾고 싶을 때 좋습니다."
         },
         "1600": {
-          title: "🌌 전체 근접 1600개",
-          desc: "코스피·코스닥 대부분을 넓게 보는 모드입니다. Render 무료 서버에서는 안정화를 위해 실제 분석은 최대 700개로 자동 보정됩니다."
+          title: "🌌 확장 분석 400개",
+          desc: "코스피·코스닥 대부분을 넓게 보는 모드입니다. Render 무료 서버에서는 안정화를 위해 실제 분석은 최대 400개로 자동 보정됩니다."
         }
       };
       const item = guide[value] || guide["700"];
@@ -4269,51 +4559,9 @@ function fmtProfitMoney(v) {
         latestData.all = (latestData.all || []).map(applyItem);
       }
 
-      try {
-        if (typeof loadPortfolio === "function") {
-          const portfolio = loadPortfolio();
-          if (portfolio && portfolio.holdings) {
-            Object.values(portfolio.holdings).forEach(h => {
-              const code = String(h.code || "").padStart(6, "0");
-              if (priceMap[code]) {
-                h.currentPrice = Number(priceMap[code].price || h.currentPrice || h.avgPrice || 0);
-                h.lastPrice = h.currentPrice;
-              }
-            });
-            savePortfolio(portfolio);
-          }
-        }
-      } catch(e) {}
+      try { /* portfolio removed in lightweight mode */ } catch(e) {}
 
-      try {
-        if (typeof loadAiSim === "function") {
-          const sim = loadAiSim();
-          if (sim && sim.strategies) {
-            Object.values(sim.strategies).forEach(st => {
-              Object.values(st.holdings || {}).forEach(h => {
-                const code = String(h.code || "").padStart(6, "0");
-                if (priceMap[code]) {
-                  h.currentPrice = Number(priceMap[code].price || h.currentPrice || h.avgPrice || 0);
-                  h.lastPrice = h.currentPrice;
-                }
-              });
-
-              if (typeof calcStrategySnapshot === "function") {
-                const snap = calcStrategySnapshot(st);
-                if (st.equity && st.equity.length > 0) {
-                  st.equity[st.equity.length - 1] = {
-                    ...st.equity[st.equity.length - 1],
-                    total: snap.total,
-                    cash: st.cash,
-                    returnRate: st.initialCash > 0 ? ((snap.total - st.initialCash) / st.initialCash * 100) : 0
-                  };
-                }
-              }
-            });
-            saveAiSim(sim);
-          }
-        }
-      } catch(e) {}
+      try { /* AI simulation removed in lightweight mode */ } catch(e) {}
     }
 
     async function updateRealtimePrices(silent=false) {
@@ -4428,7 +4676,7 @@ function fmtProfitMoney(v) {
 
     async function runBacktest(days=365) {
       const status = document.getElementById("backtestStatus");
-      if (status) status.innerText = "🧪 백테스트 실행 중입니다. 과거 가격 데이터를 불러오고 전략별 매매를 계산합니다...";
+      if (status) status.innerText = "🧪 검증 실행 중입니다. 과거 가격 데이터를 불러오고 전략별 매매를 계산합니다...";
 
       try {
         const cash = getBacktestCash();
@@ -4568,6 +4816,195 @@ function fmtProfitMoney(v) {
     }
 
 
+
+    function renderPortfolio() { return; }
+    function renderAiSim() { return; }
+    function multiAiAutoRunIfNeeded() { return; }
+    function loadPortfolio() { return {cash:0, holdings:{}, history:[]}; }
+    function savePortfolio(p) { return; }
+    function loadAiSim() { return {started:false, strategies:{}}; }
+    function saveAiSim(s) { return; }
+
+
+    let scalpChart = null;
+    let latestScalpLearn = null;
+
+    function setScalpCash(amount) {
+      const el = document.getElementById("scalpCash");
+      if (el) el.value = Number(amount).toLocaleString();
+    }
+
+    function getScalpCash() {
+      const el = document.getElementById("scalpCash");
+      return parseMoney(el ? el.value : 10000000) || 10000000;
+    }
+
+    async function runScalpingLearn(days=365) {
+      const status = document.getElementById("scalpStatus");
+      if (status) {
+        status.innerText = "🧠 단타 AI가 최근 시장 데이터를 학습 중입니다. Render 무료 서버에서는 1~3분 정도 걸릴 수 있습니다...";
+      }
+
+      try {
+        const cash = getScalpCash();
+        const res = await fetch(`/api/scalping_learn?days=${days}&cash=${cash}`, { cache: "no-store" });
+        const raw = await res.text();
+
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch(e) {
+          console.log("scalping non-json", raw.slice(0, 500));
+          throw new Error("학습 서버 응답이 JSON 형식이 아닙니다.");
+        }
+
+        if (!data.ok) throw new Error(data.error || "단타 AI 학습 오류");
+
+        latestScalpLearn = data;
+        renderScalpingLearn(data);
+      } catch(e) {
+        console.log("runScalpingLearn error", e);
+        if (status) status.innerText = "⚠️ 단타 AI 학습 오류: " + e.message;
+      }
+    }
+
+    function renderScalpingLearn(data) {
+      const status = document.getElementById("scalpStatus");
+      const p = data.bestParams || {};
+      const m = data.monthResult || {};
+      const b = data.bestLearn || {};
+
+      if (status) {
+        status.innerText = `⚡ 학습 완료. 최적 조건은 익절 ${(Number(p.take || 0)*100).toFixed(1)}%, 손절 ${(Number(p.stop || 0)*100).toFixed(1)}%, 최대보유 ${p.max_hold || "-"}일입니다. 최근 1개월 검증 수익률은 ${Number(m.returnRate || 0).toFixed(2)}%, 승률은 ${Number(m.winRate || 0).toFixed(1)}%입니다.`;
+      }
+
+      renderScalpChart(data);
+      renderScalpBest(data);
+      renderScalpPicks(data);
+      renderScalpTrades(data);
+    }
+
+    function renderScalpChart(data) {
+      const canvas = document.getElementById("scalpChart");
+      if (!canvas) return;
+      if (scalpChart) scalpChart.destroy();
+
+      const equity = (data.monthResult || {}).equity || [];
+      const labels = equity.map(x => x.date || ("D+" + x.day));
+
+      scalpChart = new Chart(canvas, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: "⚡ 단타형 실전 AI",
+            data: equity.map(x => x.total),
+            tension: 0.35,
+            borderWidth: 3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: true } },
+          scales: {
+            x: { ticks: { maxTicksLimit: 6 } },
+            y: { ticks: { callback: value => Number(value).toLocaleString() } }
+          }
+        }
+      });
+    }
+
+    function renderScalpBest(data) {
+      const el = document.getElementById("scalpBestBox");
+      if (!el) return;
+
+      const p = data.bestParams || {};
+      const b = data.bestLearn || {};
+      const m = data.monthResult || {};
+      const top = data.topConditions || [];
+
+      el.innerHTML = `
+        <div class="scalp-condition-main">
+          <div><span>익절</span><b>${(Number(p.take || 0)*100).toFixed(1)}%</b></div>
+          <div><span>손절</span><b>${(Number(p.stop || 0)*100).toFixed(1)}%</b></div>
+          <div><span>최대보유</span><b>${p.max_hold || "-"}일</b></div>
+          <div><span>5일상승 기준</span><b>${(Number(p.min_r5 || 0)*100).toFixed(1)}%</b></div>
+        </div>
+        <p class="trade-helper">최근 학습구간 기준 수익률 ${Number(b.returnRate || 0).toFixed(2)}%, 승률 ${Number(b.winRate || 0).toFixed(1)}%, 최대낙폭 ${Number(b.maxDrawdown || 0).toFixed(2)}%, 매매 ${b.tradeCount || 0}회.</p>
+        <p class="trade-helper">최근 1개월 검증 결과: 수익률 ${Number(m.returnRate || 0).toFixed(2)}%, 승률 ${Number(m.winRate || 0).toFixed(1)}%, 매매 ${m.tradeCount || 0}회.</p>
+        <div class="detail-title">상위 조건 TOP5</div>
+        ${top.map(x => `
+          <div class="ai-log-card">
+            #${x.rank} 익절 ${(x.params.take*100).toFixed(1)}% · 손절 ${(x.params.stop*100).toFixed(1)}% · 보유 ${x.params.max_hold}일
+            <br>수익률 ${Number(x.returnRate).toFixed(2)}% · 승률 ${Number(x.winRate).toFixed(1)}% · 낙폭 ${Number(x.maxDrawdown).toFixed(2)}%
+          </div>
+        `).join("")}
+      `;
+    }
+
+    function renderScalpPicks(data) {
+      const el = document.getElementById("scalpPickList");
+      if (!el) return;
+
+      const picks = data.picks || [];
+      if (!picks.length) {
+        el.innerHTML = `<div class="empty-box">현재 학습 조건을 통과한 단타 후보가 없습니다. 무리한 매매보다 관망이 유리할 수 있습니다.</div>`;
+        return;
+      }
+
+      el.innerHTML = picks.map((p, idx) => `
+        <div class="card premium-card scalp-pick-card">
+          <div class="top-line">
+            <span class="rank">#${idx + 1} 단타후보</span>
+            <span class="market">${p.market}</span>
+            <span class="market">${p.code}</span>
+          </div>
+          <div class="name-row">
+            <div>
+              <div class="name">${p.name}</div>
+              <div class="theme">${p.theme}</div>
+            </div>
+            <div class="score-circle score-hot">
+              <small>단타점수</small>
+              <b>${Number(p.score || 0).toFixed(1)}</b>
+            </div>
+          </div>
+          <div class="grid premium-grid">
+            <div class="metric"><span>현재가</span><b>${fmtPrice(p.price)}</b></div>
+            <div class="metric"><span>매수관찰가</span><b>${fmtPrice(p.buyZone)}</b></div>
+            <div class="metric"><span>목표가</span><b class="red">${fmtPrice(p.target)}</b></div>
+            <div class="metric"><span>손절가</span><b class="blue">${fmtPrice(p.stop)}</b></div>
+          </div>
+          <div class="ai-box">
+            <div class="ai-title">⚡ AI 단타 판단</div>
+            <p>${p.reason} 최대 보유 기준은 ${p.maxHold}일입니다.</p>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderScalpTrades(data) {
+      const el = document.getElementById("scalpTradeLog");
+      if (!el) return;
+
+      const trades = ((data.monthResult || {}).trades || []).slice(-30).reverse();
+      if (!trades.length) {
+        el.innerHTML = `<div class="empty-box">최근 1개월 검증 매매 로그가 없습니다.</div>`;
+        return;
+      }
+
+      el.innerHTML = trades.map(t => `
+        <div class="ai-log-card">
+          <b>${t.date} · ${t.type}</b> · ${t.name} (${t.code})<br>
+          수량 ${t.qty || "-"}주 · 가격 ${fmtMoney(t.price || 0)}
+          ${t.pnl !== undefined ? `<br>손익 <b class="${Number(t.pnl) >= 0 ? 'red' : 'blue'}">${fmtProfitMoney(t.pnl)}</b> · 수익률 ${Number(t.returnRate || 0).toFixed(2)}%` : ""}
+          ${t.theme ? `<br>테마 ${t.theme}` : ""}
+        </div>
+      `).join("");
+    }
+
+
     async function runAnalyze() {
       updateLimitGuide();
       const limit = document.getElementById("limit").value;
@@ -4625,7 +5062,7 @@ function fmtProfitMoney(v) {
         loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p><small style='color:#6b7280'>" + (e.message || "") + "</small>";
       }
     }
-    window.addEventListener('load', () => { renderPortfolio(); renderAiSim(); multiAiAutoRunIfNeeded(); });
+    window.addEventListener('load', () => { /* lightweight mode */ });
   </script>
 
   <script>
