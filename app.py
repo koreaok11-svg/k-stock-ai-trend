@@ -1250,7 +1250,7 @@ HTML = """
     }
     .strategy-grid {
       display:grid;
-      grid-template-columns:repeat(4,1fr);
+      grid-template-columns:repeat(5,1fr);
       gap:8px;
       margin-top:12px;
     }
@@ -1655,7 +1655,7 @@ HTML = """
 
       <div class="ai-sim-actions">
         <button onclick="multiAiStart()">🚀 5가지 AI 자동운용 시작</button>
-        <button onclick="multiAiRefreshNow()">🔎 지금 시장 재분석</button>
+        <button onclick="multiAiRefreshNow()">🔄 실시간 현재가 갱신</button>
         <button onclick="multiAiToggleAuto()" id="aiAutoBtn">⏸ 자동운용 켜짐</button>
         <button onclick="multiAiReset()">🔄 초기화</button>
       </div>
@@ -2946,20 +2946,37 @@ HTML = """
       try {
         await fetchMarketForAi(700);
         let sim = loadAiSim();
+
         if (sim.started) {
           Object.keys(AI_STRATEGIES).forEach(key => {
-            sim.strategies[key] = updateStrategyPicks(sim.strategies[key], key, true);
+            const st = sim.strategies[key];
+
+            const snap = calcStrategySnapshot(st);
+            if (st.equity && st.equity.length > 0) {
+              st.equity[st.equity.length - 1] = {
+                ...st.equity[st.equity.length - 1],
+                total: snap.total,
+                cash: st.cash,
+                returnRate: st.initialCash > 0 ? ((snap.total - st.initialCash) / st.initialCash * 100) : 0
+              };
+            }
+
+            sim.strategies[key] = updateStrategyPicks(st, key, false);
             sim.strategies[key].history.unshift({
-              day:sim.day, strategy:AI_STRATEGIES[key].name, type:"시장 재분석",
-              text:"최신 시장 데이터를 다시 분석하고 전략별 5종목 후보를 갱신했습니다.",
+              day:sim.day,
+              strategy:AI_STRATEGIES[key].name,
+              type:"실시간 현재가 갱신",
+              text:"최신 시장 데이터를 다시 불러와 보유 종목 평가손익과 전략별 수익률을 갱신했습니다.",
               time:new Date().toLocaleString()
             });
           });
+
           saveAiSim(sim);
         }
+
         renderAiSim();
       } catch (e) {
-        alert("시장 재분석 중 오류가 발생했습니다: " + e.message);
+        alert("실시간 현재가 갱신 중 오류가 발생했습니다: " + e.message);
       }
     }
 
@@ -3058,12 +3075,22 @@ HTML = """
       return eq.slice(Math.max(0, eq.length - (n + 1)));
     }
 
-    function rangeReturn(eq) {
-      const filtered = filterEquityByRange(eq);
-      if (filtered.length < 2) return 0;
-      const first = filtered[0].total;
-      const last = filtered[filtered.length - 1].total;
-      return first > 0 ? (last - first) / first * 100 : 0;
+    function rangeReturn(eq, currentTotal=null) {
+      if (!eq || eq.length === 0) return 0;
+
+      const nowTotal = Number(currentTotal || eq[eq.length - 1].total || 0);
+
+      if (aiViewRange === "ALL") {
+        const first = Number(eq[0].total || 0);
+        return first > 0 ? (nowTotal - first) / first * 100 : 0;
+      }
+
+      const map = { "1D":1, "1W":7, "1M":30, "2M":60, "1Y":365 };
+      const days = map[aiViewRange] || 1;
+      const baseIndex = Math.max(0, eq.length - 1 - days);
+      const base = Number(eq[baseIndex].total || eq[0].total || 0);
+
+      return base > 0 ? (nowTotal - base) / base * 100 : 0;
     }
 
     function setAiViewRange(range) {
@@ -3078,7 +3105,22 @@ HTML = """
 
       const keys = Object.keys(AI_STRATEGIES);
       const filteredMap = {};
-      keys.forEach(k => filteredMap[k] = filterEquityByRange(sim.strategies[k]?.equity || []));
+
+      keys.forEach(k => {
+        const st = sim.strategies[k];
+        const eq = [...(st?.equity || [])];
+        if (eq.length > 0) {
+          const snap = calcStrategySnapshot(st);
+          eq[eq.length - 1] = {
+            ...eq[eq.length - 1],
+            total: snap.total,
+            cash: st.cash,
+            returnRate: st.initialCash > 0 ? ((snap.total - st.initialCash) / st.initialCash * 100) : 0
+          };
+        }
+        filteredMap[k] = filterEquityByRange(eq);
+      });
+
       const maxLen = Math.max(...keys.map(k => filteredMap[k].length), 1);
       const labels = Array.from({length:maxLen}, (_, i) => "D+" + i);
 
@@ -3121,8 +3163,9 @@ HTML = """
       const strategyRows = Object.keys(AI_STRATEGIES).map(key => {
         const st = sim.strategies?.[key] || defaultStrategyState(sim.initialCash || 10000000).strategies[key];
         const snap = calcStrategySnapshot(st);
-        const viewReturn = rangeReturn(st.equity || []);
-        return {key, st, snap, viewReturn, meta:AI_STRATEGIES[key]};
+        const viewReturn = rangeReturn(st.equity || [], snap.total);
+        const totalReturn = st.initialCash > 0 ? ((snap.total - st.initialCash) / st.initialCash * 100) : 0;
+        return {key, st, snap, viewReturn, totalReturn, meta:AI_STRATEGIES[key]};
       }).sort((a,b) => b.viewReturn - a.viewReturn);
 
       const best = strategyRows[0];
@@ -3137,7 +3180,7 @@ HTML = """
       if (!sim.started) {
         note.innerText = "🤖 5가지 AI 자동운용 시작을 누르면 AI가 직접 시장 분석·종목 선정·첫 매매를 시작합니다.";
       } else {
-        note.innerText = `🤖 현재 D+${sim.day}일차입니다. ${rangeLabels[aiViewRange]} 기준 최고 전략은 ${best.meta.name}, 수익률은 ${best.viewReturn.toFixed(2)}%입니다. 자동운용은 ${sim.autoRun ? "켜짐" : "꺼짐"} 상태입니다.`;
+        note.innerText = `🤖 현재 D+${sim.day}일차입니다. ${rangeLabels[aiViewRange]} 기준 최고 전략은 ${best.meta.name}, 수익률은 ${best.viewReturn.toFixed(2)}%입니다. 자동운용은 ${sim.autoRun ? "켜짐" : "꺼짐"} 상태입니다. 수익률은 현재 평가자산 기준입니다.`;
       }
 
       document.getElementById("strategyRankList").innerHTML = strategyRows.map((row, idx) => `
@@ -3154,6 +3197,7 @@ HTML = """
             <div><span>현금</span><b>${fmtMoney(row.st.cash)}</b></div>
             <div><span>보유</span><b>${row.snap.holdings.length}종목</b></div>
             <div><span>주식평가</span><b>${fmtMoney(row.snap.stockValue)}</b></div>
+            <div><span>전체수익률</span><b class="${row.totalReturn >= 0 ? 'red' : 'blue'}">${row.totalReturn.toFixed(2)}%</b></div>
           </div>
         </div>
       `).join("");
