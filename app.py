@@ -817,6 +817,7 @@ HTML = """
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#6fa87a">
+  <!-- REALTIME_SAFARI_FETCH_FIXED_V33 -->
   <title>K-Stock AI Trend</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
@@ -2029,7 +2030,7 @@ function fmtProfitMoney(v) {
     </section>
 
     <div class="notice">⚠️ 투자 판단 보조용입니다. 실제 매수·매도는 본인 판단과 손절 기준이 필요합니다.</div>
-<div id="realtimeBadge" class="realtime-badge">⚪ 자동갱신 OFF</div>
+<div id="realtimeBadge" class="realtime-badge">⚪ 실시간 자동갱신 OFF</div>
 
     <div id="loading" class="loading">
       <div class="spinner"></div>
@@ -3916,10 +3917,32 @@ function fmtProfitMoney(v) {
       }
 
       try {
-        const res = await fetch(`/api/realtime_prices?codes=${codes.join(",")}`);
-        const data = await res.json();
+        const params = new URLSearchParams();
+        params.set("codes", codes.join(","));
+
+        const res = await fetch("/api/realtime_prices?" + params.toString(), {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        const rawText = await res.text();
+        let data;
+        try {
+          data = JSON.parse(rawText);
+        } catch(parseError) {
+          console.log("realtime non-json response", rawText.slice(0, 300));
+          throw new Error("현재가 서버 응답이 JSON 형식이 아닙니다.");
+        }
 
         if (!data.ok) throw new Error(data.error || "현재가 갱신 오류");
+
+        const priceCount = Object.keys(data.prices || {}).length;
+        if (priceCount === 0) {
+          const badge = document.getElementById("realtimeBadge");
+          if (badge) badge.innerText = "🟡 현재가 갱신 대기 · 데이터 없음";
+          if (!silent) alert("현재가를 가져오지 못했습니다. 잠시 후 다시 눌러주세요.");
+          return;
+        }
 
         applyRealtimePriceMap(data.prices || {});
         lastRealtimeUpdated = data.updated || "";
@@ -3944,9 +3967,17 @@ function fmtProfitMoney(v) {
         if (!silent) alert(`현재가 갱신 완료: ${Object.keys(data.prices || {}).length}개 종목`);
       } catch(e) {
         console.log("updateRealtimePrices error", e);
+
         const badge = document.getElementById("realtimeBadge");
+
+        // 자동 조용한 갱신 중 발생한 오류는 화면을 방해하지 않습니다.
+        if (silent) {
+          if (badge) badge.innerText = "⚪ 자동갱신 대기 중";
+          return;
+        }
+
         if (badge) badge.innerText = "⚠️ 실시간 갱신 오류: " + e.message;
-        if (!silent) alert("실시간 현재가 갱신 중 오류가 발생했습니다: " + e.message);
+        alert("실시간 현재가 갱신 중 오류가 발생했습니다: " + e.message);
       }
     }
 
@@ -3963,7 +3994,7 @@ function fmtProfitMoney(v) {
       realtimeTimer = null;
 
       const badge = document.getElementById("realtimeBadge");
-      if (badge) badge.innerText = "⚪ 자동갱신 OFF";
+      if (badge) badge.innerText = "⚪ 실시간 자동갱신 OFF";
     }
 
     function toggleRealtimeAutoUpdate() {
@@ -4033,7 +4064,7 @@ function fmtProfitMoney(v) {
         loading.innerHTML = "<b>오류가 발생했습니다.</b><p>잠시 후 다시 실행해 주세요.</p><small style='color:#6b7280'>" + (e.message || "") + "</small>";
       }
     }
-    window.addEventListener('load', () => { renderPortfolio(); renderAiSim(); multiAiAutoRunIfNeeded(); setTimeout(() => updateRealtimePrices(true), 2500); });
+    window.addEventListener('load', () => { renderPortfolio(); renderAiSim(); multiAiAutoRunIfNeeded(); });
   </script>
 
   <script>
