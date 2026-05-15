@@ -1104,12 +1104,14 @@ def api_backtest():
 
 
 
+
 @app.route("/api/scalping_learn")
+@app.route("/api/scalping_learn/")
 def api_scalping_learn():
     """
-    단타형 실전 AI 학습모드.
-    최근 1년/6개월 데이터를 기준으로 여러 익절/손절/보유기간 조건을 자동 탐색하고,
-    최근 1개월 가상 운용 결과와 오늘 후보 3~5개를 반환합니다.
+    단타형 실전 AI 학습모드 - Render 무료 서버 안정형.
+    1년 조건 학습 버튼을 눌러도 서버 부담을 줄이기 위해 핵심 후보만 빠르게 검증합니다.
+    어떤 경우에도 HTML이 아닌 JSON만 반환합니다.
     """
     def json_response(payload, status=200):
         return Response(
@@ -1120,11 +1122,12 @@ def api_scalping_learn():
 
     try:
         initial_cash = safe_float(request.args.get("cash", 10000000), 10000000)
-        days = int(safe_float(request.args.get("days", 365), 365))
-        days = max(90, min(days, 365))
+        req_days = int(safe_float(request.args.get("days", 365), 365))
 
-        end = now_kst()
-        start = end - pd.DateOffset(days=days + 45)
+        # 무료 Render 안정화: 실제 계산은 최대 180일 + 상위 25종목으로 제한
+        learn_days = 180 if req_days >= 180 else 90
+        end_dt = now_kst()
+        start_dt = end_dt - pd.DateOffset(days=learn_days + 35)
 
         df = get_market_df()
         if df is None or df.empty:
@@ -1137,44 +1140,75 @@ def api_scalping_learn():
         df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
         df = df[df["Close"] > 0]
 
-        # Render 무료 서버 안정화: 거래대금/시총 상위 45개만 학습 후보
-        df = df.sort_values(["Amount", "Marcap"], ascending=False).head(45)
+        # 단타는 거래대금이 중요하므로 거래대금 상위 위주
+        df = df.sort_values(["Amount", "Volume", "Marcap"], ascending=False).head(25)
 
-        candidates = []
+        raw_candidates = []
         for _, row in df.iterrows():
             code = str(row.get("Code", "")).zfill(6)
             name = str(row.get("Name", ""))
             if not code or code == "000000":
                 continue
-            candidates.append({
+
+            raw_candidates.append({
                 "code": code,
                 "name": name,
                 "market": str(row.get("Market", "")),
                 "theme": normalize_output_theme(classify_theme(name)),
+                "price": safe_float(row.get("Close", 0)),
                 "amount": safe_float(row.get("Amount", 0)),
+                "volume": safe_float(row.get("Volume", 0)),
                 "marcap": safe_float(row.get("Marcap", 0))
             })
 
         price_data = {}
-        for c in candidates:
+        for c in raw_candidates[:20]:
             try:
-                data = fdr.DataReader(c["code"], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
-                if data is None or data.empty or len(data) < 45:
+                d = fdr.DataReader(c["code"], start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d"))
+                if d is None or d.empty or len(d) < 35:
                     continue
-                data = data.reset_index()
-                data["Close"] = pd.to_numeric(data["Close"], errors="coerce").ffill().fillna(0)
-                data["Volume"] = pd.to_numeric(data.get("Volume", 0), errors="coerce").fillna(0)
-                data = data[data["Close"] > 0]
-                if len(data) >= 45:
-                    price_data[c["code"]] = {"info": c, "data": data}
+                d = d.reset_index()
+                d["Close"] = pd.to_numeric(d["Close"], errors="coerce").ffill().fillna(0)
+                d["Volume"] = pd.to_numeric(d.get("Volume", 0), errors="coerce").fillna(0)
+                d = d[d["Close"] > 0]
+                if len(d) >= 35:
+                    price_data[c["code"]] = {"info": c, "data": d}
             except Exception:
                 continue
 
+        # FDR 과거 데이터가 부족해도 현재 후보는 보여주기
         if not price_data:
-            raise Exception("학습용 가격 데이터를 가져오지 못했습니다.")
+            picks = []
+            for c in raw_candidates[:5]:
+                p = safe_float(c["price"])
+                picks.append({
+                    "code": c["code"], "name": c["name"], "market": c["market"], "theme": c["theme"],
+                    "price": round(p, 0), "score": 50,
+                    "buyZone": round(p * 0.995, 0),
+                    "target": round(p * 1.045, 0),
+                    "stop": round(p * 0.975, 0),
+                    "maxHold": 5,
+                    "reason": "과거 데이터 수집이 제한되어 현재 거래대금 기준 단타 관찰 후보로 표시합니다."
+                })
+
+            return json_response({
+                "ok": True,
+                "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                "initialCash": initial_cash,
+                "learnDays": 0,
+                "testDays": 0,
+                "bestParams": {"take": 0.045, "stop": -0.025, "max_hold": 5, "min_r5": 0.03, "vol_mult": 1.1},
+                "bestLearn": {"returnRate": 0, "winRate": 0, "maxDrawdown": 0, "tradeCount": 0, "learnScore": 0},
+                "monthResult": {"returnRate": 0, "winRate": 0, "maxDrawdown": 0, "tradeCount": 0, "equity": [], "trades": []},
+                "picks": picks,
+                "topConditions": [],
+                "message": "과거 데이터 수집이 제한되어 현재 거래대금 기준 후보만 표시했습니다."
+            })
 
         all_dates = sorted(list(set().union(*[set(v["data"]["Date"].dt.strftime("%Y-%m-%d")) for v in price_data.values()])))
-        all_dates = all_dates[-days:]
+        all_dates = all_dates[-learn_days:]
+        test_dates = all_dates[-22:] if len(all_dates) >= 30 else all_dates
+        train_dates = all_dates[:-22] if len(all_dates) > 40 else all_dates
 
         def price_on(code, date):
             d = price_data[code]["data"]
@@ -1183,17 +1217,16 @@ def api_scalping_learn():
                 return None
             return safe_float(rows.iloc[-1]["Close"])
 
-        def scalp_score(code, date, min_r5=0.03, vol_mult=1.2):
+        def score_code(code, date, min_r5, vol_mult):
             d = price_data[code]["data"]
-            rows = d[d["Date"].dt.strftime("%Y-%m-%d") <= date].tail(25)
-            if len(rows) < 12:
+            rows = d[d["Date"].dt.strftime("%Y-%m-%d") <= date].tail(22)
+            if len(rows) < 10:
                 return -999
 
             p0 = safe_float(rows.iloc[-1]["Close"])
             p3 = safe_float(rows.iloc[-4]["Close"]) if len(rows) >= 4 else p0
             p5 = safe_float(rows.iloc[-6]["Close"]) if len(rows) >= 6 else p0
             p20 = safe_float(rows.iloc[0]["Close"])
-
             v_now = safe_float(rows.iloc[-3:]["Volume"].mean())
             v_old = safe_float(rows.iloc[:-3]["Volume"].mean()) if len(rows) > 6 else v_now
 
@@ -1202,19 +1235,16 @@ def api_scalping_learn():
             r20 = (p0 - p20) / p20 if p20 > 0 else 0
             vol_power = v_now / v_old if v_old > 0 else 1
 
-            info = price_data[code]["info"]
-            theme_bonus = 0.05 if info["theme"] not in ["기타/개별이슈", "미분류"] else -0.02
-
-            # 단타 필터: 너무 약하면 제외, 과열은 감점
-            if r5 < min_r5:
-                return -999
-            if vol_power < vol_mult:
+            if r5 < min_r5 or vol_power < vol_mult:
                 return -999
 
-            overheat_penalty = max(r20 - 0.45, 0) * 1.5
-            return r3 * 2.2 + r5 * 2.8 + min(vol_power, 4) * 0.18 + theme_bonus - overheat_penalty
+            theme = price_data[code]["info"]["theme"]
+            theme_bonus = 0.05 if theme not in ["기타/개별이슈", "미분류"] else -0.01
+            overheat = max(r20 - 0.45, 0) * 1.3
 
-        def simulate(params, sim_dates):
+            return r3 * 2.0 + r5 * 2.5 + min(vol_power, 4) * 0.18 + theme_bonus - overheat
+
+        def simulate(params, dates):
             cash = initial_cash
             holdings = {}
             trades = []
@@ -1224,40 +1254,30 @@ def api_scalping_learn():
             peak = initial_cash
             max_dd = 0
 
-            take = params["take"]
-            stop = params["stop"]
-            max_hold = params["max_hold"]
-            min_r5 = params["min_r5"]
-            vol_mult = params["vol_mult"]
-            slots = 4
-
-            for day_idx, date in enumerate(sim_dates):
-                # 매도
+            for di, date in enumerate(dates):
+                # sell
                 for code in list(holdings.keys()):
                     h = holdings[code]
                     p = price_on(code, date)
                     if not p:
                         continue
+                    ret = (p - h["avg"]) / h["avg"] if h["avg"] else 0
+                    hold_days = di - h["buy_day"]
 
-                    ret = (p - h["avg"]) / h["avg"] if h["avg"] > 0 else 0
-                    hold_days = day_idx - h["buy_day"]
                     reason = None
-
-                    if ret >= take:
+                    if ret >= params["take"]:
                         reason = "익절"
-                    elif ret <= stop:
+                    elif ret <= params["stop"]:
                         reason = "손절"
-                    elif hold_days >= max_hold:
+                    elif hold_days >= params["max_hold"]:
                         reason = "시간청산"
 
                     if reason:
                         amount = h["qty"] * p * 0.9975
                         pnl = amount - h["cost"]
                         cash += amount
-                        if pnl >= 0:
-                            wins += 1
-                        else:
-                            losses += 1
+                        wins += 1 if pnl >= 0 else 0
+                        losses += 1 if pnl < 0 else 0
                         trades.append({
                             "date": date, "type": reason, "name": h["name"], "code": code,
                             "price": round(p, 0), "qty": h["qty"], "pnl": round(pnl, 0),
@@ -1265,9 +1285,9 @@ def api_scalping_learn():
                         })
                         del holdings[code]
 
-                # 매수
-                slots_left = slots - len(holdings)
-                if slots_left > 0 and day_idx > 25:
+                # buy
+                slots = 4 - len(holdings)
+                if slots > 0 and di > 12:
                     ranked = []
                     for code in price_data.keys():
                         if code in holdings:
@@ -1275,36 +1295,32 @@ def api_scalping_learn():
                         p = price_on(code, date)
                         if not p:
                             continue
-                        score = scalp_score(code, date, min_r5=min_r5, vol_mult=vol_mult)
-                        if score > 0:
-                            ranked.append((score, code, p))
-
+                        s = score_code(code, date, params["min_r5"], params["vol_mult"])
+                        if s > 0:
+                            ranked.append((s, code, p))
                     ranked.sort(reverse=True)
-                    reserve = initial_cash * 0.18
-                    invest_per = max(0, (cash - reserve) / max(slots_left, 1))
 
-                    for score, code, p in ranked[:slots_left]:
+                    reserve = initial_cash * 0.2
+                    invest_per = max(0, (cash - reserve) / max(slots, 1))
+
+                    for s, code, p in ranked[:slots]:
                         if cash <= reserve:
                             break
-
-                        invest = min(invest_per, cash - reserve)
-                        qty = int(invest // p)
+                        qty = int(invest_per // p)
                         if qty <= 0:
                             continue
-
                         cost = qty * p * 1.0025
                         if cost > cash:
                             continue
-
                         info = price_data[code]["info"]
                         cash -= cost
                         holdings[code] = {
-                            "code": code, "name": info["name"], "theme": info["theme"],
-                            "qty": qty, "avg": p, "cost": cost, "buy_day": day_idx
+                            "name": info["name"], "code": code, "theme": info["theme"],
+                            "qty": qty, "avg": p, "cost": cost, "buy_day": di
                         }
                         trades.append({
                             "date": date, "type": "매수", "name": info["name"], "code": code,
-                            "price": round(p, 0), "qty": qty, "score": round(score, 3), "theme": info["theme"]
+                            "price": round(p, 0), "qty": qty, "score": round(s, 3), "theme": info["theme"]
                         })
 
                 stock_value = 0
@@ -1312,26 +1328,24 @@ def api_scalping_learn():
                     p = price_on(code, date)
                     if p:
                         stock_value += h["qty"] * p
-
                 total = cash + stock_value
                 peak = max(peak, total)
                 dd = (total - peak) / peak if peak > 0 else 0
                 max_dd = min(max_dd, dd)
-
                 equity.append({
                     "date": date, "day": len(equity), "total": round(total, 0),
                     "returnRate": round((total - initial_cash) / initial_cash * 100, 2)
                 })
 
             final_total = equity[-1]["total"] if equity else initial_cash
-            total_return = (final_total - initial_cash) / initial_cash * 100
             closed = wins + losses
             win_rate = wins / closed * 100 if closed > 0 else 0
+            return_rate = (final_total - initial_cash) / initial_cash * 100 if initial_cash else 0
 
             return {
                 "params": params,
                 "finalTotal": round(final_total, 0),
-                "returnRate": round(total_return, 2),
+                "returnRate": round(return_rate, 2),
                 "maxDrawdown": round(max_dd * 100, 2),
                 "winRate": round(win_rate, 2),
                 "wins": wins,
@@ -1341,44 +1355,38 @@ def api_scalping_learn():
                 "trades": trades
             }
 
-        # 자동 조건 탐색
-        param_grid = []
-        for take in [0.035, 0.045, 0.06, 0.08]:
-            for stop in [-0.018, -0.025, -0.035]:
-                for max_hold in [3, 5, 7, 10]:
-                    for min_r5 in [0.025, 0.04, 0.06]:
-                        param_grid.append({
-                            "take": take, "stop": stop, "max_hold": max_hold,
-                            "min_r5": min_r5, "vol_mult": 1.2
-                        })
-
-        learn_dates = all_dates[:-22] if len(all_dates) > 80 else all_dates
-        test_dates = all_dates[-22:] if len(all_dates) > 40 else all_dates[-20:]
+        param_grid = [
+            {"take": 0.035, "stop": -0.018, "max_hold": 3, "min_r5": 0.025, "vol_mult": 1.1},
+            {"take": 0.045, "stop": -0.025, "max_hold": 5, "min_r5": 0.030, "vol_mult": 1.1},
+            {"take": 0.060, "stop": -0.025, "max_hold": 5, "min_r5": 0.040, "vol_mult": 1.2},
+            {"take": 0.060, "stop": -0.035, "max_hold": 7, "min_r5": 0.040, "vol_mult": 1.2},
+            {"take": 0.080, "stop": -0.035, "max_hold": 7, "min_r5": 0.060, "vol_mult": 1.3},
+            {"take": 0.045, "stop": -0.018, "max_hold": 3, "min_r5": 0.040, "vol_mult": 1.2},
+            {"take": 0.035, "stop": -0.025, "max_hold": 5, "min_r5": 0.025, "vol_mult": 1.2},
+            {"take": 0.080, "stop": -0.050, "max_hold": 10, "min_r5": 0.060, "vol_mult": 1.3},
+        ]
 
         results = []
-        for params in param_grid[:144]:
-            r = simulate(params, learn_dates)
-            # 수익률, 승률, 낙폭을 함께 보는 점수
+        for params in param_grid:
+            r = simulate(params, train_dates)
             score = r["returnRate"] * 0.55 + r["winRate"] * 0.25 + r["maxDrawdown"] * 0.45
-            if r["tradeCount"] < 5:
-                score -= 20
+            if r["tradeCount"] < 3:
+                score -= 15
             r["learnScore"] = round(score, 2)
             results.append(r)
 
         results.sort(key=lambda x: x["learnScore"], reverse=True)
         best_params = results[0]["params"]
-
-        # 최근 1개월 검증
         month_result = simulate(best_params, test_dates)
 
-        # 오늘 후보 3~5개 산출
+        # today picks
         last_date = all_dates[-1]
         picks = []
         for code in price_data.keys():
             p = price_on(code, last_date)
             if not p:
                 continue
-            s = scalp_score(code, last_date, min_r5=best_params["min_r5"], vol_mult=best_params["vol_mult"])
+            s = score_code(code, last_date, best_params["min_r5"], best_params["vol_mult"])
             if s <= 0:
                 continue
             info = price_data[code]["info"]
@@ -1398,9 +1406,10 @@ def api_scalping_learn():
         return json_response({
             "ok": True,
             "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
-            "initialCash": initial_cash,
-            "learnDays": len(learn_dates),
+            "requestedDays": req_days,
+            "learnDays": len(train_dates),
             "testDays": len(test_dates),
+            "initialCash": initial_cash,
             "bestParams": best_params,
             "bestLearn": {
                 "returnRate": results[0]["returnRate"],
@@ -1412,15 +1421,8 @@ def api_scalping_learn():
             "monthResult": month_result,
             "picks": picks,
             "topConditions": [
-                {
-                    "rank": i + 1,
-                    "params": r["params"],
-                    "returnRate": r["returnRate"],
-                    "winRate": r["winRate"],
-                    "maxDrawdown": r["maxDrawdown"],
-                    "tradeCount": r["tradeCount"],
-                    "learnScore": r["learnScore"]
-                }
+                {"rank": i+1, "params": r["params"], "returnRate": r["returnRate"], "winRate": r["winRate"],
+                 "maxDrawdown": r["maxDrawdown"], "tradeCount": r["tradeCount"], "learnScore": r["learnScore"]}
                 for i, r in enumerate(results[:5])
             ],
             "message": "단타형 AI가 최근 시장에서 승률과 수익률이 가장 좋았던 조건을 자동 탐색했습니다."
@@ -4842,12 +4844,20 @@ function fmtProfitMoney(v) {
     async function runScalpingLearn(days=365) {
       const status = document.getElementById("scalpStatus");
       if (status) {
-        status.innerText = "🧠 단타 AI가 최근 시장 데이터를 학습 중입니다. Render 무료 서버에서는 1~3분 정도 걸릴 수 있습니다...";
+        status.innerText = "🧠 단타 AI가 최근 시장 데이터를 학습 중입니다. Render 무료 서버 안정형으로 핵심 후보만 빠르게 검증합니다. 30초~2분 정도 걸릴 수 있습니다...";
       }
 
       try {
         const cash = getScalpCash();
-        const res = await fetch(`/api/scalping_learn?days=${days}&cash=${cash}`, { cache: "no-store" });
+        const params = new URLSearchParams();
+        params.set("days", String(days));
+        params.set("cash", String(cash));
+        params.set("_", Date.now().toString());
+
+        const res = await fetch(window.location.origin + "/api/scalping_learn?" + params.toString(), {
+          cache: "no-store",
+          headers: { "Accept": "application/json" }
+        });
         const raw = await res.text();
 
         let data;
@@ -4855,7 +4865,7 @@ function fmtProfitMoney(v) {
           data = JSON.parse(raw);
         } catch(e) {
           console.log("scalping non-json", raw.slice(0, 500));
-          throw new Error("학습 서버 응답이 JSON 형식이 아닙니다.");
+          throw new Error("서버가 아직 새 버전으로 배포되지 않았거나 응답이 지연되었습니다. 1분 후 다시 실행해 주세요.");
         }
 
         if (!data.ok) throw new Error(data.error || "단타 AI 학습 오류");
