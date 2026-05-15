@@ -282,7 +282,7 @@ def get_naver_realtime_price(code):
             "User-Agent": "Mozilla/5.0",
             "Referer": "https://finance.naver.com/"
         }
-        r = requests.get(url, headers=headers, timeout=0.5)
+        r = requests.get(url, headers=headers, timeout=1.2)
         if r.status_code != 200:
             return None
 
@@ -2088,6 +2088,12 @@ function fmtProfitMoney(v) {
         <button onclick="multiAiReset()">🔄 초기화</button>
       </div>
 
+      
+      <div class="ai-sim-actions realtime-actions">
+        <button onclick="updateRealtimePrices(false)">🔄 실시간 현재가 갱신</button>
+        <button onclick="toggleRealtimeAutoUpdate()">🔴 30초 자동갱신</button>
+      </div>
+
       <div class="ai-filter-box">
         <div class="detail-title">📊 성과 조회 기간</div>
         <div class="ai-filter-buttons">
@@ -3797,6 +3803,7 @@ function fmtProfitMoney(v) {
     }
 
 
+
     let realtimeTimer = null;
     let lastRealtimeUpdated = "";
 
@@ -3807,19 +3814,24 @@ function fmtProfitMoney(v) {
         if (latestData) {
           (latestData.recommend || []).slice(0, 10).forEach(x => x.code && codes.add(String(x.code).padStart(6, "0")));
           (latestData.watch || []).slice(0, 30).forEach(x => x.code && codes.add(String(x.code).padStart(6, "0")));
+          (latestData.all || []).slice(0, 30).forEach(x => x.code && codes.add(String(x.code).padStart(6, "0")));
         }
 
-        const portfolio = loadPortfolio ? loadPortfolio() : null;
-        if (portfolio && portfolio.holdings) {
-          Object.keys(portfolio.holdings).forEach(code => codes.add(String(code).padStart(6, "0")));
+        if (typeof loadPortfolio === "function") {
+          const portfolio = loadPortfolio();
+          if (portfolio && portfolio.holdings) {
+            Object.keys(portfolio.holdings).forEach(code => codes.add(String(code).padStart(6, "0")));
+          }
         }
 
-        const sim = loadAiSim ? loadAiSim() : null;
-        if (sim && sim.strategies) {
-          Object.values(sim.strategies).forEach(st => {
-            Object.keys(st.holdings || {}).forEach(code => codes.add(String(code).padStart(6, "0")));
-            (st.picks || []).forEach(p => p.code && codes.add(String(p.code).padStart(6, "0")));
-          });
+        if (typeof loadAiSim === "function") {
+          const sim = loadAiSim();
+          if (sim && sim.strategies) {
+            Object.values(sim.strategies).forEach(st => {
+              Object.keys(st.holdings || {}).forEach(code => codes.add(String(code).padStart(6, "0")));
+              (st.picks || []).forEach(p => p.code && codes.add(String(p.code).padStart(6, "0")));
+            });
+          }
         }
       } catch(e) {
         console.log("collectRealtimeCodes error", e);
@@ -3848,45 +3860,49 @@ function fmtProfitMoney(v) {
         latestData.all = (latestData.all || []).map(applyItem);
       }
 
-      // 일반 모의투자 보유 종목 현재가 반영
       try {
-        const portfolio = loadPortfolio ? loadPortfolio() : null;
-        if (portfolio && portfolio.holdings) {
-          Object.values(portfolio.holdings).forEach(h => {
-            const code = String(h.code || "").padStart(6, "0");
-            if (priceMap[code]) {
-              h.currentPrice = Number(priceMap[code].price || h.currentPrice || h.avgPrice || 0);
-              h.lastPrice = h.currentPrice;
-            }
-          });
-          savePortfolio(portfolio);
-        }
-      } catch(e) {}
-
-      // AI 전략 보유 종목 현재가 반영
-      try {
-        const sim = loadAiSim ? loadAiSim() : null;
-        if (sim && sim.strategies) {
-          Object.values(sim.strategies).forEach(st => {
-            Object.values(st.holdings || {}).forEach(h => {
+        if (typeof loadPortfolio === "function") {
+          const portfolio = loadPortfolio();
+          if (portfolio && portfolio.holdings) {
+            Object.values(portfolio.holdings).forEach(h => {
               const code = String(h.code || "").padStart(6, "0");
               if (priceMap[code]) {
                 h.currentPrice = Number(priceMap[code].price || h.currentPrice || h.avgPrice || 0);
                 h.lastPrice = h.currentPrice;
               }
             });
+            savePortfolio(portfolio);
+          }
+        }
+      } catch(e) {}
 
-            const snap = calcStrategySnapshot(st);
-            if (st.equity && st.equity.length > 0) {
-              st.equity[st.equity.length - 1] = {
-                ...st.equity[st.equity.length - 1],
-                total: snap.total,
-                cash: st.cash,
-                returnRate: st.initialCash > 0 ? ((snap.total - st.initialCash) / st.initialCash * 100) : 0
-              };
-            }
-          });
-          saveAiSim(sim);
+      try {
+        if (typeof loadAiSim === "function") {
+          const sim = loadAiSim();
+          if (sim && sim.strategies) {
+            Object.values(sim.strategies).forEach(st => {
+              Object.values(st.holdings || {}).forEach(h => {
+                const code = String(h.code || "").padStart(6, "0");
+                if (priceMap[code]) {
+                  h.currentPrice = Number(priceMap[code].price || h.currentPrice || h.avgPrice || 0);
+                  h.lastPrice = h.currentPrice;
+                }
+              });
+
+              if (typeof calcStrategySnapshot === "function") {
+                const snap = calcStrategySnapshot(st);
+                if (st.equity && st.equity.length > 0) {
+                  st.equity[st.equity.length - 1] = {
+                    ...st.equity[st.equity.length - 1],
+                    total: snap.total,
+                    cash: st.cash,
+                    returnRate: st.initialCash > 0 ? ((snap.total - st.initialCash) / st.initialCash * 100) : 0
+                  };
+                }
+              }
+            });
+            saveAiSim(sim);
+          }
         }
       } catch(e) {}
     }
@@ -3920,13 +3936,16 @@ function fmtProfitMoney(v) {
 
         const badge = document.getElementById("realtimeBadge");
         if (badge) {
-          badge.innerText = `🔴 실시간 현재가 ${lastRealtimeUpdated || ""}`;
+          const count = Object.keys(data.prices || {}).length;
+          badge.innerText = `🔴 실시간 현재가 ${count}개 갱신 · ${lastRealtimeUpdated || ""}`;
           badge.classList.add("blink-live");
         }
 
         if (!silent) alert(`현재가 갱신 완료: ${Object.keys(data.prices || {}).length}개 종목`);
       } catch(e) {
         console.log("updateRealtimePrices error", e);
+        const badge = document.getElementById("realtimeBadge");
+        if (badge) badge.innerText = "⚠️ 실시간 갱신 오류: " + e.message;
         if (!silent) alert("실시간 현재가 갱신 중 오류가 발생했습니다: " + e.message);
       }
     }
