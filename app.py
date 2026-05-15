@@ -226,7 +226,7 @@ def get_naver_realtime_price(code):
             "User-Agent": "Mozilla/5.0",
             "Referer": "https://finance.naver.com/"
         }
-        r = requests.get(url, headers=headers, timeout=3)
+        r = requests.get(url, headers=headers, timeout=1.0)
         if r.status_code != 200:
             return None
 
@@ -516,127 +516,155 @@ def normalize_output_theme(theme):
 
 @app.route("/api/analyze")
 def api_analyze():
-    limit = int(request.args.get("limit", "700"))
-    limit = max(100, min(limit, 1600))
+    try:
+        limit = int(request.args.get("limit", "700"))
+        limit = max(100, min(limit, 1600))
 
-    df = get_market_df(limit=limit)
+        df = get_market_df(limit=limit)
 
-    if df.empty:
+        if df.empty:
+            return jsonify({
+                "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "analyzedCount": 0,
+                "summary": [],
+                "recommend": [],
+                "watch": [],
+                "all": []
+            })
+
+        change_col = "ChagesRatio" if "ChagesRatio" in df.columns else None
+
+        if change_col:
+            df["dayChange"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0)
+        else:
+            df["dayChange"] = 0
+
+        df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
+        df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+        df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
+        df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+        df["liveGap"] = 0
+
+        # 전체 종목에 네이버 현재가 보정을 적용하면 Render 무료 서버에서 시간 초과가 발생할 수 있어
+        # records 생성 후 상위 후보 일부만 보정합니다.
+
+        df["theme"] = df["Name"].apply(classify_theme)
+        df["themeWeight"] = df["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
+
+        df["amountScore"] = df["Amount"].rank(pct=True) * 100
+        df["volumeScore"] = df["Volume"].rank(pct=True) * 100
+        df["marcapScore"] = df["Marcap"].rank(pct=True) * 100
+
+        df["score"] = (
+            df["dayChange"] * 0.45 +
+            df["amountScore"] * 0.25 +
+            df["volumeScore"] * 0.20 +
+            df["marcapScore"] * 0.10
+        ) * df["themeWeight"]
+
+        df = df.sort_values("score", ascending=False).reset_index(drop=True)
+
+        records = []
+
+        for idx, row in df.iterrows():
+            category = "관찰"
+            if idx < 10:
+                category = "추천"
+            elif idx < 40:
+                category = "관심"
+
+            item = {
+                "rank": int(idx + 1),
+                "category": category,
+                "market": str(row["Market"]),
+                "code": str(row["Code"]),
+                "name": str(row["Name"]),
+                "theme": str(row["theme"]),
+                "price": float(row["Close"]),
+                "priceSource": "Naver/FDR 보정",
+                "liveGap": round(float(row.get("liveGap", 0)), 2),
+                "return5": round(float(row["dayChange"]), 2),
+                "return20": 0,
+                "volumePower": round(float(row["volumeScore"] / 50), 2),
+                "trendPower": 1,
+                "score": round(float(row["score"]), 2),
+            }
+
+            analysis = make_opinion(item, category)
+            item["opinion"] = analysis["summary"]
+            item["reasons"] = analysis["reasons"]
+            item["strategy"] = analysis["strategy"]
+            item["risk"] = analysis["risk"]
+            item["tradePlan"] = get_trade_plan(item)
+            item["companyProfile"] = get_company_profile(item)
+
+            records.append(item)
+
+        # 추천/관심 상위 후보만 네이버 현재가로 빠르게 보정합니다.
+        # 전체 1600개에 적용하면 분석 시간이 길어져 JSON 대신 Render 오류 HTML이 반환될 수 있습니다.
+        for item in records[:30]:
+            try:
+                live_price = get_naver_realtime_price(item["code"])
+                if live_price and live_price > 0:
+                    old_price = float(item.get("price", 0) or 0)
+                    item["price"] = float(live_price)
+                    item["priceSource"] = "Naver 현재가 보정"
+                    item["liveGap"] = round(((live_price - old_price) / old_price) * 100, 2) if old_price > 0 else 0
+                    item["tradePlan"] = get_trade_plan(item)
+                    item["companyProfile"] = get_company_profile(item)
+                else:
+                    item["priceSource"] = "FDR 기준"
+            except Exception:
+                item["priceSource"] = "FDR 기준"
+
+        summary_df = (
+            pd.DataFrame(records)
+            .groupby("theme")
+            .agg(
+                avgScore=("score", "mean"),
+                maxScore=("score", "max"),
+                count=("name", "count")
+            )
+            .sort_values("avgScore", ascending=False)
+            .reset_index()
+        )
+
+        summary = []
+        for _, row in summary_df.head(16).iterrows():
+            summary.append({
+                "theme": row["theme"],
+                "avgScore": round(float(row["avgScore"]), 2),
+                "maxScore": round(float(row["maxScore"]), 2),
+                "count": int(row["count"]),
+            })
+
+        theme_groups = {}
+        for item in records:
+            theme_groups.setdefault(item["theme"], []).append(item)
+
+        for theme in theme_groups:
+            theme_groups[theme] = sorted(theme_groups[theme], key=lambda x: x["score"], reverse=True)
+
         return jsonify({
+            "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "analyzedCount": len(records),
+            "summary": summary,
+            "themeGroups": theme_groups,
+            "recommend": records[:10],
+            "watch": records[10:40],
+            "all": records[:120],
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
             "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "analyzedCount": 0,
             "summary": [],
+            "themeGroups": {},
             "recommend": [],
             "watch": [],
             "all": []
-        })
-
-    change_col = "ChagesRatio" if "ChagesRatio" in df.columns else None
-
-    if change_col:
-        df["dayChange"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0)
-    else:
-        df["dayChange"] = 0
-
-    df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
-    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
-    df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
-    df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
-    df["liveGap"] = 0
-
-    # FDR 현재가가 지연/전일 기준으로 보일 수 있어 네이버 금융 현재가로 보정
-    df = apply_realtime_prices(df, top_n=160)
-
-    df["theme"] = df["Name"].apply(classify_theme)
-    df["themeWeight"] = df["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
-
-    df["amountScore"] = df["Amount"].rank(pct=True) * 100
-    df["volumeScore"] = df["Volume"].rank(pct=True) * 100
-    df["marcapScore"] = df["Marcap"].rank(pct=True) * 100
-
-    df["score"] = (
-        df["dayChange"] * 0.45 +
-        df["amountScore"] * 0.25 +
-        df["volumeScore"] * 0.20 +
-        df["marcapScore"] * 0.10
-    ) * df["themeWeight"]
-
-    df = df.sort_values("score", ascending=False).reset_index(drop=True)
-
-    records = []
-
-    for idx, row in df.iterrows():
-        category = "관찰"
-        if idx < 10:
-            category = "추천"
-        elif idx < 40:
-            category = "관심"
-
-        item = {
-            "rank": int(idx + 1),
-            "category": category,
-            "market": str(row["Market"]),
-            "code": str(row["Code"]),
-            "name": str(row["Name"]),
-            "theme": str(row["theme"]),
-            "price": float(row["Close"]),
-            "priceSource": "Naver/FDR 보정",
-            "liveGap": round(float(row.get("liveGap", 0)), 2),
-            "return5": round(float(row["dayChange"]), 2),
-            "return20": 0,
-            "volumePower": round(float(row["volumeScore"] / 50), 2),
-            "trendPower": 1,
-            "score": round(float(row["score"]), 2),
-        }
-
-        analysis = make_opinion(item, category)
-        item["opinion"] = analysis["summary"]
-        item["reasons"] = analysis["reasons"]
-        item["strategy"] = analysis["strategy"]
-        item["risk"] = analysis["risk"]
-        item["tradePlan"] = get_trade_plan(item)
-        item["companyProfile"] = get_company_profile(item)
-
-        records.append(item)
-
-    summary_df = (
-        pd.DataFrame(records)
-        .groupby("theme")
-        .agg(
-            avgScore=("score", "mean"),
-            maxScore=("score", "max"),
-            count=("name", "count")
-        )
-        .sort_values("avgScore", ascending=False)
-        .reset_index()
-    )
-
-    summary = []
-    for _, row in summary_df.head(16).iterrows():
-        summary.append({
-            "theme": row["theme"],
-            "avgScore": round(float(row["avgScore"]), 2),
-            "maxScore": round(float(row["maxScore"]), 2),
-            "count": int(row["count"]),
-        })
-
-    theme_groups = {}
-    for item in records:
-        theme_groups.setdefault(item["theme"], []).append(item)
-
-    for theme in theme_groups:
-        theme_groups[theme] = sorted(theme_groups[theme], key=lambda x: x["score"], reverse=True)
-
-    return jsonify({
-        "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "analyzedCount": len(records),
-        "summary": summary,
-        "themeGroups": theme_groups,
-        "recommend": records[:10],
-        "watch": records[10:40],
-        "all": records[:120],
-    })
-
+        }), 200
 
 @app.route("/api/chart")
 def api_chart():
@@ -3656,7 +3684,7 @@ function fmtProfitMoney(v) {
         const res = await fetch(`/api/analyze?limit=${limit}`);
         const data = await res.json();
 
-        if (!res.ok || data.error) {
+        if (data.error) {
           throw new Error(data.error || "API 분석 오류");
         }
 
