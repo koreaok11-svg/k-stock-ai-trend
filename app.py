@@ -538,7 +538,7 @@ def api_analyze():
     )
 
     summary = []
-    for _, row in summary_df.head(8).iterrows():
+    for _, row in summary_df.head(16).iterrows():
         summary.append({
             "theme": row["theme"],
             "avgScore": round(float(row["avgScore"]), 2),
@@ -1817,7 +1817,7 @@ function fmtProfitMoney(v) {
 
     <section id="recommend" class="section active"><h2>🔥 추천종목 TOP10</h2><div id="recommendList"></div></section>
     <section id="watch" class="section"><h2>👀 관심종목 TOP30</h2><div id="watchList"></div></section>
-    <section id="theme" class="section"><h2>📊 테마별 흐름</h2><div id="themeList" class="theme-box"></div></section>
+    <section id="theme" class="section"><h2>📊 테마별 흐름</h2><div id="themeList" class="theme-box"></div><div class="trade-helper">상위 테마 최대 16개까지 표시됩니다.</div></section>
 
     <section id="aiSim" class="section">
       <h2>🤖 AI 전략별 자동운용 시뮬레이션</h2>
