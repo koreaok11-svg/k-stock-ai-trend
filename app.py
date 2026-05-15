@@ -1,8 +1,10 @@
 import os
+import math
 import re
 from datetime import datetime
 
 import pandas as pd
+import numpy as np
 import yfinance as yf
 import FinanceDataReader as fdr
 import requests
@@ -200,6 +202,60 @@ WEIGHT = {
     "기타/개별이슈": 0.96,
     "미분류": 0.95,
 }
+
+
+
+
+def safe_value(v):
+    """
+    Flask jsonify 전에 NaN, inf, numpy 타입, pandas 결측값을 안전한 JSON 값으로 변환합니다.
+    JSON이 깨져서 브라우저에서 Unexpected token '<' 오류가 나는 것을 방지합니다.
+    """
+    try:
+        if v is None:
+            return 0
+
+        try:
+            if pd.isna(v):
+                return 0
+        except Exception:
+            pass
+
+        if isinstance(v, (np.integer,)):
+            return int(v)
+
+        if isinstance(v, (np.floating, float)):
+            if math.isnan(float(v)) or math.isinf(float(v)):
+                return 0
+            return float(v)
+
+        if isinstance(v, (np.ndarray,)):
+            return v.tolist()
+
+        return v
+    except Exception:
+        return 0
+
+
+def safe_json(obj):
+    """
+    dict/list 내부까지 재귀적으로 JSON 안전 값으로 변환합니다.
+    """
+    if isinstance(obj, dict):
+        return {str(k): safe_json(v) for k, v in obj.items()}
+
+    if isinstance(obj, list):
+        return [safe_json(v) for v in obj]
+
+    return safe_value(obj)
+
+
+def safe_float(v, default=0.0):
+    try:
+        v = safe_value(v)
+        return float(v)
+    except Exception:
+        return default
 
 
 def classify_theme(name):
@@ -523,14 +579,14 @@ def api_analyze():
         df = get_market_df(limit=limit)
 
         if df.empty:
-            return jsonify({
+            return jsonify(safe_json({
                 "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "analyzedCount": 0,
                 "summary": [],
                 "recommend": [],
                 "watch": [],
                 "all": []
-            })
+            }))
 
         change_col = "ChagesRatio" if "ChagesRatio" in df.columns else None
 
@@ -580,14 +636,14 @@ def api_analyze():
                 "code": str(row["Code"]),
                 "name": str(row["Name"]),
                 "theme": str(row["theme"]),
-                "price": float(row["Close"]),
+                "price": safe_float(row["Close"]),
                 "priceSource": "Naver/FDR 보정",
-                "liveGap": round(float(row.get("liveGap", 0)), 2),
-                "return5": round(float(row["dayChange"]), 2),
+                "liveGap": round(safe_float(row.get("liveGap", 0)), 2),
+                "return5": round(safe_float(row["dayChange"]), 2),
                 "return20": 0,
-                "volumePower": round(float(row["volumeScore"] / 50), 2),
+                "volumePower": round(safe_float(row["volumeScore"] / 50), 2),
                 "trendPower": 1,
-                "score": round(float(row["score"]), 2),
+                "score": round(safe_float(row["score"]), 2),
             }
 
             analysis = make_opinion(item, category)
@@ -617,6 +673,12 @@ def api_analyze():
             except Exception:
                 item["priceSource"] = "FDR 기준"
 
+        # jsonify 직렬화 전 모든 record 값을 JSON 안전 값으로 변환
+        for item in records:
+            item["theme"] = normalize_output_theme(item.get("theme"))
+            for k, v in list(item.items()):
+                item[k] = safe_json(v)
+
         summary_df = (
             pd.DataFrame(records)
             .groupby("theme")
@@ -640,12 +702,14 @@ def api_analyze():
 
         theme_groups = {}
         for item in records:
-            theme_groups.setdefault(item["theme"], []).append(item)
+            theme = normalize_output_theme(item.get("theme"))
+            item["theme"] = theme
+            theme_groups.setdefault(theme, []).append(item)
 
         for theme in theme_groups:
             theme_groups[theme] = sorted(theme_groups[theme], key=lambda x: x["score"], reverse=True)
 
-        return jsonify({
+        payload = {
             "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "analyzedCount": len(records),
             "summary": summary,
@@ -653,9 +717,10 @@ def api_analyze():
             "recommend": records[:10],
             "watch": records[10:40],
             "all": records[:120],
-        })
+        }
+        return jsonify(safe_json(payload))
     except Exception as e:
-        return jsonify({
+        return jsonify(safe_json({
             "error": str(e),
             "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "analyzedCount": 0,
@@ -664,7 +729,7 @@ def api_analyze():
             "recommend": [],
             "watch": [],
             "all": []
-        }), 200
+        })), 200
 
 @app.route("/api/chart")
 def api_chart():
@@ -3682,10 +3747,18 @@ function fmtProfitMoney(v) {
 
       try {
         const res = await fetch(`/api/analyze?limit=${limit}`);
-        const data = await res.json();
+        const rawText = await res.text();
 
-        if (data.error) {
-          throw new Error(data.error || "API 분석 오류");
+        let data;
+        try {
+          data = JSON.parse(rawText);
+        } catch(parseError) {
+          console.log("API returned non-JSON:", rawText.slice(0, 500));
+          throw new Error("서버가 JSON이 아닌 응답을 반환했습니다. Render Logs에서 실제 오류를 확인해 주세요.");
+        }
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || ("HTTP " + res.status + " API 분석 오류"));
         }
 
         data.recommend = data.recommend || [];
