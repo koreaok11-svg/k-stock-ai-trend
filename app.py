@@ -9,7 +9,7 @@ import numpy as np
 import yfinance as yf
 import FinanceDataReader as fdr
 import requests
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, Response
 
 app = Flask(__name__)
 
@@ -741,13 +741,14 @@ def api_realtime_ping():
         mimetype="application/json; charset=utf-8"
     )
 
+
 @app.route("/api/realtime_prices")
 @app.route("/api/realtime_prices/")
 @app.route("/realtime_prices")
 def api_realtime_prices():
     """
     요청받은 종목 코드만 현재가로 갱신합니다.
-    어떤 오류가 나도 HTML이 아니라 JSON 문자열만 반환하도록 Response로 직접 처리합니다.
+    어떤 오류가 나도 HTML이 아니라 JSON 문자열만 반환합니다.
     """
     def json_response(payload, status=200):
         return Response(
@@ -765,9 +766,9 @@ def api_realtime_prices():
             if c and c.isdigit() and len(c) == 6 and c not in codes:
                 codes.append(c)
 
-        codes = codes[:25]  # Render 무료 서버 보호용
-
+        codes = codes[:25]
         result = {}
+
         for code in codes:
             price = None
 
@@ -780,7 +781,10 @@ def api_realtime_prices():
             # 2차: 네이버 실패 시 FDR 최근가 fallback
             if not price:
                 try:
-                    temp = fdr.DataReader(code, (datetime.now() - pd.DateOffset(days=7)).strftime("%Y-%m-%d"))
+                    temp = fdr.DataReader(
+                        code,
+                        (datetime.now() - pd.DateOffset(days=7)).strftime("%Y-%m-%d")
+                    )
                     if temp is not None and not temp.empty:
                         price = float(temp["Close"].iloc[-1])
                 except Exception:
@@ -801,6 +805,7 @@ def api_realtime_prices():
         })
 
     except Exception as e:
+        # 이 경우에도 절대 HTML 에러가 나가지 않게 JSON으로 반환
         return json_response({
             "ok": False,
             "error": str(e),
@@ -3975,7 +3980,7 @@ function fmtProfitMoney(v) {
         } catch(parseError) {
           console.log("realtime non-json response", rawText.slice(0, 300));
           const badge = document.getElementById("realtimeBadge");
-          if (badge) badge.innerText = "🟡 실시간 서버 준비 중 · 기존 가격 유지";
+          if (badge) badge.innerText = "🟡 실시간 서버 응답 대기 · 기존 가격 유지";
           return;
         }
 
@@ -3984,7 +3989,7 @@ function fmtProfitMoney(v) {
         const priceCount = Object.keys(data.prices || {}).length;
         if (priceCount === 0) {
           const badge = document.getElementById("realtimeBadge");
-          if (badge) badge.innerText = "🟡 현재가 갱신 대기 · 데이터 없음";
+          if (badge) badge.innerText = "🟡 현재가 데이터 대기 · 기존 가격 유지";
           return;
         }
 
