@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 
 import pandas as pd
@@ -2303,8 +2304,15 @@ function fmtProfitMoney(v) {
       `;
     }
 
+
+    function safeThemeKey(theme) {
+      return String(theme || "")
+        .replace(/[^a-zA-Z0-9가-힣]/g, "_")
+        .replace(/_+/g, "_");
+    }
+
     function toggleTheme(theme) {
-      const target = document.getElementById("theme-detail-" + btoa(unescape(encodeURIComponent(theme))).replace(/=/g, ""));
+      const target = document.getElementById("theme-detail-" + safeThemeKey(theme));
       if (!target) return;
 
       const isOpen = target.classList.contains("active");
@@ -2319,12 +2327,12 @@ function fmtProfitMoney(v) {
       const groups = data.themeGroups || {};
       const summary = data.summary || [];
       return summary.map(t => {
-        const key = btoa(unescape(encodeURIComponent(t.theme))).replace(/=/g, "");
+        const key = safeThemeKey(t.theme);
         const items = groups[t.theme] || [];
         const stockHtml = items.map(item => makeThemeStockCard(item)).join("");
 
         return `
-          <div class="theme-row clickable" onclick='toggleTheme(${JSON.stringify(t.theme)})'>
+          <div class="theme-row clickable" onclick="toggleTheme(decodeURIComponent('${encodeURIComponent(t.theme)}'))">
             <b>${t.theme}</b>
             <span>평균점수 ${t.avgScore} · 최고점수 ${t.maxScore} · 종목수 ${t.count}개 · 클릭하면 종목별 AI 평가 보기</span>
           </div>
@@ -3666,7 +3674,12 @@ function fmtProfitMoney(v) {
         document.getElementById("analyzedCount").innerText = data.analyzedCount || 0;
         document.getElementById("recommendList").innerHTML = data.recommend.map(item => makeCard(item, "recommend")).join("");
         document.getElementById("watchList").innerHTML = data.watch.map(item => makeCard(item, "watch")).join("");
-        document.getElementById("themeList").innerHTML = renderThemeList(data);
+        try {
+          document.getElementById("themeList").innerHTML = renderThemeList(data);
+        } catch(themeError) {
+          console.log("theme render error", themeError);
+          document.getElementById("themeList").innerHTML = "<div class='empty-box'>테마 표시 중 오류가 발생했습니다. 추천/관심 종목은 정상 표시됩니다.</div>";
+        }
         loading.style.display = "none";
         renderPortfolio();
         multiAiAutoRunIfNeeded();
