@@ -1211,6 +1211,101 @@ HTML = """
       color:#fffdf4;
     }
 
+
+    .click-metric {
+      cursor:pointer;
+      position:relative;
+      border:1px solid rgba(127,163,111,.25);
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    .click-metric:active {
+      transform:scale(.98);
+    }
+    .click-metric small {
+      display:block;
+      margin-top:4px;
+      font-size:10px;
+      color:#6a8a58;
+      font-weight:900;
+    }
+    .holding-modal-card {
+      max-height:86vh;
+    }
+    .holding-summary-box {
+      background:linear-gradient(135deg,#5d7758,#8aaa73,#f2c879);
+      color:#fffdf4;
+      border-radius:22px;
+      padding:15px;
+      margin-bottom:12px;
+    }
+    .holding-summary-title {
+      font-size:22px;
+      font-weight:900;
+      margin-bottom:8px;
+    }
+    .holding-summary-grid {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+    }
+    .holding-summary-grid div {
+      background:rgba(255,255,255,.25);
+      border-radius:15px;
+      padding:10px;
+      text-align:center;
+    }
+    .holding-summary-grid span {
+      display:block;
+      font-size:11px;
+      opacity:.85;
+      margin-bottom:4px;
+    }
+    .holding-summary-grid b {
+      font-size:15px;
+    }
+    .holding-profit-card {
+      background:rgba(255,255,248,.92);
+      border:1px solid #e0e6ca;
+      border-radius:19px;
+      padding:13px;
+      margin:10px 0;
+      box-shadow:0 8px 18px rgba(98,126,86,.10);
+    }
+    .holding-profit-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .holding-profit-name {
+      font-size:20px;
+      font-weight:900;
+      color:#243025;
+    }
+    .holding-profit-rate {
+      padding:7px 10px;
+      border-radius:999px;
+      background:#e6f4dc;
+      color:#3f6b35;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    .holding-profit-rate.loss {
+      background:#fee2e2;
+      color:#991b1b;
+    }
+    .holding-profit-detail {
+      margin-top:8px;
+      color:#4b5563;
+      line-height:1.55;
+      font-size:14px;
+    }
+    .holding-profit-money {
+      font-size:18px;
+      font-weight:900;
+      margin-top:6px;
+    }
+
     .strategy-card {
       background:rgba(255,255,248,.9);
       border:1px solid rgba(255,255,255,.9);
@@ -1730,6 +1825,20 @@ HTML = """
     <div class="footer">K-Stock AI Trend WebApp<br>데이터 제공 상태에 따라 일부 종목은 누락될 수 있습니다.</div>
   </main>
 
+
+  
+  <div id="holdingModal" class="trade-modal" onclick="closeHoldingModal(event)">
+    <div class="trade-modal-card holding-modal-card" onclick="event.stopPropagation()">
+      <div class="trade-modal-head">
+        <div>
+          <div class="trade-modal-label">AI STRATEGY HOLDINGS</div>
+          <h3 id="holdingModalTitle">보유 현황</h3>
+        </div>
+        <button class="trade-modal-close" onclick="hideHoldingModal()">닫기</button>
+      </div>
+      <div id="holdingModalBody"></div>
+    </div>
+  </div>
 
   <div id="tradeModal" class="trade-modal" onclick="closeTradeModal(event)">
     <div class="trade-modal-card" onclick="event.stopPropagation()">
@@ -2576,7 +2685,7 @@ HTML = """
                 <div><span>보유수량</span><b>${h.qty}주</b></div>
                 <div><span>평균단가</span><b>${fmtMoney(h.avgPrice)}</b></div>
                 <div><span>현재가</span><b>${fmtMoney(h.currentPrice)}</b></div>
-                <div><span>평가손익</span><b class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</b></div>
+                <div><span>평가손익</span><b class="${profitClass(h.profit)}">${fmtProfitMoney(h.profit)}</b></div>
               </div>
               <div class="trade-actions">
                 <button onclick='paperBuy(${safeItemForClick(currentItem)})'>🟢 추가 매수</button>
@@ -3147,6 +3256,80 @@ HTML = """
       });
     }
 
+
+    function openStrategyHoldings(strategyKey) {
+      const sim = loadAiSim();
+      const meta = AI_STRATEGIES[strategyKey];
+      const st = sim.strategies?.[strategyKey];
+      if (!meta || !st) return;
+
+      const snap = calcStrategySnapshot(st);
+      const title = document.getElementById("holdingModalTitle");
+      const body = document.getElementById("holdingModalBody");
+
+      if (title) title.innerText = `${meta.icon} ${meta.name} 보유 현황`;
+
+      if (!snap.holdings || snap.holdings.length === 0) {
+        body.innerHTML = `
+          <div class="empty-box">
+            아직 보유 종목이 없습니다.<br>
+            AI가 매수 조건을 기다리는 중입니다.
+          </div>
+        `;
+      } else {
+        const profitTotal = snap.total - st.initialCash;
+        const returnTotal = st.initialCash > 0 ? (profitTotal / st.initialCash * 100) : 0;
+        const winCount = snap.holdings.filter(h => Number(h.profit || 0) > 0).length;
+        const lossCount = snap.holdings.filter(h => Number(h.profit || 0) < 0).length;
+
+        body.innerHTML = `
+          <div class="holding-summary-box">
+            <div class="holding-summary-title">${meta.icon} ${meta.name}</div>
+            <div class="holding-summary-grid">
+              <div><span>총 자산</span><b>${fmtMoney(snap.total)}</b></div>
+              <div><span>총 손익</span><b>${fmtProfitMoney(profitTotal)}</b></div>
+              <div><span>수익률</span><b>${returnTotal.toFixed(2)}%</b></div>
+              <div><span>수익 종목</span><b>${winCount}개</b></div>
+              <div><span>손실 종목</span><b>${lossCount}개</b></div>
+              <div><span>현금</span><b>${fmtMoney(st.cash)}</b></div>
+            </div>
+          </div>
+
+          ${snap.holdings
+            .sort((a,b) => Number(b.profit || 0) - Number(a.profit || 0))
+            .map(h => `
+              <div class="holding-profit-card">
+                <div class="holding-profit-head">
+                  <div>
+                    <div class="holding-profit-name">${h.name}</div>
+                    <div style="color:#6b7280;font-size:13px;margin-top:3px;">${h.market} · ${h.code} · ${h.theme}</div>
+                  </div>
+                  <div class="${h.returnRate >= 0 ? 'holding-profit-rate' : 'holding-profit-rate loss'}">${h.returnRate.toFixed(2)}%</div>
+                </div>
+                <div class="holding-profit-detail">
+                  수량 ${h.qty}주 · 평균 ${fmtMoney(h.avgPrice)} · 현재 ${fmtMoney(h.currentPrice)}<br>
+                  평가금액 ${fmtMoney(h.value)}
+                  <div class="holding-profit-money ${profitClass(h.profit)}">손익 ${fmtProfitMoney(h.profit)}</div>
+                </div>
+              </div>
+            `).join("")}
+        `;
+      }
+
+      const modal = document.getElementById("holdingModal");
+      if (modal) modal.style.display = "flex";
+    }
+
+    function hideHoldingModal() {
+      const modal = document.getElementById("holdingModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function closeHoldingModal(event) {
+      if (event.target.id === "holdingModal") hideHoldingModal();
+    }
+
+
     function renderAiSim() {
       const sim = loadAiSim();
       const totalEl = document.getElementById("bestStrategy");
@@ -3195,7 +3378,7 @@ HTML = """
           <div class="strategy-grid">
             <div><span>총 자산</span><b>${fmtMoney(row.snap.total)}</b></div>
             <div><span>현금</span><b>${fmtMoney(row.st.cash)}</b></div>
-            <div><span>보유</span><b>${row.snap.holdings.length}종목</b></div>
+            <div class="click-metric" onclick="openStrategyHoldings('${row.key}')"><span>보유</span><b>${row.snap.holdings.length}종목</b><small>눌러서 보기</small></div>
             <div><span>주식평가</span><b>${fmtMoney(row.snap.stockValue)}</b></div>
             <div><span>전체수익률</span><b class="${row.totalReturn >= 0 ? 'red' : 'blue'}">${row.totalReturn.toFixed(2)}%</b></div>
           </div>
@@ -3228,7 +3411,7 @@ HTML = """
           <div class="strategy-card">
             <div class="strategy-title">${meta.icon} ${meta.name} 보유 현황</div>
             <div class="strategy-stock-list">
-              ${snap.holdings.length ? snap.holdings.map(h => `<div class="strategy-stock"><b>${h.name}</b> ${h.returnRate.toFixed(2)}%<br>${h.market} · ${h.code} · ${h.theme}<br>수량 ${h.qty}주 · 평균 ${fmtMoney(h.avgPrice)} · 현재 ${fmtMoney(h.currentPrice)} · 손익 <span class="${h.profit >= 0 ? 'red' : 'blue'}">${fmtMoney(h.profit)}</span></div>`).join("") : `<div class="empty-box">보유 종목이 없습니다.</div>`}
+              ${snap.holdings.length ? snap.holdings.map(h => `<div class="strategy-stock"><b>${h.name}</b> ${h.returnRate.toFixed(2)}%<br>${h.market} · ${h.code} · ${h.theme}<br>수량 ${h.qty}주 · 평균 ${fmtMoney(h.avgPrice)} · 현재 ${fmtMoney(h.currentPrice)} · 손익 <span class="${profitClass(h.profit)}">${fmtProfitMoney(h.profit)}</span></div>`).join("") : `<div class="empty-box">보유 종목이 없습니다.</div>`}
             </div>
           </div>
         `;
