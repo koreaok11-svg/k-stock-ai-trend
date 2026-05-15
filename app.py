@@ -2,7 +2,7 @@ import os
 import json
 import math
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import numpy as np
@@ -12,6 +12,13 @@ import requests
 from flask import Flask, render_template_string, request, jsonify, Response
 
 app = Flask(__name__)
+
+KST = timezone(timedelta(hours=9))
+
+def now_kst():
+    return datetime.now(KST)
+
+
 
 THEME_MAP = {
 
@@ -638,7 +645,7 @@ def api_analyze():
                 "name": str(row["Name"]),
                 "theme": str(row["theme"]),
                 "price": safe_float(row["Close"]),
-                "priceSource": "FDR 안정 기준",
+                "priceSource": "FDR 기준",
                 "liveGap": round(safe_float(row.get("liveGap", 0)), 2),
                 "return5": round(safe_float(row["dayChange"]), 2),
                 "return20": 0,
@@ -737,9 +744,10 @@ def api_analyze():
 @app.route("/api/realtime_ping")
 def api_realtime_ping():
     return Response(
-        json.dumps({"ok": True, "message": "realtime api alive", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False),
+        json.dumps({"ok": True, "message": "realtime api alive", "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"), "timezone": "KST"}, ensure_ascii=False),
         mimetype="application/json; charset=utf-8"
     )
+
 
 
 @app.route("/api/realtime_prices")
@@ -748,7 +756,8 @@ def api_realtime_ping():
 def api_realtime_prices():
     """
     요청받은 종목 코드만 현재가로 갱신합니다.
-    어떤 오류가 나도 HTML이 아니라 JSON 문자열만 반환합니다.
+    시간은 한국시간(KST)으로 반환합니다.
+    네이버 현재가를 우선 사용하고, 실패한 종목만 FDR 최근가로 보조 처리합니다.
     """
     def json_response(payload, status=200):
         return Response(
@@ -771,10 +780,13 @@ def api_realtime_prices():
 
         for code in codes:
             price = None
+            source = "Naver 현재가"
 
             # 1차: 네이버 현재가
             try:
                 price = get_naver_realtime_price(code)
+                if price:
+                    source = "Naver 현재가"
             except Exception:
                 price = None
 
@@ -783,33 +795,38 @@ def api_realtime_prices():
                 try:
                     temp = fdr.DataReader(
                         code,
-                        (datetime.now() - pd.DateOffset(days=7)).strftime("%Y-%m-%d")
+                        (now_kst() - pd.DateOffset(days=7)).strftime("%Y-%m-%d")
                     )
                     if temp is not None and not temp.empty:
                         price = float(temp["Close"].iloc[-1])
+                        source = "FDR 최근가"
                 except Exception:
                     price = None
 
             if price and float(price) > 0:
                 result[code] = {
                     "price": float(price),
-                    "source": "현재가 갱신",
-                    "updated": datetime.now().strftime("%H:%M:%S")
+                    "source": source,
+                    "updated": now_kst().strftime("%H:%M:%S"),
+                    "updatedKst": now_kst().strftime("%Y-%m-%d %H:%M:%S")
                 }
 
         return json_response({
             "ok": True,
-            "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "updatedTime": now_kst().strftime("%H:%M:%S"),
+            "timezone": "KST",
             "count": len(result),
             "prices": result
         })
 
     except Exception as e:
-        # 이 경우에도 절대 HTML 에러가 나가지 않게 JSON으로 반환
         return json_response({
             "ok": False,
             "error": str(e),
-            "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "updatedTime": now_kst().strftime("%H:%M:%S"),
+            "timezone": "KST",
             "count": 0,
             "prices": {}
         }, 200)
@@ -2075,6 +2092,7 @@ function fmtProfitMoney(v) {
 
     <div class="notice">⚠️ 투자 판단 보조용입니다. 실제 매수·매도는 본인 판단과 손절 기준이 필요합니다.</div>
 <div id="realtimeBadge" class="realtime-badge">⚪ 실시간 자동갱신 OFF</div>
+<div class="trade-helper realtime-note">※ 표시 시간은 한국시간(KST)입니다. Naver 현재가 실패 종목은 FDR 최근가로 보조 표시됩니다.</div>
 
     <div id="loading" class="loading">
       <div class="spinner"></div>
@@ -2128,14 +2146,14 @@ function fmtProfitMoney(v) {
 
       <div class="ai-sim-actions">
         <button onclick="multiAiStart()">🚀 5가지 AI 자동운용 시작</button>
-        <button onclick="updateRealtimePrices(false)">🔄 실시간 현재가 갱신</button>
+        <button onclick="updateRealtimePrices(false)">🔄 실시간 Naver/FDR 갱신</button>
         <button onclick="multiAiToggleAuto()" id="aiAutoBtn">⏸ 자동운용 켜짐</button>
         <button onclick="multiAiReset()">🔄 초기화</button>
       </div>
 
       
       <div class="ai-sim-actions realtime-actions">
-        <button onclick="updateRealtimePrices(false)">🔄 실시간 현재가 갱신</button>
+        <button onclick="updateRealtimePrices(false)">🔄 실시간 Naver/FDR 갱신</button>
         <button onclick="toggleRealtimeAutoUpdate()">🔴 30초 자동갱신</button>
       </div>
 
@@ -3481,7 +3499,7 @@ function fmtProfitMoney(v) {
             sim.strategies[key].history.unshift({
               day:sim.day,
               strategy:AI_STRATEGIES[key].name,
-              type:"실시간 현재가 갱신",
+              type:"실시간 Naver/FDR 갱신",
               text:"최신 시장 데이터를 다시 불러와 보유 종목 평가손익과 전략별 수익률을 갱신했습니다.",
               time:new Date().toLocaleString()
             });
@@ -3492,7 +3510,7 @@ function fmtProfitMoney(v) {
 
         renderAiSim();
       } catch (e) {
-        alert("실시간 현재가 갱신 중 오류가 발생했습니다: " + e.message);
+        alert("실시간 Naver/FDR 갱신 중 오류가 발생했습니다: " + e.message);
       }
     }
 
@@ -3984,7 +4002,7 @@ function fmtProfitMoney(v) {
           return;
         }
 
-        if (!data.ok) throw new Error(data.error || "현재가 갱신 오류");
+        if (!data.ok) throw new Error(data.error || "Naver/FDR 갱신 오류");
 
         const priceCount = Object.keys(data.prices || {}).length;
         if (priceCount === 0) {
@@ -3994,7 +4012,7 @@ function fmtProfitMoney(v) {
         }
 
         applyRealtimePriceMap(data.prices || {});
-        lastRealtimeUpdated = data.updated || "";
+        lastRealtimeUpdated = data.updatedTime || data.updated || "";
 
         if (typeof renderPortfolio === "function") renderPortfolio();
         if (typeof renderAiSim === "function") renderAiSim();
@@ -4009,11 +4027,11 @@ function fmtProfitMoney(v) {
         const badge = document.getElementById("realtimeBadge");
         if (badge) {
           const count = Object.keys(data.prices || {}).length;
-          badge.innerText = `🔴 실시간 현재가 ${count}개 갱신 · ${lastRealtimeUpdated || ""}`;
+          badge.innerText = `🔴 실시간 현재가 ${count}개 갱신 · ${data.updatedTime || lastRealtimeUpdated || ""} KST`;
           badge.classList.add("blink-live");
         }
 
-        if (!silent) alert(`현재가 갱신 완료: ${Object.keys(data.prices || {}).length}개 종목`);
+        if (!silent) alert(`Naver/FDR 갱신 완료: ${Object.keys(data.prices || {}).length}개 종목`);
       } catch(e) {
         console.log("updateRealtimePrices error", e);
         const badge = document.getElementById("realtimeBadge");
