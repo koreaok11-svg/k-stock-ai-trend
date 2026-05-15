@@ -1,4 +1,5 @@
 import os
+import json
 import math
 import re
 from datetime import datetime
@@ -731,44 +732,82 @@ def api_analyze():
             "all": []
         })), 200
 
+
+
+@app.route("/api/realtime_ping")
+def api_realtime_ping():
+    return Response(
+        json.dumps({"ok": True, "message": "realtime api alive", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False),
+        mimetype="application/json; charset=utf-8"
+    )
+
 @app.route("/api/realtime_prices")
+@app.route("/api/realtime_prices/")
+@app.route("/realtime_prices")
 def api_realtime_prices():
     """
-    보유 종목/화면 종목의 현재가만 빠르게 갱신하는 API.
-    전체 1600개가 아니라 요청받은 코드만 처리해서 Render 무료 서버에서도 안정적으로 동작합니다.
+    요청받은 종목 코드만 현재가로 갱신합니다.
+    어떤 오류가 나도 HTML이 아니라 JSON 문자열만 반환하도록 Response로 직접 처리합니다.
     """
+    def json_response(payload, status=200):
+        return Response(
+            json.dumps(safe_json(payload), ensure_ascii=False),
+            status=status,
+            mimetype="application/json; charset=utf-8"
+        )
+
     try:
         codes_raw = request.args.get("codes", "")
         codes = []
+
         for c in codes_raw.split(","):
             c = str(c).strip().zfill(6)
             if c and c.isdigit() and len(c) == 6 and c not in codes:
                 codes.append(c)
 
-        codes = codes[:40]  # 서버 보호용 상한
+        codes = codes[:25]  # Render 무료 서버 보호용
 
         result = {}
         for code in codes:
-            price = get_naver_realtime_price(code)
-            if price and price > 0:
+            price = None
+
+            # 1차: 네이버 현재가
+            try:
+                price = get_naver_realtime_price(code)
+            except Exception:
+                price = None
+
+            # 2차: 네이버 실패 시 FDR 최근가 fallback
+            if not price:
+                try:
+                    temp = fdr.DataReader(code, (datetime.now() - pd.DateOffset(days=7)).strftime("%Y-%m-%d"))
+                    if temp is not None and not temp.empty:
+                        price = float(temp["Close"].iloc[-1])
+                except Exception:
+                    price = None
+
+            if price and float(price) > 0:
                 result[code] = {
                     "price": float(price),
-                    "source": "Naver 현재가",
+                    "source": "현재가 갱신",
                     "updated": datetime.now().strftime("%H:%M:%S")
                 }
 
-        return jsonify(safe_json({
+        return json_response({
             "ok": True,
             "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "count": len(result),
             "prices": result
-        }))
+        })
+
     except Exception as e:
-        return jsonify(safe_json({
+        return json_response({
             "ok": False,
             "error": str(e),
             "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "count": 0,
             "prices": {}
-        })), 200
+        }, 200)
 
 
 
@@ -3919,10 +3958,14 @@ function fmtProfitMoney(v) {
       try {
         const params = new URLSearchParams();
         params.set("codes", codes.join(","));
+        params.set("_", Date.now().toString());
 
-        const res = await fetch("/api/realtime_prices?" + params.toString(), {
+        const apiUrl = window.location.origin + "/api/realtime_prices?" + params.toString();
+
+        const res = await fetch(apiUrl, {
           method: "GET",
-          cache: "no-store"
+          cache: "no-store",
+          headers: { "Accept": "application/json" }
         });
 
         const rawText = await res.text();
@@ -3931,7 +3974,9 @@ function fmtProfitMoney(v) {
           data = JSON.parse(rawText);
         } catch(parseError) {
           console.log("realtime non-json response", rawText.slice(0, 300));
-          throw new Error("현재가 서버 응답이 JSON 형식이 아닙니다.");
+          const badge = document.getElementById("realtimeBadge");
+          if (badge) badge.innerText = "🟡 실시간 서버 준비 중 · 기존 가격 유지";
+          return;
         }
 
         if (!data.ok) throw new Error(data.error || "현재가 갱신 오류");
@@ -3940,7 +3985,6 @@ function fmtProfitMoney(v) {
         if (priceCount === 0) {
           const badge = document.getElementById("realtimeBadge");
           if (badge) badge.innerText = "🟡 현재가 갱신 대기 · 데이터 없음";
-          if (!silent) alert("현재가를 가져오지 못했습니다. 잠시 후 다시 눌러주세요.");
           return;
         }
 
@@ -3967,17 +4011,9 @@ function fmtProfitMoney(v) {
         if (!silent) alert(`현재가 갱신 완료: ${Object.keys(data.prices || {}).length}개 종목`);
       } catch(e) {
         console.log("updateRealtimePrices error", e);
-
         const badge = document.getElementById("realtimeBadge");
-
-        // 자동 조용한 갱신 중 발생한 오류는 화면을 방해하지 않습니다.
-        if (silent) {
-          if (badge) badge.innerText = "⚪ 자동갱신 대기 중";
-          return;
-        }
-
-        if (badge) badge.innerText = "⚠️ 실시간 갱신 오류: " + e.message;
-        alert("실시간 현재가 갱신 중 오류가 발생했습니다: " + e.message);
+        if (badge) badge.innerText = "🟡 실시간 갱신 대기 · 기존 가격 유지";
+        return;
       }
     }
 
