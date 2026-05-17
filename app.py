@@ -791,6 +791,26 @@ def send_telegram_message(text):
 
 
 
+@app.route("/api/login_check", methods=["POST"])
+def api_login_check():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        pw = str(data.get("password", "")).strip()
+
+        master_pw = os.getenv("MASTER_PASSWORD", "0000").strip()
+        user_pw = os.getenv("USER_PASSWORD", "1234").strip()
+
+        if pw and pw == master_pw:
+            return jsonify({"ok": True, "role": "master", "message": "마스터 로그인 성공"})
+        if pw and pw == user_pw:
+            return jsonify({"ok": True, "role": "user", "message": "일반 사용자 로그인 성공"})
+
+        return jsonify({"ok": False, "message": "비밀번호가 맞지 않습니다."})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 200
+
+
+
 @app.route("/api/telegram_status")
 def api_telegram_status():
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -829,7 +849,30 @@ def api_telegram_test_page():
     if ok:
         html = """<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
         <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f8ed;padding:30px;color:#263629}.box{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}a{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}</style></head>
-        <body><div class='box'><h2>✅ 텔레그램 테스트 발송 완료</h2><p>텔레그램 앱에서 메시지를 확인해 주세요.</p><a href='/'>앱으로 돌아가기</a></div></body></html>"""
+        <body>
+
+  <div id="passwordLock" class="password-lock">
+    <div class="lock-sky">
+      <div class="lock-sun"></div>
+      <div class="lock-cloud c1"></div>
+      <div class="lock-cloud c2"></div>
+      <div class="lock-leaf">🍃</div>
+    </div>
+
+    <div class="lock-card">
+      <div class="mini-label">SECURE ACCESS</div>
+      <h1>성일의 AI 주식바람</h1>
+      <p>비밀번호를 입력하면 앱을 사용할 수 있습니다.</p>
+
+      <input id="passwordInput" type="password" placeholder="비밀번호 입력" autocomplete="current-password">
+      <button onclick="loginWithPassword()">🔐 로그인</button>
+
+      <div id="loginMessage" class="login-message">
+        마스터 비밀번호: 관리자용 / 일반 비밀번호: 사용자용
+      </div>
+    </div>
+  </div>
+<div class='box'><h2>✅ 텔레그램 테스트 발송 완료</h2><p>텔레그램 앱에서 메시지를 확인해 주세요.</p><a href='/'>앱으로 돌아가기</a></div></body></html>"""
         return Response(html, mimetype="text/html; charset=utf-8")
 
     safe_msg = str(msg).replace("<", "&lt;").replace(">", "&gt;")
@@ -2636,6 +2679,173 @@ function fmtProfitMoney(v) {
       .holding-form, .holding-buttons { grid-template-columns:1fr; }
     }
 
+
+    .password-lock {
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      background:linear-gradient(180deg,#fff7cf 0%,#eef8de 48%,#dceffc 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:28px;
+      overflow:hidden;
+    }
+    .password-lock.hidden {
+      display:none;
+    }
+    .lock-sky {
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+    }
+    .lock-sun {
+      position:absolute;
+      width:210px;
+      height:210px;
+      border-radius:50%;
+      left:50%;
+      top:12%;
+      transform:translateX(-50%);
+      background:radial-gradient(circle,#ffe58a 0%,#f9c85f 55%,rgba(249,200,95,0) 72%);
+      filter:blur(.2px);
+      opacity:.85;
+    }
+    .lock-cloud {
+      position:absolute;
+      width:240px;
+      height:70px;
+      border-radius:70px;
+      background:rgba(255,255,255,.75);
+      filter:blur(.2px);
+    }
+    .lock-cloud::before,
+    .lock-cloud::after {
+      content:"";
+      position:absolute;
+      background:rgba(255,255,255,.75);
+      border-radius:50%;
+    }
+    .lock-cloud::before {
+      width:95px;
+      height:95px;
+      left:35px;
+      top:-45px;
+    }
+    .lock-cloud::after {
+      width:120px;
+      height:120px;
+      right:35px;
+      top:-60px;
+    }
+    .lock-cloud.c1 {
+      top:24%;
+      right:12%;
+      opacity:.8;
+    }
+    .lock-cloud.c2 {
+      top:37%;
+      left:14%;
+      width:190px;
+      transform:scale(.78);
+      opacity:.65;
+    }
+    .lock-leaf {
+      position:absolute;
+      left:20%;
+      top:30%;
+      font-size:40px;
+      animation:floatLeaf 4s ease-in-out infinite;
+    }
+    @keyframes floatLeaf {
+      0%,100% { transform:translateY(0) rotate(-8deg); }
+      50% { transform:translateY(-14px) rotate(8deg); }
+    }
+    .lock-card {
+      position:relative;
+      width:min(560px,92vw);
+      background:rgba(255,255,255,.58);
+      border:1px solid rgba(255,255,255,.72);
+      border-radius:34px;
+      padding:34px;
+      box-shadow:0 28px 80px rgba(70,100,80,.22);
+      backdrop-filter:blur(14px);
+      text-align:center;
+      color:#263629;
+    }
+    .lock-card h1 {
+      font-size:42px;
+      line-height:1.15;
+      margin:10px 0;
+      color:#335c43;
+      letter-spacing:-1px;
+    }
+    .lock-card p {
+      margin:8px 0 22px;
+      color:#667260;
+      font-size:17px;
+      line-height:1.55;
+    }
+    .lock-card input {
+      width:100%;
+      box-sizing:border-box;
+      border:1px solid rgba(77,101,74,.22);
+      background:rgba(255,255,255,.92);
+      border-radius:20px;
+      padding:18px;
+      font-size:20px;
+      outline:none;
+      text-align:center;
+      margin:10px 0 14px;
+    }
+    .lock-card button {
+      width:100%;
+      border:0;
+      border-radius:22px;
+      padding:18px;
+      background:linear-gradient(135deg,#4e7a55,#a8d287,#f2c879);
+      color:#243326;
+      font-size:20px;
+      font-weight:900;
+      box-shadow:0 14px 32px rgba(70,110,75,.18);
+    }
+    .login-message {
+      margin-top:15px;
+      padding:13px;
+      border-radius:16px;
+      background:rgba(255,255,255,.52);
+      color:#687364;
+      font-weight:700;
+      line-height:1.45;
+    }
+    body.locked {
+      overflow:hidden;
+    }
+    body.role-user .master-only {
+      display:none !important;
+    }
+    @media(max-width:720px) {
+      .lock-card {
+        padding:28px 22px;
+      }
+      .lock-card h1 {
+        font-size:32px;
+      }
+    }
+
+
+    .logout-btn {
+      display:block;
+      margin:10px auto 18px;
+      border:0;
+      border-radius:18px;
+      padding:12px 18px;
+      background:rgba(255,255,255,.75);
+      color:#48654b;
+      font-weight:900;
+      box-shadow:0 8px 20px rgba(70,90,70,.10);
+    }
+
   </style>
 </head>
 <body>
@@ -2699,6 +2909,7 @@ function fmtProfitMoney(v) {
 
     <div class="tabs">
       <div class="tab active" onclick="showTab('recommend', this)">🔥 추천</div>
+    <button class="logout-btn" onclick="logoutPassword()">🔒 로그아웃</button>
       <div class="tab" onclick="showTab('watch', this)">👀 관심</div>
       <div class="tab" onclick="showTab('theme', this)">📊 테마</div>
       <div class="tab" onclick="showTab('scalpingAi', this)">⚡ 단타AI</div>
@@ -2814,7 +3025,7 @@ function fmtProfitMoney(v) {
 
 
       
-      <div class="telegram-panel">
+      <div class="telegram-panel master-only">
         <div class="mini-label">TELEGRAM ALERT SYSTEM</div>
         <h3>📨 텔레그램 실시간 알림</h3>
         <p>
@@ -2852,7 +3063,7 @@ function fmtProfitMoney(v) {
 
         <div class="holding-buttons">
           <button class="primary-btn" onclick="addHolding()">➕ 보유종목 등록</button>
-          <button class="primary-btn sub" onclick="clearHoldings()">🧹 전체 삭제</button>
+          <button class="primary-btn sub master-only" onclick="clearHoldings()">🧹 전체 삭제</button>
         </div>
 
         <div id="holdingStatus" class="telegram-status">등록된 보유종목이 없습니다.</div>
@@ -5346,6 +5557,58 @@ let scalpChart = null;
           ${t.theme ? `<br>테마 ${t.theme}` : ""}
         </div>
       `).join("");
+    }
+
+
+
+    function setLockedState() {
+      const saved = localStorage.getItem("sungil_ai_login_role");
+      const lock = document.getElementById("passwordLock");
+
+      if (saved === "master" || saved === "user") {
+        if (lock) lock.classList.add("hidden");
+        document.body.classList.remove("locked");
+        document.body.classList.remove("role-master", "role-user");
+        document.body.classList.add(saved === "master" ? "role-master" : "role-user");
+      } else {
+        if (lock) lock.classList.remove("hidden");
+        document.body.classList.add("locked");
+      }
+    }
+
+    async function loginWithPassword() {
+      const input = document.getElementById("passwordInput");
+      const msg = document.getElementById("loginMessage");
+      const password = input ? input.value.trim() : "";
+
+      if (!password) {
+        if (msg) msg.innerText = "비밀번호를 입력해 주세요.";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/login_check", {
+          method: "POST",
+          headers: {"Content-Type": "application/json", "Accept": "application/json"},
+          body: JSON.stringify({password})
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          localStorage.setItem("sungil_ai_login_role", data.role);
+          if (msg) msg.innerText = data.role === "master" ? "마스터 로그인 성공" : "일반 사용자 로그인 성공";
+          setLockedState();
+        } else {
+          if (msg) msg.innerText = "⚠️ " + (data.message || "비밀번호가 맞지 않습니다.");
+        }
+      } catch(e) {
+        if (msg) msg.innerText = "⚠️ 로그인 오류: " + e.message;
+      }
+    }
+
+    function logoutPassword() {
+      localStorage.removeItem("sungil_ai_login_role");
+      setLockedState();
     }
 
 
