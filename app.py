@@ -1,4 +1,6 @@
 import os
+import threading
+import time
 import json
 import math
 import re
@@ -791,6 +793,175 @@ def send_telegram_message(text):
 
 
 
+# ============================
+# Server-side holding monitor
+# ============================
+SERVER_HOLDINGS_FILE = os.getenv("SERVER_HOLDINGS_FILE", "/tmp/sungil_holdings.json")
+SERVER_WATCH_STATE = {"running": False, "thread": None, "last_alerts": {}}
+
+def _read_server_holdings():
+    try:
+        if os.path.exists(SERVER_HOLDINGS_FILE):
+            with open(SERVER_HOLDINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+    except Exception:
+        pass
+    return []
+
+def _write_server_holdings(items):
+    try:
+        with open(SERVER_HOLDINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(items or [], f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+def _get_price_for_code(code):
+    code = str(code).zfill(6)
+    try:
+        df = get_market_df(limit=400)
+        if df is not None and not df.empty:
+            d = df.copy()
+            d["Code"] = d["Code"].astype(str).str.zfill(6)
+            rows = d[d["Code"] == code]
+            if not rows.empty:
+                return safe_float(rows.iloc[0].get("Close", 0))
+    except Exception:
+        pass
+
+    try:
+        end_dt = now_kst()
+        start_dt = end_dt - pd.DateOffset(days=7)
+        hist = fdr.DataReader(code, start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d"))
+        if hist is not None and not hist.empty:
+            return safe_float(hist.iloc[-1].get("Close", 0))
+    except Exception:
+        pass
+    return 0
+
+def _server_monitor_loop():
+    while SERVER_WATCH_STATE.get("running"):
+        try:
+            holdings = _read_server_holdings()
+            changed = False
+            today = now_kst().strftime("%Y-%m-%d")
+
+            for h in holdings:
+                code = str(h.get("code", "")).zfill(6)
+                if not code:
+                    continue
+                cur = _get_price_for_code(code)
+                if cur <= 0:
+                    continue
+
+                h["lastPrice"] = cur
+                changed = True
+
+                name = h.get("name", code)
+                buy_price = safe_float(h.get("buyPrice", 0))
+                qty = safe_float(h.get("qty", 0))
+                target = safe_float(h.get("target", 0))
+                stop = safe_float(h.get("stop", 0))
+                pnl = (cur - buy_price) * qty if buy_price and qty else 0
+
+                if target and cur >= target:
+                    key = f"target_{code}_{today}"
+                    if not SERVER_WATCH_STATE["last_alerts"].get(key):
+                        SERVER_WATCH_STATE["last_alerts"][key] = True
+                        send_telegram_message(
+                            f"🎯 <b>보유종목 목표가 도달</b>\n"
+                            f"종목: <b>{name}</b> ({code})\n"
+                            f"현재가: {cur:,.0f}원\n"
+                            f"목표가: {target:,.0f}원\n"
+                            f"손절가: {stop:,.0f}원\n"
+                            f"평가손익: {pnl:,.0f}원\n\n"
+                            "※ 자동매매가 아닙니다. 증권앱에서 직접 매도 여부를 확인하세요."
+                        )
+
+                if stop and cur <= stop:
+                    key = f"stop_{code}_{today}"
+                    if not SERVER_WATCH_STATE["last_alerts"].get(key):
+                        SERVER_WATCH_STATE["last_alerts"][key] = True
+                        send_telegram_message(
+                            f"⚠️ <b>보유종목 손절가 이탈</b>\n"
+                            f"종목: <b>{name}</b> ({code})\n"
+                            f"현재가: {cur:,.0f}원\n"
+                            f"목표가: {target:,.0f}원\n"
+                            f"손절가: {stop:,.0f}원\n"
+                            f"평가손익: {pnl:,.0f}원\n\n"
+                            "※ 자동매매가 아닙니다. 증권앱에서 직접 손절 여부를 확인하세요."
+                        )
+
+            if changed:
+                _write_server_holdings(holdings)
+
+        except Exception as e:
+            print("server monitor error:", e)
+
+        time.sleep(15)
+
+@app.route("/api/server_holdings", methods=["GET", "POST"])
+def api_server_holdings():
+    if request.method == "GET":
+        return jsonify({"ok": True, "holdings": _read_server_holdings()})
+
+    data = request.get_json(force=True, silent=True) or {}
+    action = data.get("action", "add")
+    holdings = _read_server_holdings()
+
+    if action == "add":
+        item = data.get("item", {})
+        if item:
+            # same code existing item replace
+            code = str(item.get("code", "")).zfill(6)
+            item["code"] = code
+            holdings = [h for h in holdings if str(h.get("code", "")).zfill(6) != code]
+            holdings.append(item)
+            _write_server_holdings(holdings)
+        return jsonify({"ok": True, "holdings": holdings})
+
+    if action == "remove":
+        item_id = str(data.get("id", ""))
+        code = str(data.get("code", "")).zfill(6)
+        holdings = [
+            h for h in holdings
+            if str(h.get("id", "")) != item_id and str(h.get("code", "")).zfill(6) != code
+        ]
+        _write_server_holdings(holdings)
+        return jsonify({"ok": True, "holdings": holdings})
+
+    if action == "clear":
+        _write_server_holdings([])
+        return jsonify({"ok": True, "holdings": []})
+
+    return jsonify({"ok": False, "message": "unknown action", "holdings": holdings})
+
+@app.route("/api/server_watch/start", methods=["POST", "GET"])
+def api_server_watch_start():
+    SERVER_WATCH_STATE["running"] = True
+    thread = SERVER_WATCH_STATE.get("thread")
+    if thread is None or not thread.is_alive():
+        thread = threading.Thread(target=_server_monitor_loop, daemon=True)
+        SERVER_WATCH_STATE["thread"] = thread
+        thread.start()
+    return jsonify({"ok": True, "running": True, "holdings": len(_read_server_holdings())})
+
+@app.route("/api/server_watch/stop", methods=["POST", "GET"])
+def api_server_watch_stop():
+    SERVER_WATCH_STATE["running"] = False
+    return jsonify({"ok": True, "running": False})
+
+@app.route("/api/server_watch/status")
+def api_server_watch_status():
+    return jsonify({
+        "ok": True,
+        "running": bool(SERVER_WATCH_STATE.get("running")),
+        "holdings": len(_read_server_holdings())
+    })
+
+
+
 @app.route("/api/login_check", methods=["POST"])
 def api_login_check():
     try:
@@ -847,38 +1018,53 @@ def api_telegram_test_page():
         ok, msg = False, str(e)
 
     if ok:
-        html = """<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
-        <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f8ed;padding:30px;color:#263629}.box{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}a{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}</style></head>
-        <body>
-
-  <div id="passwordLock" class="password-lock">
-    <div class="lock-sky">
-      <div class="lock-sun"></div>
-      <div class="lock-cloud c1"></div>
-      <div class="lock-cloud c2"></div>
-      <div class="lock-leaf">🍃</div>
-    </div>
-
-    <div class="lock-card">
-      <div class="mini-label">SECURE ACCESS</div>
-      <h1>성일의 AI 주식바람</h1>
-      <p>비밀번호를 입력하면 앱을 사용할 수 있습니다.</p>
-
-      <input id="passwordInput" type="password" placeholder="비밀번호 입력" autocomplete="current-password">
-      <button onclick="loginWithPassword()">🔐 로그인</button>
-
-      <div id="loginMessage" class="login-message">
-        마스터 비밀번호: 관리자용 / 일반 비밀번호: 사용자용
-      </div>
-    </div>
-  </div>
-<div class='box'><h2>✅ 텔레그램 테스트 발송 완료</h2><p>텔레그램 앱에서 메시지를 확인해 주세요.</p><a href='/'>앱으로 돌아가기</a></div></body></html>"""
+        html = """<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram Test</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(180deg,#f7f9e9,#eaf5de);padding:30px;color:#263629}
+.box{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+h2{font-size:30px;line-height:1.25}
+p{font-size:18px;line-height:1.6}
+a{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>✅ 텔레그램 테스트 발송 완료</h2>
+<p>텔레그램 앱에서 메시지를 확인해 주세요.</p>
+<a href="/">앱으로 돌아가기</a>
+</div>
+</body>
+</html>"""
         return Response(html, mimetype="text/html; charset=utf-8")
 
     safe_msg = str(msg).replace("<", "&lt;").replace(">", "&gt;")
-    html = f"""<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
-    <style>body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff7ed;padding:30px;color:#263629}}.box{{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}}pre{{white-space:pre-wrap;background:#f7f7f0;border-radius:14px;padding:12px}}a{{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}}</style></head>
-    <body><div class='box'><h2>⚠️ 텔레그램 테스트 실패</h2><p>Render 환경변수 또는 토큰/Chat ID를 다시 확인해 주세요.</p><pre>{safe_msg}</pre><a href='/'>앱으로 돌아가기</a></div></body></html>"""
+    html = f"""<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram Test Fail</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff7ed;padding:30px;color:#263629}}
+.box{{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}}
+pre{{white-space:pre-wrap;background:#f7f7f0;border-radius:14px;padding:12px}}
+a{{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>⚠️ 텔레그램 테스트 실패</h2>
+<p>Render 환경변수 또는 토큰/Chat ID를 다시 확인해 주세요.</p>
+<pre>{safe_msg}</pre>
+<a href="/">앱으로 돌아가기</a>
+</div>
+</body>
+</html>"""
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
@@ -1132,7 +1318,7 @@ HTML = """
   <!-- REALTIME_SAFARI_FETCH_FIXED_V33 -->
   <title>K-Stock AI Trend</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js">
-    window.addEventListener('load', () => { try { renderHoldings(); } catch(e){} });
+    window.addEventListener('load', () => { try { syncHoldingsFromServer(); renderHoldings(); } catch(e){} });
   </script>
   <script>
     
@@ -5089,13 +5275,16 @@ let sentTelegramAlerts = {};
       }
 
       const list = loadHoldings();
-      list.push({
+      const holdingItem = {
         id: Date.now(), name, code, buyPrice,
         buyAmount: buyAmount || Math.round(buyPrice * qty),
         qty, target, stop, createdAt: new Date().toISOString(),
         lastPrice: buyPrice
-      });
+      };
+      list.push(holdingItem);
       saveHoldings(list);
+      pushHoldingToServer(holdingItem);
+      startServerWatch();
       renderHoldings();
 
       ["holdName","holdCode","holdBuyPrice","holdBuyAmount","holdQty","holdTarget","holdStop"].forEach(id => {
@@ -5105,13 +5294,17 @@ let sentTelegramAlerts = {};
     }
 
     function removeHolding(id) {
-      saveHoldings(loadHoldings().filter(x => String(x.id) !== String(id)));
+      const list = loadHoldings();
+      const item = list.find(x => String(x.id) === String(id));
+      saveHoldings(list.filter(x => String(x.id) !== String(id)));
+      removeHoldingFromServer(item);
       renderHoldings();
     }
 
     function clearHoldings() {
       if (!confirm("등록된 보유종목을 모두 삭제할까요?")) return;
       saveHoldings([]);
+      clearHoldingsFromServer();
       renderHoldings();
     }
 
@@ -5217,6 +5410,78 @@ let scalpWatchTimer = null;
     let scalpWatching = false;
     let lastWatchData = null;
 
+
+    async function syncHoldingsFromServer() {
+      try {
+        const res = await fetch("/api/server_holdings", {cache:"no-store", headers:{"Accept":"application/json"}});
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.holdings)) {
+          saveHoldings(data.holdings);
+          renderHoldings();
+        }
+      } catch(e) {
+        console.log("syncHoldingsFromServer error", e);
+      }
+    }
+
+    async function pushHoldingToServer(item) {
+      try {
+        await fetch("/api/server_holdings", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({action:"add", item})
+        });
+      } catch(e) {
+        console.log("pushHoldingToServer error", e);
+      }
+    }
+
+    async function removeHoldingFromServer(item) {
+      try {
+        await fetch("/api/server_holdings", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({action:"remove", id:item && item.id, code:item && item.code})
+        });
+      } catch(e) {
+        console.log("removeHoldingFromServer error", e);
+      }
+    }
+
+    async function clearHoldingsFromServer() {
+      try {
+        await fetch("/api/server_holdings", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({action:"clear"})
+        });
+      } catch(e) {
+        console.log("clearHoldingsFromServer error", e);
+      }
+    }
+
+    async function startServerWatch() {
+      try {
+        const res = await fetch("/api/server_watch/start", {method:"POST", cache:"no-store"});
+        const data = await res.json();
+        const status = document.getElementById("watchStatus");
+        if (status && data.ok) {
+          status.innerText = `🟢 서버 백그라운드 감시 시작. 앱을 닫아도 서버가 보유종목 ${data.holdings}개를 15초 간격으로 확인합니다.`;
+        }
+      } catch(e) {
+        console.log("startServerWatch error", e);
+      }
+    }
+
+    async function stopServerWatch() {
+      try {
+        await fetch("/api/server_watch/stop", {method:"POST", cache:"no-store"});
+      } catch(e) {
+        console.log("stopServerWatch error", e);
+      }
+    }
+
+
     async function startScalpWatch() {
       if (scalpWatching) return;
 
@@ -5227,6 +5492,7 @@ let scalpWatchTimer = null;
         status.innerText = "🟢 단타 실전 감시 시작. 기본 15초 감시 모드로 동작합니다.";
       }
 
+      await startServerWatch();
       await runScalpWatchCycle();
 
       scalpWatchTimer = setInterval(async () => {
@@ -5248,6 +5514,7 @@ let scalpWatchTimer = null;
       }
 
       const status = document.getElementById("watchStatus");
+      stopServerWatch();
       if (status) {
         status.innerText = "⏹ 실전 감시가 중지되었습니다.";
       }
