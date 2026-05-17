@@ -388,7 +388,7 @@ def make_opinion(item, category):
 
     if change >= 15:
         reasons.append("상승 탄력이 강하게 반영되어 시장 관심이 집중된 상태입니다.")
-        risk.append("단기 급등 구간일 수 있어 추격매수보다는 눌림 확인이 필요합니다.")
+        risk.append("단기 거래량 급증 구간일 수 있어 추격매수보다는 눌림 확인이 필요합니다.")
     elif change >= 5:
         reasons.append("상승률이 양호해 단기 모멘텀이 붙은 상태로 볼 수 있습니다.")
     elif change > 0:
@@ -411,7 +411,7 @@ def make_opinion(item, category):
     elif category == "관심":
         strategy.append("관심종목은 바로 매수보다 거래대금 증가, 양봉 유지, 테마 지속 여부를 확인한 뒤 접근하는 것이 좋습니다.")
     else:
-        strategy.append("관찰 단계에서는 급등 여부보다 거래량 증가와 테마 편입 가능성을 확인하는 것이 좋습니다.")
+        strategy.append("관찰 단계에서는 거래량 급증 여부보다 거래량 증가와 테마 편입 가능성을 확인하는 것이 좋습니다.")
 
     if price <= 0:
         risk.append("현재가 데이터가 정상 수집되지 않았을 수 있으므로 실제 HTS 가격 확인이 필요합니다.")
@@ -540,7 +540,7 @@ def get_company_profile(item):
 
     if change >= 10:
         strengths.append("최근 상승률이 높아 시장 관심이 붙은 상태입니다.")
-        cautions.append("단기 급등 이후 변동성이 커질 수 있습니다.")
+        cautions.append("단기 거래량 급증 이후 변동성이 커질 수 있습니다.")
     elif change > 0:
         strengths.append("최근 가격 흐름이 양호한 편입니다.")
     else:
@@ -757,203 +757,8 @@ def api_analyze():
 
 
 
-@app.route("/api/scalping_learn")
-@app.route("/api/scalping_learn/")
-def api_scalping_learn():
-    """
-    최종 경량 단타 AI 학습모드.
-    Render 무료 서버 안정화를 위해 외부 과거가격 대량 호출을 하지 않고,
-    현재 KRX/FDR StockListing 데이터 기반으로 단타 조건과 후보를 빠르게 산출합니다.
-    항상 JSON만 반환합니다.
-    """
-    def json_response(payload, status=200):
-        return Response(
-            json.dumps(safe_json(payload), ensure_ascii=False),
-            status=status,
-            mimetype="application/json; charset=utf-8"
-        )
-
-    try:
-        initial_cash = safe_float(request.args.get("cash", 10000000), 10000000)
-        req_days = int(safe_float(request.args.get("days", 365), 365))
-
-        df = get_market_df(limit=400)
-        if df is None or df.empty:
-            raise Exception("시장 데이터를 가져오지 못했습니다.")
-
-        df = df.copy()
-        change_col = "ChagesRatio" if "ChagesRatio" in df.columns else None
-        df["dayChange"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0) if change_col else 0
-        df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
-        df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
-        df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
-        df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
-        df = df[df["Close"] > 0]
-
-        df["theme"] = df["Name"].apply(classify_theme).apply(normalize_output_theme)
-        df["amountScore"] = df["Amount"].rank(pct=True) * 100
-        df["volumeScore"] = df["Volume"].rank(pct=True) * 100
-        df["marcapScore"] = df["Marcap"].rank(pct=True) * 100
-
-        # 단타형 점수: 당일 등락률, 거래대금, 거래량, 테마 가중을 중심으로 구성
-        df["themeWeight"] = df["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
-        df["scalpScore"] = (
-            df["dayChange"].clip(lower=-8, upper=25) * 2.2 +
-            df["amountScore"] * 0.35 +
-            df["volumeScore"] * 0.30 +
-            df["marcapScore"] * 0.08
-        ) * df["themeWeight"]
-
-        # 너무 약한 종목 제외, 그래도 후보가 없으면 상위 점수로 보완
-        strong = df[(df["dayChange"] >= 1.5) & (df["amountScore"] >= 55)].copy()
-        if strong.empty:
-            strong = df.copy()
-
-        strong = strong.sort_values("scalpScore", ascending=False).head(5)
-
-        # 요청 기간별 단타 조건을 다르게 제시하되, 서버 계산은 경량화
-        if req_days >= 365:
-            best_params = {"take": 0.045, "stop": -0.025, "max_hold": 5, "min_r5": 0.03, "vol_mult": 1.15}
-            learn_title = "1년 조건 기준 경량 학습"
-        else:
-            best_params = {"take": 0.035, "stop": -0.020, "max_hold": 3, "min_r5": 0.025, "vol_mult": 1.10}
-            learn_title = "6개월 빠른 기준 경량 학습"
-
-        # 가상 1개월 운용 곡선: 후보 평균 점수/등락률을 기반으로 보수적 시뮬레이션
-        avg_change = safe_float(strong["dayChange"].mean(), 0)
-        avg_score = safe_float(strong["scalpScore"].mean(), 0)
-        daily_edge = max(min((avg_change / 100) * 0.22 + (avg_score / 10000), 0.012), -0.006)
-
-        total = initial_cash
-        equity = []
-        for i in range(22):
-            # 변동성 패턴을 약하게 반영
-            wave = ((i % 5) - 2) * 0.0015
-            total = total * (1 + daily_edge + wave)
-            equity.append({
-                "date": f"D+{i}",
-                "day": i,
-                "total": round(total, 0),
-                "returnRate": round((total - initial_cash) / initial_cash * 100, 2)
-            })
-
-        final_return = round((equity[-1]["total"] - initial_cash) / initial_cash * 100, 2) if equity else 0
-        win_rate = round(min(max(52 + avg_change * 1.8, 45), 76), 1)
-        max_dd = round(-abs(min(3.5, max(1.2, 4.5 - avg_change * 0.2))), 2)
-
-        picks = []
-        for _, row in strong.iterrows():
-            p = safe_float(row["Close"])
-            score = safe_float(row["scalpScore"])
-            picks.append({
-                "code": str(row["Code"]).zfill(6),
-                "name": str(row["Name"]),
-                "market": str(row["Market"]),
-                "theme": normalize_output_theme(row["theme"]),
-                "price": round(p, 0),
-                "score": round(score, 2),
-                "buyZone": round(p * 0.995, 0),
-                "target": round(p * (1 + best_params["take"]), 0),
-                "stop": round(p * (1 + best_params["stop"]), 0),
-                "maxHold": best_params["max_hold"],
-                "reason": "거래대금, 거래량, 단기 가격 흐름이 단타 AI 경량 기준을 통과했습니다."
-            })
-
-        # 예시 매매 로그 생성
-        trades = []
-        for i, p in enumerate(picks[:4]):
-            qty = int((initial_cash * 0.18) // max(p["price"], 1))
-            if qty <= 0:
-                continue
-            trades.append({
-                "date": f"D+{max(1, i*3)}",
-                "type": "매수",
-                "name": p["name"],
-                "code": p["code"],
-                "price": p["price"],
-                "qty": qty,
-                "theme": p["theme"]
-            })
-            pnl_rate = best_params["take"] if i % 2 == 0 else best_params["stop"]
-            trades.append({
-                "date": f"D+{max(2, i*3+2)}",
-                "type": "익절" if pnl_rate > 0 else "손절",
-                "name": p["name"],
-                "code": p["code"],
-                "price": round(p["price"] * (1 + pnl_rate), 0),
-                "qty": qty,
-                "pnl": round(p["price"] * qty * pnl_rate, 0),
-                "returnRate": round(pnl_rate * 100, 2),
-                "theme": p["theme"]
-            })
-
-        top_conditions = [
-            {"rank": 1, "params": best_params, "returnRate": final_return, "winRate": win_rate, "maxDrawdown": max_dd, "tradeCount": len(trades), "learnScore": round(final_return * 0.6 + win_rate * 0.25 + max_dd * 0.4, 2)},
-            {"rank": 2, "params": {"take": 0.035, "stop": -0.020, "max_hold": 3, "min_r5": 0.025, "vol_mult": 1.1}, "returnRate": round(final_return * 0.82, 2), "winRate": round(win_rate + 2, 1), "maxDrawdown": round(max_dd * 0.8, 2), "tradeCount": max(len(trades)-1, 1), "learnScore": round(final_return * 0.5 + win_rate * 0.23, 2)},
-            {"rank": 3, "params": {"take": 0.060, "stop": -0.035, "max_hold": 7, "min_r5": 0.04, "vol_mult": 1.2}, "returnRate": round(final_return * 1.08, 2), "winRate": round(win_rate - 4, 1), "maxDrawdown": round(max_dd * 1.25, 2), "tradeCount": len(trades), "learnScore": round(final_return * 0.55 + win_rate * 0.20, 2)}
-        ]
-
-        return json_response({
-            "ok": True,
-            "mode": "lightweight",
-            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
-            "requestedDays": req_days,
-            "learnDays": req_days,
-            "testDays": 22,
-            "initialCash": initial_cash,
-            "bestParams": best_params,
-            "bestLearn": {
-                "title": learn_title,
-                "returnRate": final_return,
-                "winRate": win_rate,
-                "maxDrawdown": max_dd,
-                "tradeCount": len(trades),
-                "learnScore": top_conditions[0]["learnScore"]
-            },
-            "monthResult": {
-                "returnRate": final_return,
-                "winRate": win_rate,
-                "maxDrawdown": max_dd,
-                "tradeCount": len(trades),
-                "equity": equity,
-                "trades": trades
-            },
-            "picks": picks,
-            "topConditions": top_conditions,
-            "message": "무료 Render 안정형으로 단타 조건과 후보를 빠르게 산출했습니다. 실제 매매 전 HTS/MTS 실시간 현재가와 호가를 반드시 확인하세요."
-        })
-
-    except Exception as e:
-        return json_response({
-            "ok": False,
-            "error": str(e),
-            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
-            "picks": [],
-            "topConditions": [],
-            "monthResult": {"equity": [], "trades": []}
-        }, 200)
 
 
-
-def send_telegram_message(text):
-    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-    if not token or not chat_id:
-        return False, "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 설정되지 않았습니다."
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True
-        }
-        r = requests.post(url, json=payload, timeout=5)
-        if r.status_code != 200:
-            return False, r.text[:300]
-        return True, "sent"
-    except Exception as e:
-        return False, str(e)
 
 
 @app.route("/api/telegram_status")
@@ -1007,6 +812,179 @@ def api_telegram_alert():
 
 
 
+@app.route("/api/scalping_learn")
+@app.route("/api/scalping_learn/")
+def api_scalping_learn():
+    """
+    알짜 거래량 급증 단타 스캐너.
+    거래량 급증주 추격보다, 장중 거래량/거래대금이 붙으면서 아직 과열되지 않은
+    비교적 알짜 회사 후보 3종목을 찾습니다.
+    """
+    def json_response(payload, status=200):
+        return Response(
+            json.dumps(safe_json(payload), ensure_ascii=False),
+            status=status,
+            mimetype="application/json; charset=utf-8"
+        )
+
+    try:
+        initial_cash = safe_float(request.args.get("cash", 10000000), 10000000)
+
+        df = get_market_df(limit=400)
+        if df is None or df.empty:
+            raise Exception("시장 데이터를 가져오지 못했습니다.")
+
+        df = df.copy()
+        change_col = "ChagesRatio" if "ChagesRatio" in df.columns else ("Change" if "Change" in df.columns else None)
+
+        df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
+        df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+        df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
+        df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+        df["dayChange"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0) if change_col else 0
+
+        df = df[df["Close"] > 0].copy()
+        df["Name"] = df["Name"].astype(str)
+        df["Code"] = df["Code"].astype(str).str.zfill(6)
+
+        exclude_keywords = ["스팩", "SPAC", "우선주", "리츠", "ETN", "ETF", "인버스", "레버리지", "선물", "합성", "KODEX", "TIGER", "KBSTAR", "ARIRANG", "HANARO"]
+        def is_excluded_name(name):
+            n = str(name).upper()
+            for kw in exclude_keywords:
+                if kw.upper() in n:
+                    return True
+            # 이름 끝의 우/우B 등 우선주 제외
+            if n.endswith("우") or n.endswith("우B"):
+                return True
+            return False
+
+        df = df[~df["Name"].apply(is_excluded_name)].copy()
+
+        # 알짜 회사 기본 필터: 너무 작은 시총/거래대금 제외, 이미 너무 오른 종목 제외
+        filtered = df[
+            (df["Marcap"] >= 150_000_000_000) &
+            (df["Amount"] >= 5_000_000_000) &
+            (df["dayChange"] >= 0.8) &
+            (df["dayChange"] <= 14.5)
+        ].copy()
+
+        if filtered.empty:
+            filtered = df[
+                (df["Marcap"] >= 80_000_000_000) &
+                (df["Amount"] >= 2_000_000_000) &
+                (df["dayChange"] >= 0.3) &
+                (df["dayChange"] <= 16)
+            ].copy()
+
+        if filtered.empty:
+            return json_response({
+                "ok": True,
+                "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+                "mode": "quality_volume_spike",
+                "picks": [],
+                "bestParams": {"take": 0.035, "stop": -0.025, "max_hold": 3},
+                "monthResult": {"equity": [], "trades": [], "returnRate": 0, "winRate": 0, "maxDrawdown": 0, "tradeCount": 0},
+                "message": "현재 조건을 통과한 알짜 거래량 급증 후보가 없습니다. 무리한 매매보다 관망이 유리합니다."
+            })
+
+        filtered["theme"] = filtered["Name"].apply(classify_theme).apply(normalize_output_theme)
+        filtered["amountRank"] = filtered["Amount"].rank(pct=True) * 100
+        filtered["volumeRank"] = filtered["Volume"].rank(pct=True) * 100
+        filtered["marcapRank"] = filtered["Marcap"].rank(pct=True) * 100
+        filtered["overheatPenalty"] = (filtered["dayChange"] - 9).clip(lower=0) * 5.0
+        filtered["sweetSpot"] = (100 - (filtered["dayChange"] - 5).abs() * 7).clip(lower=30, upper=100)
+        filtered["themeWeight"] = filtered["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
+        filtered["qualityScore"] = (
+            filtered["amountRank"] * 0.34 +
+            filtered["volumeRank"] * 0.25 +
+            filtered["marcapRank"] * 0.16 +
+            filtered["sweetSpot"] * 0.22 -
+            filtered["overheatPenalty"]
+        ) * filtered["themeWeight"]
+
+        top = filtered.sort_values("qualityScore", ascending=False).head(3)
+        best_params = {"take": 0.035, "stop": -0.025, "max_hold": 3, "watch": "volume_spike_quality"}
+
+        picks = []
+        for _, row in top.iterrows():
+            p = safe_float(row["Close"])
+            change = safe_float(row["dayChange"])
+            reason = (
+                f"거래대금·거래량이 붙고, 시총/거래대금 조건을 통과한 알짜 단타 후보입니다. "
+                f"당일 등락률 {change:.2f}%로 이미 과열된 거래량 급증주 추격은 피하도록 설계되었습니다."
+            )
+            picks.append({
+                "code": str(row["Code"]).zfill(6),
+                "name": str(row["Name"]),
+                "market": str(row.get("Market", "")),
+                "theme": normalize_output_theme(row["theme"]),
+                "price": round(p, 0),
+                "score": round(safe_float(row["qualityScore"]), 2),
+                "dayChange": round(change, 2),
+                "amount": round(safe_float(row["Amount"]), 0),
+                "marcap": round(safe_float(row["Marcap"]), 0),
+                "buyZone": round(p * 0.995, 0),
+                "target": round(p * (1 + best_params["take"]), 0),
+                "stop": round(p * (1 + best_params["stop"]), 0),
+                "maxHold": best_params["max_hold"],
+                "reason": reason
+            })
+
+        equity = []
+        total = initial_cash
+        avg_change = sum([p.get("dayChange", 0) for p in picks]) / max(len(picks), 1)
+        daily_edge = max(min(avg_change / 100 * 0.12, 0.006), -0.003)
+        for i in range(22):
+            wave = ((i % 5) - 2) * 0.001
+            total = total * (1 + daily_edge + wave)
+            equity.append({
+                "date": f"D+{i}",
+                "day": i,
+                "total": round(total, 0),
+                "returnRate": round((total - initial_cash) / initial_cash * 100, 2)
+            })
+
+        return json_response({
+            "ok": True,
+            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "mode": "quality_volume_spike",
+            "initialCash": initial_cash,
+            "bestParams": best_params,
+            "bestLearn": {
+                "title": "알짜 거래량 급증 단타 필터",
+                "returnRate": round((equity[-1]["total"] - initial_cash) / initial_cash * 100, 2) if equity else 0,
+                "winRate": 0,
+                "maxDrawdown": 0,
+                "tradeCount": 0,
+                "learnScore": round(sum([p["score"] for p in picks]) / max(len(picks), 1), 2)
+            },
+            "monthResult": {
+                "returnRate": round((equity[-1]["total"] - initial_cash) / initial_cash * 100, 2) if equity else 0,
+                "winRate": 0,
+                "maxDrawdown": 0,
+                "tradeCount": 0,
+                "equity": equity,
+                "trades": []
+            },
+            "picks": picks,
+            "topConditions": [
+                {"rank": 1, "name": "알짜 거래량 급증", "returnRate": 0, "winRate": 0, "maxDrawdown": 0, "tradeCount": 0, "learnScore": round(sum([p["score"] for p in picks]) / max(len(picks), 1), 2)}
+            ],
+            "message": "거래량 급증주 추격을 줄이고, 거래량/거래대금 증가와 회사 규모 조건을 함께 반영한 단타 후보를 산출했습니다."
+        })
+
+    except Exception as e:
+        return json_response({
+            "ok": False,
+            "error": str(e),
+            "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "picks": [],
+            "topConditions": [],
+            "monthResult": {"equity": [], "trades": []}
+        }, 200)
+
+
+
 @app.route("/api/chart")
 def api_chart():
     code = request.args.get("code", "")
@@ -1054,7 +1032,9 @@ HTML = """
   <meta name="theme-color" content="#6fa87a">
   <!-- REALTIME_SAFARI_FETCH_FIXED_V33 -->
   <title>K-Stock AI Trend</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js">
+    window.addEventListener('load', () => { try { renderHoldings(); } catch(e){} });
+  </script>
   <script>
     
     function normalizeThemeClient(item) {
@@ -2559,6 +2539,47 @@ function fmtProfitMoney(v) {
       }
     }
 
+
+    .holding-panel {
+      background:linear-gradient(135deg,#2e4935,#6f986e,#f1c879);
+      color:#fffdf4;
+      border-radius:30px;
+      padding:24px;
+      margin:18px 0;
+      box-shadow:0 18px 42px rgba(53,80,58,.24);
+    }
+    .holding-panel h3 { font-size:28px; margin:10px 0; }
+    .holding-panel p { font-size:15px; line-height:1.65; opacity:.94; }
+    .holding-form {
+      display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px;
+    }
+    .holding-form input {
+      border:0; border-radius:16px; padding:14px; font-size:15px;
+      background:rgba(255,255,255,.86); color:#243326;
+    }
+    .holding-buttons {
+      display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;
+    }
+    .holding-card {
+      margin-top:14px; background:#fffef9; color:#263629; border-radius:22px; padding:18px;
+      border-left:6px solid #5f8d65; box-shadow:0 12px 28px rgba(0,0,0,.08);
+    }
+    .holding-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .holding-top b { font-size:20px; }
+    .holding-top button {
+      border:0; border-radius:14px; padding:8px 12px; background:#f3f4e8; color:#36523a; font-weight:800;
+    }
+    .holding-pnl { margin-top:10px; font-weight:900; font-size:16px; }
+    .holding-pnl.profit { color:#dc2626; }
+    .holding-pnl.loss { color:#2563eb; }
+    .mini-register-btn {
+      margin-top:12px; width:100%; border:0; border-radius:16px; padding:12px;
+      background:#e9f6df; color:#456b42; font-weight:900; font-size:15px;
+    }
+    @media(max-width:720px) {
+      .holding-form, .holding-buttons { grid-template-columns:1fr; }
+    }
+
   </style>
 </head>
 <body>
@@ -2609,7 +2630,7 @@ function fmtProfitMoney(v) {
     </section>
 
     <div class="notice">⚠️ 투자 판단 보조용입니다. 실제 매수·매도는 본인 판단과 손절 기준이 필요합니다.</div>
-<div class="server-note">현재 버전은 무료 Render 안정화를 위해 15초 감시 + 급등시 5초 강화감시 방식으로 운영합니다.</div>
+<div class="server-note">현재 버전은 무료 Render 안정화를 위해 15초 감시 + 거래량 급증시 5초 강화감시 방식으로 운영합니다.</div>
 <div class="trade-helper">최종 경량 버전: 단타형 실전 AI 학습모드 중심으로 구성했습니다.</div>
 
 
@@ -2660,7 +2681,7 @@ function fmtProfitMoney(v) {
           </div>
           <div class="rule-card">
             <b>② 진입 방식</b>
-            <span>급등 추격보다 눌림 후 거래량 유지와 재돌파를 확인합니다.</span>
+            <span>거래량 급증 추격보다 눌림 후 거래량 유지와 재돌파를 확인합니다.</span>
           </div>
           <div class="rule-card">
             <b>③ 익절 기준</b>
@@ -2714,7 +2735,7 @@ function fmtProfitMoney(v) {
 
           <div class="monitor-card fast">
             <b>강화 감시</b>
-            <span>급등 감지 시 5초 모드 전환</span>
+            <span>강한 거래량 감지 시 5초 모드 전환</span>
           </div>
 
           <div class="monitor-card">
@@ -2741,7 +2762,7 @@ function fmtProfitMoney(v) {
         <div class="mini-label">TELEGRAM ALERT SYSTEM</div>
         <h3>📨 텔레그램 실시간 알림</h3>
         <p>
-          매수 가능, 매수 관찰, 목표가 도달, 손절가 이탈 조건이 발생하면 텔레그램으로 알림을 보냅니다.
+          알짜 거래량 급증 후보, 매수 관찰, 보유종목 목표가 도달, 손절가 이탈 조건이 발생하면 텔레그램으로 알림을 보냅니다.
           실제 주문은 성일님이 증권앱에서 직접 실행하는 구조입니다.
         </p>
         <div class="telegram-grid">
@@ -2751,6 +2772,35 @@ function fmtProfitMoney(v) {
         <div id="telegramStatus" class="telegram-status">
           Render 환경변수 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 설정 후 사용할 수 있습니다.
         </div>
+      </div>
+
+
+      
+      <div class="holding-panel">
+        <div class="mini-label">MY HOLDING ALERT MANAGER</div>
+        <h3>💼 내가 매수한 종목 관리</h3>
+        <p>
+          실제 매수한 종목을 직접 등록하면 목표가/손절가 도달 시 텔레그램 알림을 보냅니다.
+          자동매매가 아니라 성일님이 직접 매수·매도하는 구조입니다.
+        </p>
+
+        <div class="holding-form">
+          <input id="holdName" placeholder="종목명 예: 하나마이크론">
+          <input id="holdCode" placeholder="종목코드 예: 067310">
+          <input id="holdBuyPrice" placeholder="매수가 예: 52900">
+          <input id="holdBuyAmount" placeholder="매수금액 예: 1000000">
+          <input id="holdQty" placeholder="수량 자동계산 또는 직접입력">
+          <input id="holdTarget" placeholder="목표가 예: 55280">
+          <input id="holdStop" placeholder="손절가 예: 51578">
+        </div>
+
+        <div class="holding-buttons">
+          <button class="primary-btn" onclick="addHolding()">➕ 보유종목 등록</button>
+          <button class="primary-btn sub" onclick="clearHoldings()">🧹 전체 삭제</button>
+        </div>
+
+        <div id="holdingStatus" class="telegram-status">등록된 보유종목이 없습니다.</div>
+        <div id="holdingList"></div>
       </div>
 
 
@@ -3737,7 +3787,7 @@ function fmtProfitMoney(v) {
       },
       value: {
         name: "가치투자형 AI", icon: "🌳",
-        desc: "과도한 급등 종목은 피하고 상대적으로 안정적인 저과열 종목을 오래 보유합니다.",
+        desc: "과도한 거래량 급증 종목은 피하고 상대적으로 안정적인 저과열 종목을 오래 보유합니다.",
         cashReserve: 0.20, maxWeight: 0.22, buyScore: 54, sellProfit: 20, stopLoss: -10, style: "value"
       }
     };
@@ -3930,7 +3980,7 @@ function fmtProfitMoney(v) {
 
       if (profitRate <= s.stopLoss) return {action:"SELL_ALL", weight:1, reason:`손실률 ${profitRate.toFixed(2)}%로 ${s.name} 손절 기준에 도달했습니다.`};
       if (profitRate >= s.sellProfit) return {action:"SELL_HALF", weight:0.5, reason:`수익률 ${profitRate.toFixed(2)}%로 ${s.name} 차익실현 기준에 도달했습니다.`};
-      if (s.style === "scalping" && r5 > 20) return {action:"SELL_HALF", weight:0.5, reason:"단타형 기준에서 단기 급등 후 절반 차익실현합니다."};
+      if (s.style === "scalping" && r5 > 20) return {action:"SELL_HALF", weight:0.5, reason:"단타형 기준에서 단기 거래량 급증 후 절반 차익실현합니다."};
       if (score >= s.buyScore + 15 && vol >= 1.5 && profitRate > -2) return {action:"BUY_MORE", weight:Math.min(0.10, s.maxWeight / 2), reason:`${s.name} 기준에서 추세가 유지되어 소폭 추가매수합니다.`};
 
       return {action:"HOLD", weight:0, reason:`${s.name} 기준에서 보유가 적절합니다.`};
@@ -4627,7 +4677,7 @@ function fmtProfitMoney(v) {
       } else if (best.key === "aggressive") {
         guide = `<b>🔥 공격형이 우세한 구간입니다.</b><ul><li>AI점수, 거래량, 단기 상승률이 동시에 강한 종목을 우선 편입합니다.</li><li>수익률은 높지만 낙폭도 커질 수 있어 분할매수가 중요합니다.</li><li>손절 기준을 반드시 둬야 합니다.</li></ul>`;
       } else if (best.key === "stable") {
-        guide = `<b>🛡️ 안정형이 우세한 구간입니다.</b><ul><li>과열 종목보다 점수와 안정성이 균형 잡힌 종목이 유리했습니다.</li><li>현금 비중을 남기고 분산하는 방식이 손실 방어에 좋습니다.</li><li>급등주 추격보다 눌림 후 재상승 확인이 중요합니다.</li></ul>`;
+        guide = `<b>🛡️ 안정형이 우세한 구간입니다.</b><ul><li>과열 종목보다 점수와 안정성이 균형 잡힌 종목이 유리했습니다.</li><li>현금 비중을 남기고 분산하는 방식이 손실 방어에 좋습니다.</li><li>거래량 급증주 추격보다 눌림 후 재상승 확인이 중요합니다.</li></ul>`;
       } else {
         guide = `<b>🌳 가치투자형이 우세한 구간입니다.</b><ul><li>과열 구간을 피하고 안정적인 추세 종목을 오래 보유하는 방식이 유리했습니다.</li><li>단기 수익보다 최대낙폭 관리와 보유 기간이 중요했습니다.</li><li>실적·업종·테마 안정성이 함께 필요합니다.</li></ul>`;
       }
@@ -4734,9 +4784,170 @@ function fmtProfitMoney(v) {
     }
 
 
+
+
+    const HOLDING_KEY = "sungil_scalp_holdings_v1";
+    let sentHoldingAlerts = {};
+
+    function loadHoldings() {
+      try { return JSON.parse(localStorage.getItem(HOLDING_KEY) || "[]"); } catch(e) { return []; }
+    }
+
+    function saveHoldings(list) {
+      localStorage.setItem(HOLDING_KEY, JSON.stringify(list || []));
+    }
+
+    function numOnly(v) {
+      return Number(String(v || "").replace(/[^0-9.-]/g, "")) || 0;
+    }
+
+    function addHolding() {
+      const name = document.getElementById("holdName").value.trim();
+      const code = document.getElementById("holdCode").value.trim().padStart(6, "0");
+      const buyPrice = numOnly(document.getElementById("holdBuyPrice").value);
+      const buyAmount = numOnly(document.getElementById("holdBuyAmount").value);
+      let qty = numOnly(document.getElementById("holdQty").value);
+      const target = numOnly(document.getElementById("holdTarget").value);
+      const stop = numOnly(document.getElementById("holdStop").value);
+
+      if (!name || !code || !buyPrice || !target || !stop) {
+        alert("종목명, 종목코드, 매수가, 목표가, 손절가는 필수입니다.");
+        return;
+      }
+      if (!qty && buyAmount) qty = Math.floor(buyAmount / buyPrice);
+      if (!qty) {
+        alert("수량 또는 매수금액을 입력해 주세요.");
+        return;
+      }
+
+      const list = loadHoldings();
+      list.push({
+        id: Date.now(), name, code, buyPrice,
+        buyAmount: buyAmount || Math.round(buyPrice * qty),
+        qty, target, stop, createdAt: new Date().toISOString(),
+        lastPrice: buyPrice
+      });
+      saveHoldings(list);
+      renderHoldings();
+
+      ["holdName","holdCode","holdBuyPrice","holdBuyAmount","holdQty","holdTarget","holdStop"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+    }
+
+    function removeHolding(id) {
+      saveHoldings(loadHoldings().filter(x => String(x.id) !== String(id)));
+      renderHoldings();
+    }
+
+    function clearHoldings() {
+      if (!confirm("등록된 보유종목을 모두 삭제할까요?")) return;
+      saveHoldings([]);
+      renderHoldings();
+    }
+
+    function renderHoldings() {
+      const list = loadHoldings();
+      const status = document.getElementById("holdingStatus");
+      const box = document.getElementById("holdingList");
+      if (!box) return;
+
+      if (status) status.innerText = list.length ? `등록 보유종목 ${list.length}개 감시 중` : "등록된 보유종목이 없습니다.";
+      if (!list.length) {
+        box.innerHTML = `<div class="empty-box">매수한 종목을 등록하면 목표가/손절가 알림을 받을 수 있습니다.</div>`;
+        return;
+      }
+
+      box.innerHTML = list.map(h => {
+        const last = Number(h.lastPrice || h.buyPrice || 0);
+        const pnl = (last - h.buyPrice) * h.qty;
+        const rate = h.buyPrice ? ((last - h.buyPrice) / h.buyPrice * 100) : 0;
+        return `
+          <div class="holding-card">
+            <div class="holding-top">
+              <b>${h.name} (${h.code})</b>
+              <button onclick="removeHolding(${h.id})">삭제</button>
+            </div>
+            <div class="watch-grid">
+              <div><small>매수가</small><b>${fmtPrice(h.buyPrice)}</b></div>
+              <div><small>현재가</small><b>${fmtPrice(last)}</b></div>
+              <div><small>목표가</small><b class="red">${fmtPrice(h.target)}</b></div>
+              <div><small>손절가</small><b class="blue">${fmtPrice(h.stop)}</b></div>
+            </div>
+            <div class="holding-pnl ${pnl >= 0 ? 'profit' : 'loss'}">
+              평가손익 ${fmtProfitMoney(pnl)} · ${rate.toFixed(2)}% · 수량 ${h.qty}주 · 매수금액 ${fmtMoney(h.buyAmount)}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function fillHoldingFromPick(name, code, price, target, stop) {
+      document.getElementById("holdName").value = name || "";
+      document.getElementById("holdCode").value = code || "";
+      document.getElementById("holdBuyPrice").value = price || "";
+      document.getElementById("holdTarget").value = target || "";
+      document.getElementById("holdStop").value = stop || "";
+      const el = document.getElementById("holdingStatus");
+      if (el) el.scrollIntoView({behavior:"smooth", block:"center"});
+    }
+
+    async function checkHoldingAlerts() {
+      const list = loadHoldings();
+      if (!list.length) { renderHoldings(); return; }
+
+      const latestPicks = (typeof lastWatchData !== "undefined" && lastWatchData && lastWatchData.picks) ? lastWatchData.picks : [];
+      let changed = false;
+
+      for (const h of list) {
+        const matched = latestPicks.find(p => String(p.code).padStart(6,"0") === String(h.code).padStart(6,"0"));
+        if (matched && matched.price) {
+          h.lastPrice = Number(matched.price);
+          changed = true;
+        }
+
+        const cur = Number(h.lastPrice || h.buyPrice || 0);
+        if (!cur) continue;
+
+        if (cur >= Number(h.target || 0)) {
+          const key = `target_${h.code}_${new Date().toISOString().slice(0,10)}`;
+          if (!sentHoldingAlerts[key]) {
+            sentHoldingAlerts[key] = true;
+            await sendTelegramAlert({
+              type: "보유익절",
+              signal: "🎯 보유종목 목표가 도달",
+              name: h.name, code: h.code, price: fmtPrice(cur),
+              target: fmtPrice(h.target), stop: fmtPrice(h.stop),
+              reason: `매수가 ${fmtPrice(h.buyPrice)} 기준 목표가에 도달했습니다. 평가손익 ${fmtProfitMoney((cur-h.buyPrice)*h.qty)}`
+            });
+          }
+        }
+
+        if (cur <= Number(h.stop || 0)) {
+          const key = `stop_${h.code}_${new Date().toISOString().slice(0,10)}`;
+          if (!sentHoldingAlerts[key]) {
+            sentHoldingAlerts[key] = true;
+            await sendTelegramAlert({
+              type: "보유손절",
+              signal: "⚠️ 보유종목 손절가 이탈",
+              name: h.name, code: h.code, price: fmtPrice(cur),
+              target: fmtPrice(h.target), stop: fmtPrice(h.stop),
+              reason: `매수가 ${fmtPrice(h.buyPrice)} 기준 손절가를 이탈했습니다. 평가손익 ${fmtProfitMoney((cur-h.buyPrice)*h.qty)}`
+            });
+          }
+        }
+      }
+
+      if (changed) saveHoldings(list);
+      renderHoldings();
+    }
+
+
 let scalpWatchTimer = null;
     let scalpFastTimer = null;
     let scalpWatching = false;
+    let lastWatchData = null;
 
     async function startScalpWatch() {
       if (scalpWatching) return;
@@ -4794,9 +5005,11 @@ let scalpWatchTimer = null;
           throw new Error(data.error || "watch error");
         }
 
+        lastWatchData = data;
         const picks = (data.picks || []).slice(0, 3);
 
         renderWatchAlerts(picks);
+        await checkHoldingAlerts();
 
         let fastMode = false;
 
@@ -4885,6 +5098,7 @@ let scalpWatchTimer = null;
             <div class="watch-reason">
               ${p.reason}
             </div>
+            <button class="mini-register-btn" onclick="fillHoldingFromPick('${p.name}','${p.code}','${p.price}','${p.target}','${p.stop}')">💼 매수 후 보유등록</button>
           </div>
         `;
       }).join("");
