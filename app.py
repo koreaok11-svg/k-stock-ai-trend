@@ -761,6 +761,36 @@ def api_analyze():
 
 
 
+def send_telegram_message(text):
+    """
+    Telegram Bot API 알림 발송.
+    Render Environment Variables:
+    - TELEGRAM_BOT_TOKEN
+    - TELEGRAM_CHAT_ID
+    """
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+    if not token or not chat_id:
+        return False, "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 설정되지 않았습니다."
+
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        }
+        r = requests.post(url, json=payload, timeout=8)
+        if r.status_code != 200:
+            return False, r.text[:500]
+        return True, "sent"
+    except Exception as e:
+        return False, str(e)
+
+
+
 @app.route("/api/telegram_status")
 def api_telegram_status():
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -786,20 +816,26 @@ def api_telegram_test():
 
 @app.route("/api/telegram_test_page")
 def api_telegram_test_page():
-    now_text = now_kst().strftime("%Y-%m-%d %H:%M:%S") if "now_kst" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    ok, msg = send_telegram_message(
-        "✅ <b>성일의 AI 주식바람</b>\n"
-        "텔레그램 알림 테스트가 정상 발송되었습니다.\n"
-        f"시간: {now_text}"
-    )
+    try:
+        now_text = now_kst().strftime("%Y-%m-%d %H:%M:%S") if "now_kst" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ok, msg = send_telegram_message(
+            "✅ <b>성일의 AI 주식바람</b>\n"
+            "텔레그램 알림 테스트가 정상 발송되었습니다.\n"
+            f"시간: {now_text}"
+        )
+    except Exception as e:
+        ok, msg = False, str(e)
+
     if ok:
         html = """<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
         <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f8ed;padding:30px;color:#263629}.box{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}a{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}</style></head>
         <body><div class='box'><h2>✅ 텔레그램 테스트 발송 완료</h2><p>텔레그램 앱에서 메시지를 확인해 주세요.</p><a href='/'>앱으로 돌아가기</a></div></body></html>"""
         return Response(html, mimetype="text/html; charset=utf-8")
+
+    safe_msg = str(msg).replace("<", "&lt;").replace(">", "&gt;")
     html = f"""<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
     <style>body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff7ed;padding:30px;color:#263629}}.box{{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}}pre{{white-space:pre-wrap;background:#f7f7f0;border-radius:14px;padding:12px}}a{{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}}</style></head>
-    <body><div class='box'><h2>⚠️ 텔레그램 테스트 실패</h2><p>Render 환경변수 또는 토큰/Chat ID를 다시 확인해 주세요.</p><pre>{msg}</pre><a href='/'>앱으로 돌아가기</a></div></body></html>"""
+    <body><div class='box'><h2>⚠️ 텔레그램 테스트 실패</h2><p>Render 환경변수 또는 토큰/Chat ID를 다시 확인해 주세요.</p><pre>{safe_msg}</pre><a href='/'>앱으로 돌아가기</a></div></body></html>"""
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
