@@ -784,6 +784,26 @@ def api_telegram_test():
     return jsonify({"ok": ok, "message": msg})
 
 
+@app.route("/api/telegram_test_page")
+def api_telegram_test_page():
+    now_text = now_kst().strftime("%Y-%m-%d %H:%M:%S") if "now_kst" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ok, msg = send_telegram_message(
+        "✅ <b>성일의 AI 주식바람</b>\n"
+        "텔레그램 알림 테스트가 정상 발송되었습니다.\n"
+        f"시간: {now_text}"
+    )
+    if ok:
+        html = """<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+        <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f8ed;padding:30px;color:#263629}.box{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}a{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}</style></head>
+        <body><div class='box'><h2>✅ 텔레그램 테스트 발송 완료</h2><p>텔레그램 앱에서 메시지를 확인해 주세요.</p><a href='/'>앱으로 돌아가기</a></div></body></html>"""
+        return Response(html, mimetype="text/html; charset=utf-8")
+    html = f"""<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+    <style>body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff7ed;padding:30px;color:#263629}}.box{{background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08)}}pre{{white-space:pre-wrap;background:#f7f7f0;border-radius:14px;padding:12px}}a{{display:block;margin-top:20px;padding:16px;border-radius:16px;background:#5f8d65;color:white;text-align:center;text-decoration:none;font-weight:800}}</style></head>
+    <body><div class='box'><h2>⚠️ 텔레그램 테스트 실패</h2><p>Render 환경변수 또는 토큰/Chat ID를 다시 확인해 주세요.</p><pre>{msg}</pre><a href='/'>앱으로 돌아가기</a></div></body></html>"""
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
+
 @app.route("/api/telegram_alert", methods=["POST"])
 def api_telegram_alert():
     try:
@@ -4723,9 +4743,8 @@ function fmtProfitMoney(v) {
 
     
     function apiUrl(path) {
-      const origin = window.location.origin || "https://k-stock-ai-trend.onrender.com";
       if (!path.startsWith("/")) path = "/" + path;
-      return origin + path;
+      return path;
     }
 
 let sentTelegramAlerts = {};
@@ -4746,17 +4765,12 @@ let sentTelegramAlerts = {};
       }
     }
 
-    async function sendTelegramTest() {
+    function sendTelegramTest() {
       const el = document.getElementById("telegramStatus");
-      try {
-        if (el) el.innerText = "테스트 알림 발송 중...";
-        const res = await fetch(apiUrl("/api/telegram_test"), {cache:"no-store", headers: {"Accept":"application/json"}});
-        const data = await res.json();
-        if (el) el.innerText = data.ok ? "✅ 텔레그램 테스트 발송 완료" : "⚠️ 테스트 실패: " + data.message;
-      } catch(e) {
-        if (el) el.innerText = "⚠️ 테스트 오류: 앱 주소/API 호출 오류입니다. 새로고침 후 다시 누르세요. (" + e.message + ")";
-      }
+      if (el) el.innerText = "테스트 발송 페이지로 이동합니다...";
+      window.location.href = "/api/telegram_test_page";
     }
+
 
     async function sendTelegramAlert(payload) {
       try {
