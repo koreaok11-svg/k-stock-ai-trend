@@ -935,6 +935,78 @@ def api_scalping_learn():
 
 
 
+def send_telegram_message(text):
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        return False, "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 설정되지 않았습니다."
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        }
+        r = requests.post(url, json=payload, timeout=5)
+        if r.status_code != 200:
+            return False, r.text[:300]
+        return True, "sent"
+    except Exception as e:
+        return False, str(e)
+
+
+@app.route("/api/telegram_status")
+def api_telegram_status():
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    return jsonify({
+        "ok": bool(token and chat_id),
+        "tokenSet": bool(token),
+        "chatIdSet": bool(chat_id),
+        "message": "Telegram 설정 완료" if token and chat_id else "Render 환경변수 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 설정 필요"
+    })
+
+
+@app.route("/api/telegram_test")
+def api_telegram_test():
+    now_text = now_kst().strftime("%Y-%m-%d %H:%M:%S") if "now_kst" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ok, msg = send_telegram_message(
+        "✅ <b>성일의 AI 주식바람</b>\n"
+        "텔레그램 알림 테스트가 정상 발송되었습니다.\n"
+        f"시간: {now_text}"
+    )
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route("/api/telegram_alert", methods=["POST"])
+def api_telegram_alert():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        alert_type = str(data.get("type", "알림"))
+        name = str(data.get("name", "-"))
+        code = str(data.get("code", "-"))
+        price = data.get("price", "-")
+        target = data.get("target", "-")
+        stop = data.get("stop", "-")
+        reason = str(data.get("reason", "AI 조건 알림"))
+        signal = str(data.get("signal", alert_type))
+        text = (
+            f"📢 <b>{signal}</b>\n"
+            f"종목: <b>{name}</b> ({code})\n"
+            f"현재가: {price}\n"
+            f"목표가: {target}\n"
+            f"손절가: {stop}\n"
+            f"사유: {reason}\n\n"
+            "※ 자동매매가 아닙니다. 실제 주문 전 HTS/MTS 현재가·호가·거래대금을 최종 확인하세요."
+        )
+        ok, msg = send_telegram_message(text)
+        return jsonify({"ok": ok, "message": msg})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 200
+
+
+
 @app.route("/api/chart")
 def api_chart():
     code = request.args.get("code", "")
@@ -2449,6 +2521,44 @@ function fmtProfitMoney(v) {
       }
     }
 
+
+    .telegram-panel {
+      background:linear-gradient(135deg,#233c2d,#5e8962,#d9c16f);
+      color:#fffdf4;
+      border-radius:30px;
+      padding:24px;
+      margin:18px 0;
+      box-shadow:0 18px 42px rgba(53,80,58,.24);
+    }
+    .telegram-panel h3 {
+      font-size:28px;
+      margin:10px 0;
+    }
+    .telegram-panel p {
+      font-size:15px;
+      line-height:1.65;
+      opacity:.94;
+    }
+    .telegram-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-top:16px;
+    }
+    .telegram-status {
+      margin-top:14px;
+      padding:14px 18px;
+      border-radius:18px;
+      background:rgba(255,255,255,.18);
+      font-weight:700;
+      text-align:center;
+    }
+    @media(max-width:720px) {
+      .telegram-grid {
+        grid-template-columns:1fr;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -2623,6 +2733,24 @@ function fmtProfitMoney(v) {
         </div>
 
         <div id="watchAlertBox"></div>
+      </div>
+
+
+      
+      <div class="telegram-panel">
+        <div class="mini-label">TELEGRAM ALERT SYSTEM</div>
+        <h3>📨 텔레그램 실시간 알림</h3>
+        <p>
+          매수 가능, 매수 관찰, 목표가 도달, 손절가 이탈 조건이 발생하면 텔레그램으로 알림을 보냅니다.
+          실제 주문은 성일님이 증권앱에서 직접 실행하는 구조입니다.
+        </p>
+        <div class="telegram-grid">
+          <button class="primary-btn" onclick="checkTelegramStatus()">🔍 설정 확인</button>
+          <button class="primary-btn sub" onclick="sendTelegramTest()">✅ 테스트 발송</button>
+        </div>
+        <div id="telegramStatus" class="telegram-status">
+          Render 환경변수 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 설정 후 사용할 수 있습니다.
+        </div>
       </div>
 
 
@@ -4541,7 +4669,72 @@ function fmtProfitMoney(v) {
 
     
 
-    let scalpWatchTimer = null;
+    
+
+    let sentTelegramAlerts = {};
+
+    function alertKey(type, code) {
+      const d = new Date();
+      return `${type}_${code}_${d.getFullYear()}${d.getMonth()+1}${d.getDate()}_${d.getHours()}`;
+    }
+
+    async function checkTelegramStatus() {
+      const el = document.getElementById("telegramStatus");
+      try {
+        const res = await fetch("/api/telegram_status", {cache:"no-store"});
+        const data = await res.json();
+        if (el) el.innerText = data.ok ? "✅ 텔레그램 설정 완료. 알림 발송 가능 상태입니다." : "⚠️ " + data.message;
+      } catch(e) {
+        if (el) el.innerText = "⚠️ 텔레그램 상태 확인 오류: " + e.message;
+      }
+    }
+
+    async function sendTelegramTest() {
+      const el = document.getElementById("telegramStatus");
+      try {
+        if (el) el.innerText = "테스트 알림 발송 중...";
+        const res = await fetch("/api/telegram_test", {cache:"no-store"});
+        const data = await res.json();
+        if (el) el.innerText = data.ok ? "✅ 텔레그램 테스트 발송 완료" : "⚠️ 테스트 실패: " + data.message;
+      } catch(e) {
+        if (el) el.innerText = "⚠️ 테스트 오류: " + e.message;
+      }
+    }
+
+    async function sendTelegramAlert(payload) {
+      try {
+        const key = alertKey(payload.type || payload.signal || "알림", payload.code || "");
+        if (sentTelegramAlerts[key]) return;
+        sentTelegramAlerts[key] = true;
+        const res = await fetch("/api/telegram_alert", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        const el = document.getElementById("telegramStatus");
+        if (el && data.ok) el.innerText = `📨 텔레그램 알림 발송: ${payload.name || ""}`;
+      } catch(e) {
+        console.log("telegram alert error", e);
+      }
+    }
+
+    function checkTradeAlertAndSend(p, signal, type) {
+      if (!p) return;
+      sendTelegramAlert({
+        type: type,
+        signal: signal,
+        name: p.name,
+        code: p.code,
+        price: fmtPrice(p.price),
+        target: fmtPrice(p.target),
+        stop: fmtPrice(p.stop),
+        reason: p.reason || "단타 AI 조건 충족"
+      });
+    }
+
+
+let scalpWatchTimer = null;
     let scalpFastTimer = null;
     let scalpWatching = false;
 
@@ -4858,7 +5051,7 @@ let scalpChart = null;
           </div>
           <div class="ai-box">
             <div class="ai-title">⚡ AI 단타 판단</div>
-            <p>${p.reason} 최대 보유 기준은 ${p.maxHold}일입니다. 실제 진입 전에는 증권앱에서 현재가·호가·거래대금·뉴스를 최종 확인하세요.</p>
+            <p>${p.reason} 최대 보유 기준은 ${p.maxHold}일입니다. 실제 진입 전에는 증권앱에서 현재가·호가·거래대금·뉴스를 최종 확인하세요. 텔레그램 알림은 자동주문이 아닌 판단 보조 알림입니다.</p>
           </div>
         </div>
       `).join("");
