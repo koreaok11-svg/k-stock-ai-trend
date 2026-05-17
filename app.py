@@ -920,7 +920,7 @@ def api_scalping_learn():
             },
             "picks": picks,
             "topConditions": top_conditions,
-            "message": "무료 Render 안정형으로 단타 조건과 후보를 빠르게 산출했습니다."
+            "message": "무료 Render 안정형으로 단타 조건과 후보를 빠르게 산출했습니다. 실제 매매 전 HTS/MTS 실시간 현재가와 호가를 반드시 확인하세요."
         })
 
     except Exception as e:
@@ -2243,6 +2243,212 @@ function fmtProfitMoney(v) {
       font-weight:700;
     }
 
+
+    .live-trading-guide {
+      background:linear-gradient(135deg,#355f43,#7fa36f,#f1c879);
+      color:#fffdf4;
+      border-radius:30px;
+      padding:26px;
+      margin:18px 0;
+      box-shadow:0 18px 42px rgba(69,104,72,.23);
+    }
+    .live-trading-guide h3 {
+      font-size:30px;
+      margin:10px 0;
+      line-height:1.25;
+    }
+    .live-trading-guide p {
+      font-size:16px;
+      line-height:1.65;
+      opacity:.95;
+    }
+    .rule-grid {
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+      margin-top:18px;
+    }
+    .rule-card {
+      background:rgba(255,255,255,.25);
+      border:1px solid rgba(255,255,255,.35);
+      border-radius:20px;
+      padding:15px;
+      backdrop-filter:blur(8px);
+    }
+    .rule-card b {
+      display:block;
+      font-size:17px;
+      margin-bottom:7px;
+      color:#fff;
+    }
+    .rule-card span {
+      display:block;
+      font-size:14px;
+      line-height:1.55;
+      color:#fffdf4;
+    }
+    .rule-card.danger {
+      background:rgba(255,238,210,.27);
+    }
+    .checklist-box {
+      background:rgba(255,255,248,.88);
+      border:1px solid rgba(127,163,111,.22);
+      border-radius:26px;
+      padding:20px;
+      margin:18px 0;
+      box-shadow:0 14px 34px rgba(98,126,86,.12);
+    }
+    .checklist-box li {
+      margin:8px 0;
+      line-height:1.55;
+    }
+    .realtime-warning {
+      background:#fff9df;
+      border:1px solid #ead99c;
+      border-radius:24px;
+      padding:18px;
+      margin:18px 0;
+      color:#4b553e;
+      line-height:1.65;
+    }
+    .realtime-warning b {
+      display:block;
+      font-size:18px;
+      margin-bottom:6px;
+      color:#31452f;
+    }
+    @media(max-width:720px) {
+      .rule-grid {
+        grid-template-columns:1fr;
+      }
+      .live-trading-guide h3 {
+        font-size:25px;
+      }
+    }
+
+
+    .monitor-panel {
+      background:linear-gradient(135deg,#314a36,#6f986e,#f1c879);
+      color:#fffdf4;
+      border-radius:30px;
+      padding:24px;
+      margin:18px 0;
+      box-shadow:0 18px 42px rgba(53,80,58,.24);
+    }
+
+    .monitor-panel h3 {
+      font-size:28px;
+      margin:10px 0;
+    }
+
+    .monitor-grid {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:12px;
+      margin-top:18px;
+    }
+
+    .monitor-card {
+      background:rgba(255,255,255,.20);
+      border-radius:18px;
+      padding:16px;
+      border:1px solid rgba(255,255,255,.28);
+      backdrop-filter:blur(8px);
+    }
+
+    .monitor-card.fast {
+      background:rgba(255,230,170,.25);
+    }
+
+    .monitor-card b {
+      display:block;
+      margin-bottom:7px;
+      font-size:17px;
+    }
+
+    .monitor-card span {
+      font-size:14px;
+      line-height:1.55;
+    }
+
+    .watch-buttons {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-top:18px;
+    }
+
+    .watch-status {
+      margin-top:16px;
+      padding:14px 18px;
+      border-radius:18px;
+      background:rgba(255,255,255,.18);
+      font-weight:700;
+      text-align:center;
+    }
+
+    .watch-alert {
+      margin-top:16px;
+      border-radius:22px;
+      padding:18px;
+      background:#fffef9;
+      color:#2e392d;
+      border-left:6px solid #d1d5db;
+      box-shadow:0 12px 28px rgba(0,0,0,.08);
+    }
+
+    .watch-alert.buy {
+      border-left-color:#ef4444;
+      background:#fff7f7;
+    }
+
+    .watch-alert.watch {
+      border-left-color:#f59e0b;
+      background:#fffaf0;
+    }
+
+    .watch-top {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:12px;
+    }
+
+    .watch-top b {
+      font-size:19px;
+    }
+
+    .watch-grid {
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:10px;
+      margin-bottom:12px;
+    }
+
+    .watch-grid small {
+      display:block;
+      color:#6b7280;
+      margin-bottom:4px;
+    }
+
+    .watch-grid b {
+      font-size:16px;
+    }
+
+    .watch-reason {
+      font-size:14px;
+      line-height:1.6;
+      color:#4b5563;
+    }
+
+    @media(max-width:720px) {
+      .monitor-grid,
+      .watch-grid,
+      .watch-buttons {
+        grid-template-columns:1fr;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -2293,7 +2499,7 @@ function fmtProfitMoney(v) {
     </section>
 
     <div class="notice">⚠️ 투자 판단 보조용입니다. 실제 매수·매도는 본인 판단과 손절 기준이 필요합니다.</div>
-<div class="server-note">현재 버전은 실시간 자동갱신을 제거했습니다. 추천/관심/테마/단타AI 학습만 운영합니다.</div>
+<div class="server-note">현재 버전은 무료 Render 안정화를 위해 15초 감시 + 급등시 5초 강화감시 방식으로 운영합니다.</div>
 <div class="trade-helper">최종 경량 버전: 단타형 실전 AI 학습모드 중심으로 구성했습니다.</div>
 
 
@@ -2327,6 +2533,98 @@ function fmtProfitMoney(v) {
           최근 1개월 가상 운용 결과와 오늘의 3~5개 후보를 보여줍니다.
         </p>
       </div>
+
+
+      <div class="live-trading-guide">
+        <div class="mini-label">REAL TRADING OPERATING RULE</div>
+        <h3>실전 단타 운영 원칙</h3>
+        <p>
+          이 앱은 종목 탐색과 기준 계산을 도와주는 보조 도구입니다.
+          실제 매수·매도는 반드시 성일님이 최종 판단하고, 손절 기준을 먼저 정한 뒤 진입하는 구조가 가장 안전합니다.
+        </p>
+
+        <div class="rule-grid">
+          <div class="rule-card">
+            <b>① 진입 시간</b>
+            <span>오전 9:10~10:30 집중. 오후에는 무리한 신규 진입을 줄입니다.</span>
+          </div>
+          <div class="rule-card">
+            <b>② 진입 방식</b>
+            <span>급등 추격보다 눌림 후 거래량 유지와 재돌파를 확인합니다.</span>
+          </div>
+          <div class="rule-card">
+            <b>③ 익절 기준</b>
+            <span>기본 +3~5%, 강한 테마는 +5~7%까지 관찰합니다.</span>
+          </div>
+          <div class="rule-card">
+            <b>④ 손절 기준</b>
+            <span>-2% 기본, 최대 -3% 이탈 시 기계적으로 정리합니다.</span>
+          </div>
+          <div class="rule-card">
+            <b>⑤ 종목 수</b>
+            <span>동시 관찰은 3~5종목. 집중력이 떨어지면 매매하지 않습니다.</span>
+          </div>
+          <div class="rule-card danger">
+            <b>⑥ 매매 금지</b>
+            <span>거래대금 급감, 지수 급락, 테마 약화, 손절 후 복수매매는 금지합니다.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist-box">
+        <div class="detail-title">✅ 실전 진입 전 체크리스트</div>
+        <ul>
+          <li>오늘 강한 테마에 속해 있는가?</li>
+          <li>거래대금과 거래량이 유지되고 있는가?</li>
+          <li>고점 추격이 아니라 눌림 후 재상승 구간인가?</li>
+          <li>매수 전 손절가와 목표가가 명확한가?</li>
+          <li>손절 후 물타기하지 않을 자신이 있는가?</li>
+        </ul>
+      </div>
+
+      <div class="realtime-warning">
+        <b>📡 데이터 기준 안내</b>
+        <p>
+          현재 무료 Render 버전은 실시간 호가 서버가 아닙니다. 분석은 KRX/FDR 제공 데이터와 앱 내부 계산 기준으로 동작하며,
+          증권사 HTS/MTS의 실시간 현재가와 차이가 날 수 있습니다. 실전 매수·매도 전에는 반드시 증권앱에서 현재가, 호가, 거래대금, 뉴스 여부를 최종 확인하세요.
+        </p>
+      </div>
+
+
+      
+      <div class="monitor-panel">
+        <div class="mini-label">LIVE SCALPING WATCH MODE</div>
+        <h3>⚡ 실전 감시 모드</h3>
+
+        <div class="monitor-grid">
+          <div class="monitor-card">
+            <b>기본 감시</b>
+            <span>15초마다 현재가 확인</span>
+          </div>
+
+          <div class="monitor-card fast">
+            <b>강화 감시</b>
+            <span>급등 감지 시 5초 모드 전환</span>
+          </div>
+
+          <div class="monitor-card">
+            <b>집중 종목</b>
+            <span>최대 3종목 집중 감시</span>
+          </div>
+        </div>
+
+        <div class="watch-buttons">
+          <button class="primary-btn" onclick="startScalpWatch()">▶ 실전 감시 시작</button>
+          <button class="primary-btn sub" onclick="stopScalpWatch()">⏹ 감시 중지</button>
+        </div>
+
+        <div id="watchStatus" class="watch-status">
+          아직 실전 감시를 시작하지 않았습니다.
+        </div>
+
+        <div id="watchAlertBox"></div>
+      </div>
+
 
       <div class="ai-filter-box">
         <div class="detail-title">💰 가상 학습 투자금</div>
@@ -2370,7 +2668,7 @@ function fmtProfitMoney(v) {
     </section>
 
 
-    <div class="footer">K-Stock AI Trend WebApp<br>데이터 제공 상태에 따라 일부 종목은 누락될 수 있습니다.</div>
+    <div class="footer">K-Stock AI Trend WebApp<br>데이터 제공 상태에 따라 일부 종목은 누락될 수 있으며, 실시간 호가와 차이가 날 수 있습니다.</div>
   </main>
 
 
@@ -4241,7 +4539,166 @@ function fmtProfitMoney(v) {
     function saveAiSim(s) { return; }
 
 
-    let scalpChart = null;
+    
+
+    let scalpWatchTimer = null;
+    let scalpFastTimer = null;
+    let scalpWatching = false;
+
+    async function startScalpWatch() {
+      if (scalpWatching) return;
+
+      scalpWatching = true;
+
+      const status = document.getElementById("watchStatus");
+      if (status) {
+        status.innerText = "🟢 단타 실전 감시 시작. 기본 15초 감시 모드로 동작합니다.";
+      }
+
+      await runScalpWatchCycle();
+
+      scalpWatchTimer = setInterval(async () => {
+        await runScalpWatchCycle();
+      }, 15000);
+    }
+
+    function stopScalpWatch() {
+      scalpWatching = false;
+
+      if (scalpWatchTimer) {
+        clearInterval(scalpWatchTimer);
+        scalpWatchTimer = null;
+      }
+
+      if (scalpFastTimer) {
+        clearInterval(scalpFastTimer);
+        scalpFastTimer = null;
+      }
+
+      const status = document.getElementById("watchStatus");
+      if (status) {
+        status.innerText = "⏹ 실전 감시가 중지되었습니다.";
+      }
+    }
+
+    async function runScalpWatchCycle(forceFast=false) {
+      try {
+        const cash = getScalpCash ? getScalpCash() : 10000000;
+
+        const params = new URLSearchParams();
+        params.set("days", "365");
+        params.set("cash", String(cash));
+        params.set("_", Date.now().toString());
+
+        const res = await fetch(window.location.origin + "/api/scalping_learn?" + params.toString(), {
+          cache: "no-store",
+          headers: { "Accept": "application/json" }
+        });
+
+        const data = await res.json();
+
+        if (!data.ok) {
+          throw new Error(data.error || "watch error");
+        }
+
+        const picks = (data.picks || []).slice(0, 3);
+
+        renderWatchAlerts(picks);
+
+        let fastMode = false;
+
+        for (const p of picks) {
+          const score = Number(p.score || 0);
+          if (score >= 95) {
+            fastMode = true;
+          }
+        }
+
+        const status = document.getElementById("watchStatus");
+
+        if (fastMode) {
+          if (status) {
+            status.innerText = "⚡ 강한 단타 흐름 감지. 5초 강화 감시 모드 진입.";
+          }
+
+          if (!scalpFastTimer) {
+            scalpFastTimer = setInterval(async () => {
+              if (!scalpWatching) return;
+              await runScalpWatchCycle(true);
+            }, 5000);
+          }
+        } else {
+          if (status) {
+            status.innerText = "🟢 기본 15초 감시 모드 동작 중.";
+          }
+
+          if (scalpFastTimer) {
+            clearInterval(scalpFastTimer);
+            scalpFastTimer = null;
+          }
+        }
+
+      } catch(e) {
+        console.log("watch error", e);
+
+        const status = document.getElementById("watchStatus");
+        if (status) {
+          status.innerText = "⚠️ 감시 오류: " + e.message;
+        }
+      }
+    }
+
+    function renderWatchAlerts(picks) {
+      const box = document.getElementById("watchAlertBox");
+      if (!box) return;
+
+      if (!picks.length) {
+        box.innerHTML = `
+          <div class="watch-alert neutral">
+            현재 강한 단타 흐름 종목이 없습니다. 무리한 매매보다 관망이 유리합니다.
+          </div>
+        `;
+        return;
+      }
+
+      box.innerHTML = picks.map((p, idx) => {
+        const score = Number(p.score || 0);
+
+        let signal = "관망";
+        let cls = "neutral";
+
+        if (score >= 100) {
+          signal = "🔥 매수 가능";
+          cls = "buy";
+        } else if (score >= 80) {
+          signal = "👀 매수 관찰";
+          cls = "watch";
+        }
+
+        return `
+          <div class="watch-alert ${cls}">
+            <div class="watch-top">
+              <b>#${idx + 1} ${p.name}</b>
+              <span>${signal}</span>
+            </div>
+
+            <div class="watch-grid">
+              <div><small>현재가</small><b>${fmtPrice(p.price)}</b></div>
+              <div><small>매수관찰</small><b>${fmtPrice(p.buyZone)}</b></div>
+              <div><small>목표가</small><b class="red">${fmtPrice(p.target)}</b></div>
+              <div><small>손절가</small><b class="blue">${fmtPrice(p.stop)}</b></div>
+            </div>
+
+            <div class="watch-reason">
+              ${p.reason}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+
+let scalpChart = null;
     let latestScalpLearn = null;
 
     function setScalpCash(amount) {
@@ -4401,7 +4858,7 @@ function fmtProfitMoney(v) {
           </div>
           <div class="ai-box">
             <div class="ai-title">⚡ AI 단타 판단</div>
-            <p>${p.reason} 최대 보유 기준은 ${p.maxHold}일입니다.</p>
+            <p>${p.reason} 최대 보유 기준은 ${p.maxHold}일입니다. 실제 진입 전에는 증권앱에서 현재가·호가·거래대금·뉴스를 최종 확인하세요.</p>
           </div>
         </div>
       `).join("");
