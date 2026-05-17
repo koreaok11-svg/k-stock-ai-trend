@@ -4721,7 +4721,14 @@ function fmtProfitMoney(v) {
 
     
 
-    let sentTelegramAlerts = {};
+    
+    function apiUrl(path) {
+      const origin = window.location.origin || "https://k-stock-ai-trend.onrender.com";
+      if (!path.startsWith("/")) path = "/" + path;
+      return origin + path;
+    }
+
+let sentTelegramAlerts = {};
 
     function alertKey(type, code) {
       const d = new Date();
@@ -4731,7 +4738,7 @@ function fmtProfitMoney(v) {
     async function checkTelegramStatus() {
       const el = document.getElementById("telegramStatus");
       try {
-        const res = await fetch("/api/telegram_status", {cache:"no-store"});
+        const res = await fetch(apiUrl("/api/telegram_status"), {cache:"no-store", headers: {"Accept":"application/json"}});
         const data = await res.json();
         if (el) el.innerText = data.ok ? "✅ 텔레그램 설정 완료. 알림 발송 가능 상태입니다." : "⚠️ " + data.message;
       } catch(e) {
@@ -4743,11 +4750,11 @@ function fmtProfitMoney(v) {
       const el = document.getElementById("telegramStatus");
       try {
         if (el) el.innerText = "테스트 알림 발송 중...";
-        const res = await fetch("/api/telegram_test", {cache:"no-store"});
+        const res = await fetch(apiUrl("/api/telegram_test"), {cache:"no-store", headers: {"Accept":"application/json"}});
         const data = await res.json();
         if (el) el.innerText = data.ok ? "✅ 텔레그램 테스트 발송 완료" : "⚠️ 테스트 실패: " + data.message;
       } catch(e) {
-        if (el) el.innerText = "⚠️ 테스트 오류: " + e.message;
+        if (el) el.innerText = "⚠️ 테스트 오류: 앱 주소/API 호출 오류입니다. 새로고침 후 다시 누르세요. (" + e.message + ")";
       }
     }
 
@@ -4756,7 +4763,7 @@ function fmtProfitMoney(v) {
         const key = alertKey(payload.type || payload.signal || "알림", payload.code || "");
         if (sentTelegramAlerts[key]) return;
         sentTelegramAlerts[key] = true;
-        const res = await fetch("/api/telegram_alert", {
+        const res = await fetch(apiUrl("/api/telegram_alert"), {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify(payload)
