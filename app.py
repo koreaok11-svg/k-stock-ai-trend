@@ -819,38 +819,56 @@ def _write_server_holdings(items):
         return False
 
 def _get_naver_current_price(code):
+    """
+    네이버 현재가 조회.
+    1순위: 모바일 네이버 증권 JSON
+    2순위: PC 네이버 no_today 영역
+    비정상값(예: 1원)은 무효 처리합니다.
+    """
     code = str(code).zfill(6)
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Referer": "https://finance.naver.com/"
+        "Accept": "application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://m.stock.naver.com/"
     }
 
+    # 1) 모바일 네이버 증권 JSON 우선
+    mobile_urls = [
+        f"https://m.stock.naver.com/api/stock/{code}/basic",
+        f"https://api.stock.naver.com/stock/{code}/basic"
+    ]
+    for url in mobile_urls:
+        try:
+            r = requests.get(url, headers=headers, timeout=6)
+            if r.status_code == 200 and r.text:
+                data = r.json()
+                # 네이버 모바일은 closePrice가 "12,150" 형태로 들어오는 경우가 많음
+                for key in ["closePrice", "now", "lastPrice", "currentPrice", "localTradedAt"]:
+                    if key in data:
+                        val = str(data.get(key, "")).replace(",", "").strip()
+                        price = safe_float(val)
+                        if price >= 10:
+                            return price
+        except Exception as e:
+            print("naver mobile price error:", code, e)
+
+    # 2) PC 네이버 금융 HTML: no_today 영역만 사용
     try:
         url = f"https://finance.naver.com/item/main.naver?code={code}"
-        r = requests.get(url, headers=headers, timeout=6)
+        r = requests.get(url, headers={
+            "User-Agent": headers["User-Agent"],
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Referer": "https://finance.naver.com/"
+        }, timeout=6)
         if r.status_code == 200 and r.text:
-            m = re.search(r'<p class="no_today">[\s\S]*?<span class="blind">([\d,]+)</span>', r.text)
+            html = r.text
+            m = re.search(r'<p class="no_today">[\s\S]*?<span class="blind">([\d,]+)</span>', html)
             if m:
-                return safe_float(m.group(1).replace(",", ""))
-            vals = re.findall(r'<span class="blind">([\d,]+)</span>', r.text)
-            for v in vals[:10]:
-                n = safe_float(v.replace(",", ""))
-                if n > 0:
-                    return n
+                price = safe_float(m.group(1).replace(",", ""))
+                if price >= 10:
+                    return price
     except Exception as e:
         print("naver pc price error:", code, e)
-
-    try:
-        url = f"https://m.stock.naver.com/api/stock/{code}/basic"
-        r = requests.get(url, headers=headers, timeout=6)
-        if r.status_code == 200 and r.text:
-            data = r.json()
-            for key in ["closePrice", "now", "lastPrice", "currentPrice"]:
-                if key in data:
-                    return safe_float(str(data.get(key)).replace(",", ""))
-    except Exception as e:
-        print("naver mobile price error:", code, e)
 
     return 0
 
@@ -869,7 +887,8 @@ def _get_price_for_code(code):
             d["Code"] = d["Code"].astype(str).str.zfill(6)
             rows = d[d["Code"] == code]
             if not rows.empty:
-                return safe_float(rows.iloc[0].get("Close", 0))
+                p = safe_float(rows.iloc[0].get("Close", 0))
+                return p if p >= 10 else 0
     except Exception:
         pass
 
@@ -878,7 +897,8 @@ def _get_price_for_code(code):
         start_dt = end_dt - pd.DateOffset(days=7)
         hist = fdr.DataReader(code, start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d"))
         if hist is not None and not hist.empty:
-            return safe_float(hist.iloc[-1].get("Close", 0))
+            p = safe_float(hist.iloc[-1].get("Close", 0))
+            return p if p >= 10 else 0
     except Exception:
         pass
 
@@ -1001,6 +1021,41 @@ def _server_monitor_loop():
             print("server monitor error:", e)
 
         time.sleep(SERVER_WATCH_INTERVAL)
+
+@app.route("/api/find_stock")
+def api_find_stock():
+    """
+    종목명으로 종목코드를 찾습니다. 보유종목 등록 시 자동 보정용.
+    """
+    q = str(request.args.get("q", "")).strip()
+    try:
+        df = get_market_df(limit=2000)
+        if df is None or df.empty or not q:
+            return jsonify({"ok": False, "message": "검색 결과 없음"})
+
+        d = df.copy()
+        d["Name"] = d["Name"].astype(str)
+        d["Code"] = d["Code"].astype(str).str.zfill(6)
+
+        exact = d[d["Name"] == q]
+        if exact.empty:
+            exact = d[d["Name"].str.contains(q, case=False, na=False)]
+
+        if exact.empty:
+            return jsonify({"ok": False, "message": "검색 결과 없음"})
+
+        row = exact.iloc[0]
+        return jsonify({
+            "ok": True,
+            "name": str(row["Name"]),
+            "code": str(row["Code"]).zfill(6),
+            "price": safe_float(row.get("Close", 0)),
+            "market": str(row.get("Market", ""))
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)})
+
+
 
 @app.route("/api/server_holdings", methods=["GET", "POST"])
 def api_server_holdings():
@@ -1465,7 +1520,7 @@ HTML = """
   <!-- REALTIME_SAFARI_FETCH_FIXED_V33 -->
   <title>K-Stock AI Trend</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js">
-    window.addEventListener('load', () => { try { syncHoldingsFromServer(); renderHoldings(); } catch(e){} });
+    window.addEventListener('load', () => { try { syncHoldingsFromServer(); renderHoldings();        ["holdBuyPrice","holdBuyAmount"].forEach(id => {         const el = document.getElementById(id);         if (el) el.addEventListener("input", autoCalcHoldingFields);       });       const nameEl = document.getElementById("holdName");       if (nameEl) nameEl.addEventListener("blur", autoFillStockCode);  } catch(e){} });
   </script>
   <script>
     
@@ -3386,12 +3441,12 @@ function fmtProfitMoney(v) {
 
         <div class="holding-form">
           <input id="holdName" placeholder="종목명 예: 하나마이크론">
-          <input id="holdCode" placeholder="종목코드 예: 067310">
+          <input id="holdCode" placeholder="종목코드 예: 067310 (종목명 입력 후 자동검색)">
           <input id="holdBuyPrice" placeholder="매수가 예: 52900">
           <input id="holdBuyAmount" placeholder="매수금액 예: 1000000">
           <input id="holdQty" placeholder="수량 자동계산 또는 직접입력">
-          <input id="holdTarget" placeholder="목표가 예: 55280">
-          <input id="holdStop" placeholder="손절가 예: 51578">
+          <input id="holdTarget" placeholder="목표가 자동계산 +3.5%">
+          <input id="holdStop" placeholder="손절가 자동계산 -2.5%">
         </div>
 
         <div class="holding-buttons">
@@ -5403,17 +5458,76 @@ let sentTelegramAlerts = {};
       return Number(String(v || "").replace(/[^0-9.-]/g, "")) || 0;
     }
 
+
+
+    async function autoFillStockCode() {
+      const nameEl = document.getElementById("holdName");
+      const codeEl = document.getElementById("holdCode");
+      const priceEl = document.getElementById("holdBuyPrice");
+      if (!nameEl || !codeEl) return;
+
+      const name = nameEl.value.trim();
+      if (!name || codeEl.value.trim()) return;
+
+      try {
+        const res = await fetch("/api/find_stock?q=" + encodeURIComponent(name), {cache:"no-store"});
+        const data = await res.json();
+        if (data.ok) {
+          codeEl.value = data.code;
+          if (!priceEl.value && data.price) priceEl.value = Math.round(data.price);
+          autoCalcHoldingFields();
+        }
+      } catch(e) {
+        console.log("autoFillStockCode error", e);
+      }
+    }
+
+    function autoCalcHoldingFields() {
+      const buyPriceEl = document.getElementById("holdBuyPrice");
+      const buyAmountEl = document.getElementById("holdBuyAmount");
+      const qtyEl = document.getElementById("holdQty");
+      const targetEl = document.getElementById("holdTarget");
+      const stopEl = document.getElementById("holdStop");
+
+      if (!buyPriceEl || !buyAmountEl || !qtyEl || !targetEl || !stopEl) return;
+
+      const buyPrice = numOnly(buyPriceEl.value);
+      const buyAmount = numOnly(buyAmountEl.value);
+
+      if (buyPrice && buyAmount && !numOnly(qtyEl.value)) {
+        qtyEl.value = Math.floor(buyAmount / buyPrice);
+      }
+
+      if (buyPrice && !numOnly(targetEl.value)) {
+        targetEl.value = Math.round(buyPrice * 1.035);
+      }
+
+      if (buyPrice && !numOnly(stopEl.value)) {
+        stopEl.value = Math.round(buyPrice * 0.975);
+      }
+    }
+
+
     function addHolding() {
       const name = document.getElementById("holdName").value.trim();
       const code = document.getElementById("holdCode").value.trim().padStart(6, "0");
       const buyPrice = numOnly(document.getElementById("holdBuyPrice").value);
       const buyAmount = numOnly(document.getElementById("holdBuyAmount").value);
       let qty = numOnly(document.getElementById("holdQty").value);
-      const target = numOnly(document.getElementById("holdTarget").value);
-      const stop = numOnly(document.getElementById("holdStop").value);
+      let target = numOnly(document.getElementById("holdTarget").value);
+      let stop = numOnly(document.getElementById("holdStop").value);
+
+      if (buyPrice && !target) {
+        target = Math.round(buyPrice * 1.035);
+        document.getElementById("holdTarget").value = target;
+      }
+      if (buyPrice && !stop) {
+        stop = Math.round(buyPrice * 0.975);
+        document.getElementById("holdStop").value = stop;
+      }
 
       if (!name || !code || !buyPrice || !target || !stop) {
-        alert("종목명, 종목코드, 매수가, 목표가, 손절가는 필수입니다.");
+        alert("종목명, 종목코드, 매수가는 필수입니다. 목표가/손절가는 자동 계산됩니다.");
         return;
       }
       if (!qty && buyAmount) qty = Math.floor(buyAmount / buyPrice);
@@ -5564,7 +5678,9 @@ let scalpWatchTimer = null;
         const res = await fetch("/api/server_watch/check_now", {cache:"no-store", headers:{"Accept":"application/json"}});
         const data = await res.json();
         if (data.ok && Array.isArray(data.holdings)) {
-          saveHoldings(data.holdings);
+          if (data.holdings.length > 0 || loadHoldings().length === 0) {
+            saveHoldings(data.holdings);
+          }
           renderHoldings();
         }
       } catch(e) {
