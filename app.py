@@ -812,7 +812,7 @@ def _dedupe_holdings_by_code(holdings):
             continue
         seen.add(key)
         if safe_float(h.get("lastPrice", 0)) < 10:
-            h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+            h["lastPrice"] = safe_float(h.get("manualPrice", 0)) if safe_float(h.get("manualPrice", 0)) >= 10 else safe_float(h.get("buyPrice", 0))
         result.append(h)
     return result
 
@@ -980,6 +980,34 @@ def _get_price_for_code(code):
     return 0
 
 
+
+
+def _holding_ai_comment(cur, buy_price, target, stop, qty=0):
+    try:
+        cur = safe_float(cur)
+        buy_price = safe_float(buy_price)
+        target = safe_float(target)
+        stop = safe_float(stop)
+        if cur <= 0 or buy_price <= 0:
+            return "현재가 확인이 불안정합니다. HTS/MTS 현재가를 먼저 확인하는 것이 안전합니다."
+
+        rate = (cur - buy_price) / buy_price * 100
+        dist_target = (target - cur) / cur * 100 if target else 0
+        dist_stop = (cur - stop) / cur * 100 if stop else 0
+
+        if stop and cur <= stop:
+            return f"AI 판단: 손절 기준을 이탈했습니다. 단타 원칙상 추가 하락 리스크를 먼저 줄이는 구간입니다. 현재 수익률 {rate:.2f}%."
+        if target and cur >= target:
+            return f"AI 판단: 목표가에 도달했습니다. 단타 원칙상 전량 또는 부분익절을 검토할 구간입니다. 현재 수익률 {rate:.2f}%."
+        if rate >= 2:
+            return f"AI 판단: 수익권입니다. 목표가까지 약 {dist_target:.2f}% 남았습니다. 거래량 유지 여부를 확인하면서 익절 기준을 지키는 구간입니다."
+        if rate <= -1.5:
+            return f"AI 판단: 손실권입니다. 손절가까지 약 {dist_stop:.2f}% 여유가 있습니다. 추가 하락 시 빠른 대응이 필요합니다."
+        return f"AI 판단: 아직 목표가/손절가 사이 관찰 구간입니다. 현재 수익률 {rate:.2f}%, 목표가까지 약 {dist_target:.2f}% 남았습니다."
+    except Exception:
+        return "AI 판단: 현재가와 기준가를 확인한 뒤 원칙대로 대응하세요."
+
+
 def _check_single_holding_and_alert(h):
     """
     보유종목 1개 현재가 확인 및 목표/손절 알림.
@@ -991,19 +1019,18 @@ def _check_single_holding_and_alert(h):
             h["priceError"] = "종목코드를 찾지 못했습니다. 종목코드를 직접 입력해 주세요."
             # 비정상 가격으로 덮어쓰기 금지
             if safe_float(h.get("lastPrice", 0)) < 10:
-                h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+                h["lastPrice"] = safe_float(h.get("manualPrice", 0)) if safe_float(h.get("manualPrice", 0)) >= 10 else safe_float(h.get("buyPrice", 0))
             return h
 
         cur = _get_price_for_code(code)
         if cur < 10:
             h["priceError"] = "현재가 조회 실패. 이전 가격을 유지합니다."
             if safe_float(h.get("lastPrice", 0)) < 10:
-                h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+                h["lastPrice"] = safe_float(h.get("manualPrice", 0)) if safe_float(h.get("manualPrice", 0)) >= 10 else safe_float(h.get("buyPrice", 0))
             return h
 
         h["code"] = code
         h["lastPrice"] = cur
-        h["realtimePrice"] = cur
         h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
         h.pop("priceError", None)
         SERVER_WATCH_STATE["last_prices"][code] = cur
@@ -1023,11 +1050,13 @@ def _check_single_holding_and_alert(h):
                 send_telegram_message(
                     f"🎯 <b>보유종목 목표가 도달</b>\n"
                     f"종목: <b>{name}</b> ({code})\n"
+                    f"매수가: {buy_price:,.0f}원\n"
                     f"현재가: {cur:,.0f}원\n"
                     f"목표가: {target:,.0f}원\n"
                     f"손절가: {stop:,.0f}원\n"
-                    f"평가손익: {pnl:,.0f}원\n\n"
-                    "※ 자동매매가 아닙니다. 증권앱에서 직접 매도 여부를 확인하세요."
+                    f"평가손익: {pnl:,.0f}원\n"
+                    f"{_holding_ai_comment(cur, buy_price, target, stop, qty)}\n\n"
+                    "※ 자동매매가 아닙니다. 실제 주문 전 HTS/MTS 현재가·호가·거래대금을 최종 확인하세요."
                 )
 
         if stop and cur <= stop:
@@ -1066,7 +1095,7 @@ def _server_monitor_loop():
                 if cur < 10:
                     h["priceError"] = "현재가 조회 실패. 이전 가격 유지"
                     if safe_float(h.get("lastPrice", 0)) < 10:
-                        h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+                        h["lastPrice"] = safe_float(h.get("manualPrice", 0)) if safe_float(h.get("manualPrice", 0)) >= 10 else safe_float(h.get("buyPrice", 0))
                     changed = True
                     continue
 
@@ -1240,18 +1269,59 @@ def api_server_holdings_repair():
 
         # 1원 등 비정상 현재가는 매수가로 복구
         if safe_float(h.get("lastPrice", 0)) < 10:
-            h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+            h["lastPrice"] = safe_float(h.get("manualPrice", 0)) if safe_float(h.get("manualPrice", 0)) >= 10 else safe_float(h.get("buyPrice", 0))
 
         # 현재가 즉시 재조회. 실패하면 매수가 유지
         h = _check_single_holding_and_alert(h)
         if safe_float(h.get("lastPrice", 0)) < 10:
-            h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+            h["lastPrice"] = safe_float(h.get("manualPrice", 0)) if safe_float(h.get("manualPrice", 0)) >= 10 else safe_float(h.get("buyPrice", 0))
 
         repaired.append(h)
 
     repaired = _dedupe_holdings_by_code(repaired)
     _write_server_holdings(repaired)
     return jsonify({"ok": True, "holdings": repaired})
+
+
+
+@app.route("/api/server_holdings/manual_price", methods=["POST"])
+def api_server_holdings_manual_price():
+    data = request.get_json(force=True, silent=True) or {}
+    code = str(data.get("code", "")).zfill(6)
+    name = str(data.get("name", "")).strip()
+    manual_price = safe_float(data.get("price", 0))
+    normalize = bool(data.get("normalize", False))
+
+    holdings = _read_server_holdings()
+    changed = False
+    for h in holdings:
+        h_code = _normalize_holding_code(h)
+        if (code and h_code == code) or (name and str(h.get("name", "")) == name):
+            if manual_price >= 10:
+                h["lastPrice"] = manual_price
+                h["realtimePrice"] = manual_price
+                h["manualPrice"] = manual_price
+                h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+                h.pop("priceError", None)
+
+            buy_price = safe_float(h.get("buyPrice", 0))
+            # 목표가/손절가가 너무 비현실적이면 자동 정상화
+            if normalize and buy_price > 0:
+                target = safe_float(h.get("target", 0))
+                stop = safe_float(h.get("stop", 0))
+                if target <= 0 or target > buy_price * 1.30 or target < buy_price:
+                    h["target"] = round(buy_price * 1.035)
+                if stop <= 0 or stop > buy_price or stop < buy_price * 0.70:
+                    h["stop"] = round(buy_price * 0.975)
+
+            changed = True
+
+    if changed:
+        holdings = _dedupe_holdings_by_code(holdings) if "_dedupe_holdings_by_code" in globals() else holdings
+        _write_server_holdings(holdings)
+        return jsonify({"ok": True, "holdings": holdings})
+
+    return jsonify({"ok": False, "message": "보유종목을 찾지 못했습니다.", "holdings": holdings})
 
 
 
@@ -1654,14 +1724,7 @@ HTML = """
   <!-- REALTIME_SAFARI_FETCH_FIXED_V33 -->
   <title>K-Stock AI Trend</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js">
-    window.addEventListener('load', () => { try { syncHoldingsFromServer(); 
-          renderHoldings();
-
-          // 즉시 화면 강제 갱신
-          setTimeout(() => {
-            renderHoldings();
-          }, 300);
-        ["holdBuyPrice","holdBuyAmount"].forEach(id => {         const el = document.getElementById(id);         if (el) el.addEventListener("input", autoCalcHoldingFields);       });       const nameEl = document.getElementById("holdName");       if (nameEl) nameEl.addEventListener("blur", autoFillStockCode);  } catch(e){} });
+    window.addEventListener('load', () => { try { syncHoldingsFromServer(); renderHoldings();        ["holdBuyPrice","holdBuyAmount"].forEach(id => {         const el = document.getElementById(id);         if (el) el.addEventListener("input", autoCalcHoldingFields);       });       const nameEl = document.getElementById("holdName");       if (nameEl) nameEl.addEventListener("blur", autoFillStockCode);  } catch(e){} });
   </script>
   <script>
     
@@ -3384,6 +3447,42 @@ function fmtProfitMoney(v) {
       color:#7a4b00;
       font-weight:800;
       line-height:1.45;
+    }
+
+
+    .holding-ai-comment {
+      margin-top:10px;
+      padding:12px;
+      border-radius:14px;
+      background:#eef8df;
+      color:#38563b;
+      font-weight:800;
+      line-height:1.45;
+    }
+    .manual-price-row {
+      display:grid;
+      grid-template-columns:1fr 0.8fr 1fr;
+      gap:8px;
+      margin-top:12px;
+    }
+    .manual-price-row input {
+      border:1px solid #d8dfcf;
+      border-radius:14px;
+      padding:10px;
+      font-size:14px;
+    }
+    .manual-price-row button {
+      border:0;
+      border-radius:14px;
+      padding:10px;
+      font-weight:900;
+      background:#eff6e8;
+      color:#416246;
+    }
+    @media(max-width:720px) {
+      .manual-price-row {
+        grid-template-columns:1fr;
+      }
     }
 
   </style>
@@ -5760,7 +5859,95 @@ async function autoFillStockCode() {
       renderHoldings();
     }
 
-    function renderHoldings() {
+    
+
+    function holdingAiComment(h, last, rate, hasValidCurrent) {
+      if (!hasValidCurrent) {
+        return "AI 코멘트: 현재가 자동조회가 불안정합니다. MTS 현재가를 직접 입력하면 목표가/손절가 기준으로 다시 판단합니다.";
+      }
+      const target = Number(h.target || 0);
+      const stop = Number(h.stop || 0);
+      if (stop && last <= stop) {
+        return `AI 코멘트: 손절가를 이탈했습니다. 현재 수익률 ${rate.toFixed(2)}%로 리스크 관리가 우선입니다.`;
+      }
+      if (target && last >= target) {
+        return `AI 코멘트: 목표가에 도달했습니다. 현재 수익률 ${rate.toFixed(2)}%로 익절 또는 부분익절 검토 구간입니다.`;
+      }
+      if (rate >= 2) {
+        return `AI 코멘트: 수익권입니다. 목표가까지 ${(target ? (target-last)/last*100 : 0).toFixed(2)}% 남았습니다. 거래량 유지 여부를 확인하세요.`;
+      }
+      if (rate <= -1.5) {
+        return `AI 코멘트: 손실권입니다. 손절가까지 ${(stop ? (last-stop)/last*100 : 0).toFixed(2)}% 여유가 있습니다. 원칙 대응이 필요합니다.`;
+      }
+      return `AI 코멘트: 목표가와 손절가 사이 관찰 구간입니다. 현재 수익률 ${rate.toFixed(2)}%입니다.`;
+    }
+
+    async function manualUpdateHoldingPrice(id) {
+      const list = loadHoldings();
+      const h = list.find(x => String(x.id) === String(id));
+      if (!h) return;
+
+      const el = document.getElementById("manualPrice_" + id);
+      const price = numOnly(el && el.value);
+      if (!price || price < 10) {
+        alert("현재가를 정확히 입력해 주세요. 예: 12150");
+        return;
+      }
+
+      h.lastPrice = price;
+      h.realtimePrice = price;
+      h.manualPrice = price;
+      h.priceError = "";
+      saveHoldings(list);
+      renderHoldings();
+
+      try {
+        const res = await fetch("/api/server_holdings/manual_price", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({code:h.code, name:h.name, price:price, normalize:false})
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.holdings)) {
+          saveHoldings(repairLocalHoldings(data.holdings));
+          renderHoldings();
+        }
+      } catch(e) {
+        console.log("manualUpdateHoldingPrice error", e);
+      }
+    }
+
+    async function normalizeHoldingTargetStop(id) {
+      const list = loadHoldings();
+      const h = list.find(x => String(x.id) === String(id));
+      if (!h) return;
+
+      const buy = Number(h.buyPrice || 0);
+      if (!buy) return;
+
+      h.target = Math.round(buy * 1.035);
+      h.stop = Math.round(buy * 0.975);
+      saveHoldings(list);
+      renderHoldings();
+
+      try {
+        const res = await fetch("/api/server_holdings/manual_price", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({code:h.code, name:h.name, price:Number(h.lastPrice || 0), normalize:true})
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.holdings)) {
+          saveHoldings(repairLocalHoldings(data.holdings));
+          renderHoldings();
+        }
+      } catch(e) {
+        console.log("normalizeHoldingTargetStop error", e);
+      }
+    }
+
+
+function renderHoldings() {
       const list = loadHoldings();
       const status = document.getElementById("holdingStatus");
       const box = document.getElementById("holdingList");
@@ -5773,19 +5960,11 @@ async function autoFillStockCode() {
       }
 
       box.innerHTML = list.map(h => {
-        let last = Number(h.lastPrice || h.buyPrice || 0);
-
-        // 비정상 가격 방지
-        if (last < 10) {
-          last = Number(h.buyPrice || 0);
-        }
-
-        // 실시간 현재가 우선 반영
-        if (h.realtimePrice && Number(h.realtimePrice) > 10) {
-          last = Number(h.realtimePrice);
-        }
-        const pnl = (last - h.buyPrice) * h.qty;
-        const rate = h.buyPrice ? ((last - h.buyPrice) / h.buyPrice * 100) : 0;
+        let last = Number(h.lastPrice || 0);
+        const hasValidCurrent = last >= 10;
+        if (!hasValidCurrent) last = 0;
+        const pnl = hasValidCurrent ? (last - h.buyPrice) * h.qty : 0;
+        const rate = (hasValidCurrent && h.buyPrice) ? ((last - h.buyPrice) / h.buyPrice * 100) : 0;
         return `
           <div class="holding-card">
             <div class="holding-top">
@@ -5794,12 +5973,20 @@ async function autoFillStockCode() {
             </div>
             <div class="watch-grid">
               <div><small>매수가</small><b>${fmtPrice(h.buyPrice)}</b></div>
-              <div><small>현재가</small><b>${fmtPrice(last)}</b></div>
+              <div><small>현재가</small><b>${hasValidCurrent ? fmtPrice(last) : "조회실패"}</b></div>
               <div><small>목표가</small><b class="red">${fmtPrice(h.target)}</b></div>
               <div><small>손절가</small><b class="blue">${fmtPrice(h.stop)}</b></div>
             </div>
             <div class="holding-pnl ${pnl >= 0 ? 'profit' : 'loss'}">
-              평가손익 ${fmtProfitMoney(pnl)} · ${rate.toFixed(2)}% · 수량 ${h.qty}주 · 매수금액 ${fmtMoney(h.buyAmount)}
+              ${hasValidCurrent ? `평가손익 ${fmtProfitMoney(pnl)} · ${rate.toFixed(2)}%` : "현재가 조회 실패"} · 수량 ${h.qty}주 · 매수금액 ${fmtMoney(h.buyAmount)}
+            </div>
+            <div class="holding-ai-comment">
+              ${holdingAiComment(h, last, rate, hasValidCurrent)}
+            </div>
+            <div class="manual-price-row">
+              <input id="manualPrice_${h.id}" placeholder="현재가 직접입력 예: 12150">
+              <button onclick="manualUpdateHoldingPrice(${h.id})">현재가 반영</button>
+              <button onclick="normalizeHoldingTargetStop(${h.id})">목표/손절 자동정리</button>
             </div>
           </div>
         `;
