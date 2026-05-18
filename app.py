@@ -800,6 +800,23 @@ SERVER_HOLDINGS_FILE = os.getenv("SERVER_HOLDINGS_FILE", "/tmp/sungil_holdings.j
 SERVER_WATCH_STATE = {"running": False, "thread": None, "last_alerts": {}, "last_check": None, "last_prices": {}}
 SERVER_WATCH_INTERVAL = int(os.getenv("SERVER_WATCH_INTERVAL", "10"))
 
+
+def _dedupe_holdings_by_code(holdings):
+    result = []
+    seen = set()
+    for h in holdings or []:
+        code = _normalize_holding_code(h)
+        h["code"] = code
+        key = code if code and code != "000000" else str(h.get("id", "")) + str(h.get("name", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        if safe_float(h.get("lastPrice", 0)) < 10:
+            h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+        result.append(h)
+    return result
+
+
 def _read_server_holdings():
     try:
         if os.path.exists(SERVER_HOLDINGS_FILE):
@@ -964,18 +981,30 @@ def _get_price_for_code(code):
 
 
 def _check_single_holding_and_alert(h):
+    """
+    보유종목 1개 현재가 확인 및 목표/손절 알림.
+    종목코드 000000, 현재가 1원 같은 비정상값은 알림 금지.
+    """
     try:
         code = _normalize_holding_code(h)
-        if not code or code == "000000":
+        if not code or code == "000000" or not str(code).isdigit():
             h["priceError"] = "종목코드를 찾지 못했습니다. 종목코드를 직접 입력해 주세요."
+            # 비정상 가격으로 덮어쓰기 금지
+            if safe_float(h.get("lastPrice", 0)) < 10:
+                h["lastPrice"] = safe_float(h.get("buyPrice", 0))
             return h
+
         cur = _get_price_for_code(code)
         if cur < 10:
             h["priceError"] = "현재가 조회 실패. 이전 가격을 유지합니다."
+            if safe_float(h.get("lastPrice", 0)) < 10:
+                h["lastPrice"] = safe_float(h.get("buyPrice", 0))
             return h
 
+        h["code"] = code
         h["lastPrice"] = cur
         h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+        h.pop("priceError", None)
         SERVER_WATCH_STATE["last_prices"][code] = cur
 
         today = now_kst().strftime("%Y-%m-%d")
@@ -1035,9 +1064,12 @@ def _server_monitor_loop():
                 cur = _get_price_for_code(code)
                 if cur < 10:
                     h["priceError"] = "현재가 조회 실패. 이전 가격 유지"
+                    if safe_float(h.get("lastPrice", 0)) < 10:
+                        h["lastPrice"] = safe_float(h.get("buyPrice", 0))
                     changed = True
                     continue
 
+                h["code"] = code
                 h["lastPrice"] = cur
                 h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
                 SERVER_WATCH_STATE["last_prices"][code] = cur
@@ -1197,13 +1229,30 @@ def api_server_holdings_repair():
     holdings = _read_server_holdings()
     repaired = []
     for h in holdings:
-        _normalize_holding_code(h)
-        # 1원 등 비정상 현재가는 매수가로 되돌림
+        # 강제 코드 보정
+        code = _normalize_holding_code(h)
+        h["code"] = code
+
+        # 000000이면 fallback 직접 재시도
+        if (not code or code == "000000") and h.get("name") in STOCK_CODE_FALLBACK:
+            h["code"] = STOCK_CODE_FALLBACK[h.get("name")]
+
+        # 1원 등 비정상 현재가는 매수가로 복구
         if safe_float(h.get("lastPrice", 0)) < 10:
             h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+
+        # 현재가 즉시 재조회. 실패하면 매수가 유지
+        h = _check_single_holding_and_alert(h)
+        if safe_float(h.get("lastPrice", 0)) < 10:
+            h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+
         repaired.append(h)
+
+    repaired = _dedupe_holdings_by_code(repaired)
     _write_server_holdings(repaired)
     return jsonify({"ok": True, "holdings": repaired})
+
+
 
 @app.route("/api/server_watch/check_now", methods=["GET", "POST"])
 def api_server_watch_check_now():
@@ -3546,7 +3595,7 @@ function fmtProfitMoney(v) {
 
         <div class="holding-buttons">
           <button class="primary-btn" onclick="addHolding()">➕ 보유종목 등록</button>
-          <button class="primary-btn" onclick="syncHoldingsFromServer()">🔍 즉시 가격확인</button>
+          <button class="primary-btn" onclick="syncHoldingsFromServer()">🔍 코드/현재가 즉시복구</button>
           <button class="primary-btn sub master-only" onclick="clearHoldings()">🧹 전체 삭제</button>
         </div>
 
@@ -5542,8 +5591,21 @@ let sentTelegramAlerts = {};
     const HOLDING_KEY = "sungil_scalp_holdings_v1";
     let sentHoldingAlerts = {};
 
-    function loadHoldings() {
-      try { return JSON.parse(localStorage.getItem(HOLDING_KEY) || "[]"); } catch(e) { return []; }
+    
+    function repairLocalHoldings(list) {
+      return (list || []).map(h => {
+        if ((!h.code || h.code === "000000") && h.name && STOCK_CODE_FALLBACK_JS && STOCK_CODE_FALLBACK_JS[h.name]) {
+          h.code = STOCK_CODE_FALLBACK_JS[h.name];
+        }
+        if (Number(h.lastPrice || 0) < 10) {
+          h.lastPrice = Number(h.buyPrice || 0);
+        }
+        return h;
+      });
+    }
+
+function loadHoldings() {
+      try { return repairLocalHoldings(JSON.parse(localStorage.getItem(HOLDING_KEY) || "[]")); } catch(e) { return []; }
     }
 
     function saveHoldings(list) {
@@ -5710,7 +5772,7 @@ async function autoFillStockCode() {
         return `
           <div class="holding-card">
             <div class="holding-top">
-              <b>${h.name} (${h.code})</b>
+              <b>${h.name} (${(h.code && h.code !== "000000") ? h.code : "코드확인필요"})</b>
               <button onclick="removeHolding(${h.id})">삭제</button>
             </div>
             <div class="watch-grid">
@@ -5800,8 +5862,12 @@ let scalpWatchTimer = null;
         const res = await fetch("/api/server_watch/check_now", {cache:"no-store", headers:{"Accept":"application/json"}});
         const data = await res.json();
         if (data.ok && Array.isArray(data.holdings)) {
-          if (data.holdings.length > 0 || loadHoldings().length === 0) {
-            saveHoldings(data.holdings);
+          const repairedServer = repairLocalHoldings(data.holdings);
+          const local = loadHoldings();
+
+          // 서버가 잘못된 000000/1원만 반환하면 로컬 정상값을 보호
+          if (repairedServer.length > 0 || local.length === 0) {
+            saveHoldings(repairedServer);
           }
           renderHoldings();
         }
