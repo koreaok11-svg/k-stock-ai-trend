@@ -768,6 +768,14 @@ SERVER_HOLDINGS_FILE = os.getenv("SERVER_HOLDINGS_FILE", "/tmp/sungil_holdings.j
 SERVER_WATCH_STATE = {"running": False, "thread": None, "last_alerts": {}, "last_check": None, "last_prices": {}}
 SERVER_WATCH_INTERVAL = int(os.getenv("SERVER_WATCH_INTERVAL", "20"))
 SERVER_WATCH_LOCK = threading.Lock()
+BEST_PICK_WATCH_STATE = {
+    "last_code": "",
+    "last_score": 0,
+    "last_alert_at": "",
+    "enabled": True
+}
+BEST_PICK_MIN_SCORE_GAP = float(os.getenv("BEST_PICK_MIN_SCORE_GAP", "3.0"))
+
 
 
 def _dedupe_holdings_by_code(holdings):
@@ -1107,6 +1115,9 @@ def _server_monitor_loop():
             if changed:
                 _write_server_holdings(holdings)
 
+            # 보유종목 감시와 함께 더 좋은 단타 1종목 후보도 확인
+            check_and_alert_better_pick()
+
         except Exception as e:
             print("server monitor error:", e)
 
@@ -1365,11 +1376,32 @@ def api_login_check():
 
 
 
+@app.route("/api/best_pick")
+def api_best_pick():
+    pick = get_best_scalping_pick()
+    if pick:
+        BEST_PICK_WATCH_STATE["last_code"] = pick.get("code", "")
+        BEST_PICK_WATCH_STATE["last_score"] = safe_float(pick.get("score", 0))
+        BEST_PICK_WATCH_STATE["last_pick"] = pick
+    return jsonify({
+        "ok": bool(pick),
+        "pick": pick,
+        "watch": BEST_PICK_WATCH_STATE
+    })
+
+
+@app.route("/api/best_pick/test_alert", methods=["GET", "POST"])
+def api_best_pick_test_alert():
+    result = check_and_alert_better_pick(force=True)
+    return jsonify(result)
+
+
+
 @app.route("/api/version")
 def api_version():
     return jsonify({
         "ok": True,
-        "version": "final-clean-v58",
+        "version": "final-onepick-v59",
         "watch_interval": SERVER_WATCH_INTERVAL,
         "features": [
             "server-side holding watch",
@@ -1497,13 +1529,188 @@ def api_telegram_alert():
 
 
 
+def get_best_scalping_pick():
+    """
+    알짜 거래량 급증 단타 후보 중 최종 1종목만 산출합니다.
+    기존 api_scalping_learn 로직과 동일한 방향:
+    - 급등 추격 최소화
+    - 거래대금/거래량/시총/당일 흐름 점수화
+    - 위험 종목 제외
+    """
+    try:
+        df = get_market_df(limit=400)
+        if df is None or df.empty:
+            return None
+
+        df = df.copy()
+        change_col = "ChagesRatio" if "ChagesRatio" in df.columns else ("Change" if "Change" in df.columns else None)
+
+        df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
+        df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+        df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
+        df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+        df["dayChange"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0) if change_col else 0
+        df["Name"] = df["Name"].astype(str)
+        df["Code"] = df["Code"].astype(str).str.zfill(6)
+        df = df[df["Close"] >= 10].copy()
+
+        exclude_keywords = ["스팩", "SPAC", "우선주", "리츠", "ETN", "ETF", "인버스", "레버리지", "선물", "합성", "KODEX", "TIGER", "KBSTAR", "ARIRANG", "HANARO"]
+        def is_excluded_name(name):
+            n = str(name).upper()
+            if n.endswith("우") or n.endswith("우B"):
+                return True
+            return any(kw.upper() in n for kw in exclude_keywords)
+
+        df = df[~df["Name"].apply(is_excluded_name)].copy()
+
+        filtered = df[
+            (df["Marcap"] >= 150_000_000_000) &
+            (df["Amount"] >= 5_000_000_000) &
+            (df["dayChange"] >= 0.8) &
+            (df["dayChange"] <= 14.5)
+        ].copy()
+
+        if filtered.empty:
+            filtered = df[
+                (df["Marcap"] >= 80_000_000_000) &
+                (df["Amount"] >= 2_000_000_000) &
+                (df["dayChange"] >= 0.3) &
+                (df["dayChange"] <= 16)
+            ].copy()
+
+        if filtered.empty:
+            return None
+
+        filtered["theme"] = filtered["Name"].apply(classify_theme).apply(normalize_output_theme)
+        filtered["amountRank"] = filtered["Amount"].rank(pct=True) * 100
+        filtered["volumeRank"] = filtered["Volume"].rank(pct=True) * 100
+        filtered["marcapRank"] = filtered["Marcap"].rank(pct=True) * 100
+        filtered["overheatPenalty"] = (filtered["dayChange"] - 9).clip(lower=0) * 5.0
+        filtered["sweetSpot"] = (100 - (filtered["dayChange"] - 5).abs() * 7).clip(lower=30, upper=100)
+        filtered["themeWeight"] = filtered["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
+        filtered["qualityScore"] = (
+            filtered["amountRank"] * 0.34 +
+            filtered["volumeRank"] * 0.25 +
+            filtered["marcapRank"] * 0.16 +
+            filtered["sweetSpot"] * 0.22 -
+            filtered["overheatPenalty"]
+        ) * filtered["themeWeight"]
+
+        row = filtered.sort_values("qualityScore", ascending=False).iloc[0]
+        p = safe_float(row["Close"])
+        change = safe_float(row["dayChange"])
+        score = safe_float(row["qualityScore"])
+
+        return {
+            "code": str(row["Code"]).zfill(6),
+            "name": str(row["Name"]),
+            "market": str(row.get("Market", "")),
+            "theme": normalize_output_theme(row["theme"]),
+            "price": round(p, 0),
+            "score": round(score, 2),
+            "dayChange": round(change, 2),
+            "amount": round(safe_float(row["Amount"]), 0),
+            "marcap": round(safe_float(row["Marcap"]), 0),
+            "buyZone": round(p * 0.995, 0),
+            "target": round(p * 1.035, 0),
+            "stop": round(p * 0.975, 0),
+            "maxHold": 3,
+            "reason": (
+                f"최종 1종목 집중 추천입니다. 거래대금·거래량·시총 조건을 통과했고, "
+                f"당일 등락률 {change:.2f}%로 과열 추격 위험을 줄인 후보입니다."
+            )
+        }
+    except Exception as e:
+        print("get_best_scalping_pick error:", e)
+        return None
+
+
+def _send_better_pick_alert(pick, old_code="", old_score=0):
+    try:
+        if not pick:
+            return False
+        code = pick.get("code", "")
+        score = safe_float(pick.get("score", 0))
+        price = safe_float(pick.get("price", 0))
+        target = safe_float(pick.get("target", 0))
+        stop = safe_float(pick.get("stop", 0))
+        name = pick.get("name", code)
+        theme = pick.get("theme", "")
+        day_change = safe_float(pick.get("dayChange", 0))
+        amount = safe_float(pick.get("amount", 0))
+
+        msg = (
+            "🚨 <b>더 좋은 단타 후보 발견</b>\\n"
+            f"종목: <b>{name}</b> ({code})\\n"
+            f"테마: {theme}\\n"
+            f"현재가: {price:,.0f}원\\n"
+            f"AI 점수: {score:.2f}\\n"
+            f"당일 흐름: {day_change:.2f}%\\n"
+            f"거래대금: {amount/100000000:,.1f}억원\\n"
+            f"매수관찰가: {safe_float(pick.get('buyZone', 0)):,.0f}원\\n"
+            f"목표가: {target:,.0f}원\\n"
+            f"손절가: {stop:,.0f}원\\n\\n"
+            f"AI 코멘트: 기존 후보보다 점수가 {score - old_score:.2f}점 높습니다. "
+            "단타 기준에서는 바로 추격매수보다 호가·거래량 유지 여부를 확인한 뒤 진입을 검토하는 구간입니다.\\n\\n"
+            "※ 자동매매가 아닙니다. 실제 주문 전 HTS/MTS 현재가·호가·거래대금을 최종 확인하세요."
+        )
+        ok, _ = send_telegram_message(msg)
+        return ok
+    except Exception as e:
+        print("better pick alert error:", e)
+        return False
+
+
+def check_and_alert_better_pick(force=False):
+    """
+    실전 감시 중 더 좋은 최종 1종목이 나오면 텔레그램 알림.
+    - 같은 종목이면 알림 없음
+    - 새 종목이면서 기존 점수보다 일정 점수 이상 높으면 알림
+    """
+    try:
+        if not BEST_PICK_WATCH_STATE.get("enabled", True):
+            return {"ok": False, "message": "disabled"}
+
+        pick = get_best_scalping_pick()
+        if not pick:
+            return {"ok": False, "message": "no pick"}
+
+        code = pick.get("code", "")
+        score = safe_float(pick.get("score", 0))
+        old_code = BEST_PICK_WATCH_STATE.get("last_code", "")
+        old_score = safe_float(BEST_PICK_WATCH_STATE.get("last_score", 0))
+
+        should_alert = False
+        if force and code:
+            should_alert = True
+        elif old_code and code != old_code and score >= old_score + BEST_PICK_MIN_SCORE_GAP:
+            should_alert = True
+        elif not old_code and code:
+            # 첫 후보는 상태만 저장하고 알림은 과도하게 보내지 않음
+            should_alert = False
+
+        if should_alert:
+            _send_better_pick_alert(pick, old_code, old_score)
+            BEST_PICK_WATCH_STATE["last_alert_at"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+
+        BEST_PICK_WATCH_STATE["last_code"] = code
+        BEST_PICK_WATCH_STATE["last_score"] = score
+        BEST_PICK_WATCH_STATE["last_pick"] = pick
+
+        return {"ok": True, "alerted": should_alert, "pick": pick}
+    except Exception as e:
+        print("check better pick error:", e)
+        return {"ok": False, "message": str(e)}
+
+
+
 @app.route("/api/scalping_learn")
 @app.route("/api/scalping_learn/")
 def api_scalping_learn():
     """
     알짜 거래량 급증 단타 스캐너.
     거래량 급증주 추격보다, 장중 거래량/거래대금이 붙으면서 아직 과열되지 않은
-    비교적 알짜 회사 후보 3종목을 찾습니다.
+    비교적 알짜 회사 후보 1종목을 찾습니다.
     """
     def json_response(payload, status=200):
         return Response(
@@ -1587,7 +1794,7 @@ def api_scalping_learn():
             filtered["overheatPenalty"]
         ) * filtered["themeWeight"]
 
-        top = filtered.sort_values("qualityScore", ascending=False).head(3)
+        top = filtered.sort_values("qualityScore", ascending=False).head(1)
         best_params = {"take": 0.035, "stop": -0.025, "max_hold": 3, "watch": "volume_spike_quality"}
 
         picks = []
@@ -1651,7 +1858,7 @@ def api_scalping_learn():
                 "equity": equity,
                 "trades": []
             },
-            "picks": picks,
+            "picks": picks[:1],
             "topConditions": [
                 {"rank": 1, "name": "알짜 거래량 급증", "returnRate": 0, "winRate": 0, "maxDrawdown": 0, "tradeCount": 0, "learnScore": round(sum([p["score"] for p in picks]) / max(len(picks), 1), 2)}
             ],
@@ -3635,12 +3842,12 @@ function fmtProfitMoney(v) {
 
           <div class="monitor-card fast">
             <b>강화 감시</b>
-            <span>강한 거래량 감지 시 5초 모드 전환</span>
+            <span>강한 거래량 감지 시 더 좋은 후보 발견 시 텔레그램 알림</span>
           </div>
 
           <div class="monitor-card">
-            <b>집중 종목</b>
-            <span>최대 3종목 집중 감시</span>
+            <b>최종 추천 종목</b>
+            <span>최종 최종 1종목 집중 감시</span>
           </div>
         </div>
 
@@ -3650,7 +3857,7 @@ function fmtProfitMoney(v) {
         </div>
 
         <div id="watchStatus" class="watch-status">
-          아직 실전 감시를 시작하지 않았습니다.
+          아직 실전 감시를 시작하지 않았습니다. 실전 감시 중 더 좋은 단타 후보가 나오면 텔레그램 알림을 보냅니다.
         </div>
 
         <div id="watchAlertBox"></div>
@@ -3662,7 +3869,7 @@ function fmtProfitMoney(v) {
         <div class="mini-label">TELEGRAM ALERT SYSTEM</div>
         <h3>📨 텔레그램 실시간 알림</h3>
         <p>
-          알짜 거래량 급증 후보, 매수 관찰, 보유종목 목표가 도달, 손절가 이탈 조건이 발생하면 텔레그램으로 알림을 보냅니다.
+          알짜 거래량 급증 후보, 관찰, 보유종목 목표가 도달, 손절가 이탈 조건이 발생하면 텔레그램으로 알림을 보냅니다.
           실제 주문은 성일님이 증권앱에서 직접 실행하는 구조입니다.
         </p>
         <div class="telegram-grid">
@@ -6219,7 +6426,7 @@ let scalpWatchTimer = null;
         }
 
         lastWatchData = data;
-        const picks = (data.picks || []).slice(0, 3);
+        const picks = (data.picks || []).slice(0, 1);
 
         renderWatchAlerts(picks);
         await checkHoldingAlerts();
@@ -6287,10 +6494,10 @@ let scalpWatchTimer = null;
         let cls = "neutral";
 
         if (score >= 100) {
-          signal = "🔥 매수 가능";
+          signal = "🔥 최종 후보";
           cls = "buy";
         } else if (score >= 80) {
-          signal = "👀 매수 관찰";
+          signal = "👀 관찰";
           cls = "watch";
         }
 
