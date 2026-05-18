@@ -1003,6 +1003,7 @@ def _check_single_holding_and_alert(h):
 
         h["code"] = code
         h["lastPrice"] = cur
+        h["realtimePrice"] = cur
         h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
         h.pop("priceError", None)
         SERVER_WATCH_STATE["last_prices"][code] = cur
@@ -1653,7 +1654,14 @@ HTML = """
   <!-- REALTIME_SAFARI_FETCH_FIXED_V33 -->
   <title>K-Stock AI Trend</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js">
-    window.addEventListener('load', () => { try { syncHoldingsFromServer(); renderHoldings();        ["holdBuyPrice","holdBuyAmount"].forEach(id => {         const el = document.getElementById(id);         if (el) el.addEventListener("input", autoCalcHoldingFields);       });       const nameEl = document.getElementById("holdName");       if (nameEl) nameEl.addEventListener("blur", autoFillStockCode);  } catch(e){} });
+    window.addEventListener('load', () => { try { syncHoldingsFromServer(); 
+          renderHoldings();
+
+          // 즉시 화면 강제 갱신
+          setTimeout(() => {
+            renderHoldings();
+          }, 300);
+        ["holdBuyPrice","holdBuyAmount"].forEach(id => {         const el = document.getElementById(id);         if (el) el.addEventListener("input", autoCalcHoldingFields);       });       const nameEl = document.getElementById("holdName");       if (nameEl) nameEl.addEventListener("blur", autoFillStockCode);  } catch(e){} });
   </script>
   <script>
     
@@ -5766,7 +5774,16 @@ async function autoFillStockCode() {
 
       box.innerHTML = list.map(h => {
         let last = Number(h.lastPrice || h.buyPrice || 0);
-        if (last < 10) last = Number(h.buyPrice || 0);
+
+        // 비정상 가격 방지
+        if (last < 10) {
+          last = Number(h.buyPrice || 0);
+        }
+
+        // 실시간 현재가 우선 반영
+        if (h.realtimePrice && Number(h.realtimePrice) > 10) {
+          last = Number(h.realtimePrice);
+        }
         const pnl = (last - h.buyPrice) * h.qty;
         const rate = h.buyPrice ? ((last - h.buyPrice) / h.buyPrice * 100) : 0;
         return `
