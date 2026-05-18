@@ -4,11 +4,10 @@ import time
 import json
 import math
 import re
-from datetime import datetime, timedelta, timezone, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import numpy as np
-import yfinance as yf
 import FinanceDataReader as fdr
 import requests
 from flask import Flask, render_template_string, request, jsonify, Response
@@ -312,37 +311,6 @@ def get_naver_realtime_price(code):
     except Exception:
         return None
 
-
-def apply_realtime_prices(df, top_n=160):
-    """
-    분석 속도를 위해 전체 종목이 아니라 거래대금/시총 상위 일부만 실시간 보정합니다.
-    추천/관심 후보군의 현재가 정확도를 높이는 목적입니다.
-    """
-    if df is None or df.empty:
-        return df
-
-    try:
-        target = df.sort_values(["Amount", "Marcap"], ascending=False).head(top_n).index
-    except Exception:
-        target = df.head(top_n).index
-
-    for i in target:
-        try:
-            code = str(df.at[i, "Code"]).zfill(6)
-            live_price = get_naver_realtime_price(code)
-            if live_price and live_price > 0:
-                old_price = float(df.at[i, "Close"] or 0)
-                df.at[i, "Close"] = live_price
-
-                # 기존 Close가 전일/지연가라면 당일 등락률도 보정
-                if old_price > 0:
-                    df.at[i, "liveGap"] = round(((live_price - old_price) / old_price) * 100, 2)
-                else:
-                    df.at[i, "liveGap"] = 0
-        except Exception:
-            continue
-
-    return df
 
 
 def get_market_df(limit=700):
@@ -798,7 +766,8 @@ def send_telegram_message(text):
 # ============================
 SERVER_HOLDINGS_FILE = os.getenv("SERVER_HOLDINGS_FILE", "/tmp/sungil_holdings.json")
 SERVER_WATCH_STATE = {"running": False, "thread": None, "last_alerts": {}, "last_check": None, "last_prices": {}}
-SERVER_WATCH_INTERVAL = int(os.getenv("SERVER_WATCH_INTERVAL", "10"))
+SERVER_WATCH_INTERVAL = int(os.getenv("SERVER_WATCH_INTERVAL", "20"))
+SERVER_WATCH_LOCK = threading.Lock()
 
 
 def _dedupe_holdings_by_code(holdings):
@@ -893,19 +862,22 @@ def _normalize_holding_code(h):
 
 def _get_naver_current_price(code):
     """
-    네이버 현재가 조회.
-    1순위: 모바일 네이버 증권 JSON
-    2순위: PC 네이버 no_today 영역
-    비정상값(예: 1원)은 무효 처리합니다.
+    네이버/보조 소스 기반 현재가 조회.
+    1순위: 네이버 모바일 JSON
+    2순위: 네이버 PC 현재가 HTML
+    3순위: FDR 최근 가격
     """
     code = str(code).zfill(6)
+    if code == "000000" or not code.isdigit() or len(code) != 6:
+        return 0
+
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
         "Accept": "application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Referer": "https://m.stock.naver.com/"
     }
 
-    # 1) 모바일 네이버 증권 JSON 우선
+    # 1) 네이버 모바일 JSON
     mobile_urls = [
         f"https://m.stock.naver.com/api/stock/{code}/basic",
         f"https://api.stock.naver.com/stock/{code}/basic"
@@ -915,17 +887,24 @@ def _get_naver_current_price(code):
             r = requests.get(url, headers=headers, timeout=6)
             if r.status_code == 200 and r.text:
                 data = r.json()
-                # 네이버 모바일은 closePrice가 "12,150" 형태로 들어오는 경우가 많음
-                for key in ["closePrice", "now", "lastPrice", "currentPrice", "localTradedAt"]:
+                for key in ["closePrice", "now", "lastPrice", "currentPrice"]:
                     if key in data:
                         val = str(data.get(key, "")).replace(",", "").strip()
                         price = safe_float(val)
                         if price >= 10:
                             return price
+                # 일부 응답은 nested dict
+                for _, v in data.items():
+                    if isinstance(v, dict):
+                        for key in ["closePrice", "now", "lastPrice", "currentPrice"]:
+                            if key in v:
+                                price = safe_float(str(v.get(key, "")).replace(",", "").strip())
+                                if price >= 10:
+                                    return price
         except Exception as e:
             print("naver mobile price error:", code, e)
 
-    # 2) PC 네이버 금융 HTML: no_today 영역만 사용
+    # 2) 네이버 PC HTML: 현재가 영역만
     try:
         url = f"https://finance.naver.com/item/main.naver?code={code}"
         r = requests.get(url, headers={
@@ -947,12 +926,16 @@ def _get_naver_current_price(code):
 
 
 def _get_price_for_code(code):
+    """
+    서버 감시용 현재가.
+    네이버 현재가를 우선 사용하고, 실패 시 FDR 최근값을 보조로 사용합니다.
+    """
     code = str(code).zfill(6)
     if code == "000000" or not code.isdigit():
         return 0
 
     price = _get_naver_current_price(code)
-    if price > 0:
+    if price >= 10:
         return price
 
     try:
@@ -963,7 +946,8 @@ def _get_price_for_code(code):
             rows = d[d["Code"] == code]
             if not rows.empty:
                 p = safe_float(rows.iloc[0].get("Close", 0))
-                return p if p >= 10 else 0
+                if p >= 10:
+                    return p
     except Exception:
         pass
 
@@ -973,39 +957,12 @@ def _get_price_for_code(code):
         hist = fdr.DataReader(code, start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d"))
         if hist is not None and not hist.empty:
             p = safe_float(hist.iloc[-1].get("Close", 0))
-            return p if p >= 10 else 0
+            if p >= 10:
+                return p
     except Exception:
         pass
 
     return 0
-
-
-
-
-def _holding_ai_comment(cur, buy_price, target, stop, qty=0):
-    try:
-        cur = safe_float(cur)
-        buy_price = safe_float(buy_price)
-        target = safe_float(target)
-        stop = safe_float(stop)
-        if cur <= 0 or buy_price <= 0:
-            return "현재가 확인이 불안정합니다. HTS/MTS 현재가를 먼저 확인하는 것이 안전합니다."
-
-        rate = (cur - buy_price) / buy_price * 100
-        dist_target = (target - cur) / cur * 100 if target else 0
-        dist_stop = (cur - stop) / cur * 100 if stop else 0
-
-        if stop and cur <= stop:
-            return f"AI 판단: 손절 기준을 이탈했습니다. 단타 원칙상 추가 하락 리스크를 먼저 줄이는 구간입니다. 현재 수익률 {rate:.2f}%."
-        if target and cur >= target:
-            return f"AI 판단: 목표가에 도달했습니다. 단타 원칙상 전량 또는 부분익절을 검토할 구간입니다. 현재 수익률 {rate:.2f}%."
-        if rate >= 2:
-            return f"AI 판단: 수익권입니다. 목표가까지 약 {dist_target:.2f}% 남았습니다. 거래량 유지 여부를 확인하면서 익절 기준을 지키는 구간입니다."
-        if rate <= -1.5:
-            return f"AI 판단: 손실권입니다. 손절가까지 약 {dist_stop:.2f}% 여유가 있습니다. 추가 하락 시 빠른 대응이 필요합니다."
-        return f"AI 판단: 아직 목표가/손절가 사이 관찰 구간입니다. 현재 수익률 {rate:.2f}%, 목표가까지 약 {dist_target:.2f}% 남았습니다."
-    except Exception:
-        return "AI 판단: 현재가와 기준가를 확인한 뒤 원칙대로 대응하세요."
 
 
 def _check_single_holding_and_alert(h):
@@ -1044,37 +1001,66 @@ def _check_single_holding_and_alert(h):
         pnl = (cur - buy_price) * qty if buy_price and qty else 0
 
         if target and cur >= target:
-            key = f"target_{code}_{today}"
-            if not SERVER_WATCH_STATE["last_alerts"].get(key):
-                SERVER_WATCH_STATE["last_alerts"][key] = True
-                send_telegram_message(
-                    f"🎯 <b>보유종목 목표가 도달</b>\n"
-                    f"종목: <b>{name}</b> ({code})\n"
-                    f"매수가: {buy_price:,.0f}원\n"
-                    f"현재가: {cur:,.0f}원\n"
-                    f"목표가: {target:,.0f}원\n"
-                    f"손절가: {stop:,.0f}원\n"
-                    f"평가손익: {pnl:,.0f}원\n"
-                    f"{_holding_ai_comment(cur, buy_price, target, stop, qty)}\n\n"
-                    "※ 자동매매가 아닙니다. 실제 주문 전 HTS/MTS 현재가·호가·거래대금을 최종 확인하세요."
-                )
+            _send_holding_alert("target", h, cur)
 
         if stop and cur <= stop:
-            key = f"stop_{code}_{today}"
-            if not SERVER_WATCH_STATE["last_alerts"].get(key):
-                SERVER_WATCH_STATE["last_alerts"][key] = True
-                send_telegram_message(
-                    f"⚠️ <b>보유종목 손절가 이탈</b>\n"
-                    f"종목: <b>{name}</b> ({code})\n"
-                    f"현재가: {cur:,.0f}원\n"
-                    f"목표가: {target:,.0f}원\n"
-                    f"손절가: {stop:,.0f}원\n"
-                    f"평가손익: {pnl:,.0f}원\n\n"
-                    "※ 자동매매가 아닙니다. 증권앱에서 직접 손절 여부를 확인하세요."
-                )
+            _send_holding_alert("stop", h, cur)
     except Exception as e:
         print("single holding check error:", e)
     return h
+
+
+
+def _send_holding_alert(kind, h, cur):
+    """
+    보유종목 목표/손절 알림을 한 곳에서 처리합니다.
+    중복 알림 방지, 매수가/현재가/목표가/손절가/수익률/AI 코멘트를 모두 포함합니다.
+    """
+    try:
+        code = _normalize_holding_code(h)
+        if not code or code == "000000" or cur < 10:
+            return False
+
+        today = now_kst().strftime("%Y-%m-%d")
+        key = f"{kind}_{code}_{today}"
+        if SERVER_WATCH_STATE["last_alerts"].get(key):
+            return False
+
+        name = h.get("name", code)
+        buy_price = safe_float(h.get("buyPrice", 0))
+        qty = safe_float(h.get("qty", 0))
+        target = safe_float(h.get("target", 0))
+        stop = safe_float(h.get("stop", 0))
+        pnl = (cur - buy_price) * qty if buy_price and qty else 0
+        rate = ((cur - buy_price) / buy_price * 100) if buy_price else 0
+
+        if kind == "target":
+            title = "🎯 <b>보유종목 목표가 도달</b>"
+            action = "단타 기준에서는 전량 또는 부분익절을 검토할 구간입니다."
+        else:
+            title = "⚠️ <b>보유종목 손절가 이탈</b>"
+            action = "단타 기준에서는 반등 기대보다 리스크 축소가 우선입니다."
+
+        msg = (
+            f"{title}\n"
+            f"종목: <b>{name}</b> ({code})\n"
+            f"매수가: {buy_price:,.0f}원\n"
+            f"현재가: {cur:,.0f}원\n"
+            f"목표가: {target:,.0f}원\n"
+            f"손절가: {stop:,.0f}원\n"
+            f"수량: {qty:,.0f}주\n"
+            f"평가손익: {pnl:,.0f}원 ({rate:.2f}%)\n\n"
+            f"{_holding_ai_comment(cur, buy_price, target, stop, qty)}\n"
+            f"핵심 판단: {action}\n\n"
+            "※ 자동매매가 아닙니다. 실제 주문 전 HTS/MTS 현재가·호가·거래대금을 최종 확인하세요."
+        )
+
+        SERVER_WATCH_STATE["last_alerts"][key] = True
+        ok, _ = send_telegram_message(msg)
+        return ok
+    except Exception as e:
+        print("send holding alert error:", e)
+        return False
 
 
 def _server_monitor_loop():
@@ -1113,32 +1099,10 @@ def _server_monitor_loop():
                 pnl = (cur - buy_price) * qty if buy_price and qty else 0
 
                 if target and cur >= target:
-                    key = f"target_{code}_{today}"
-                    if not SERVER_WATCH_STATE["last_alerts"].get(key):
-                        SERVER_WATCH_STATE["last_alerts"][key] = True
-                        send_telegram_message(
-                            f"🎯 <b>보유종목 목표가 도달</b>\n"
-                            f"종목: <b>{name}</b> ({code})\n"
-                            f"현재가: {cur:,.0f}원\n"
-                            f"목표가: {target:,.0f}원\n"
-                            f"손절가: {stop:,.0f}원\n"
-                            f"평가손익: {pnl:,.0f}원\n\n"
-                            "※ 자동매매가 아닙니다. 증권앱에서 직접 매도 여부를 확인하세요."
-                        )
+                    _send_holding_alert("target", h, cur)
 
                 if stop and cur <= stop:
-                    key = f"stop_{code}_{today}"
-                    if not SERVER_WATCH_STATE["last_alerts"].get(key):
-                        SERVER_WATCH_STATE["last_alerts"][key] = True
-                        send_telegram_message(
-                            f"⚠️ <b>보유종목 손절가 이탈</b>\n"
-                            f"종목: <b>{name}</b> ({code})\n"
-                            f"현재가: {cur:,.0f}원\n"
-                            f"목표가: {target:,.0f}원\n"
-                            f"손절가: {stop:,.0f}원\n"
-                            f"평가손익: {pnl:,.0f}원\n\n"
-                            "※ 자동매매가 아닙니다. 증권앱에서 직접 손절 여부를 확인하세요."
-                        )
+                    _send_holding_alert("stop", h, cur)
 
             if changed:
                 _write_server_holdings(holdings)
@@ -1147,6 +1111,20 @@ def _server_monitor_loop():
             print("server monitor error:", e)
 
         time.sleep(SERVER_WATCH_INTERVAL)
+
+
+def _ensure_server_watch_running():
+    """
+    서버 보유종목 감시 thread를 중복 없이 시작합니다.
+    """
+    try:
+        with SERVER_WATCH_LOCK:
+            _ensure_server_watch_running()
+        return True
+    except Exception as e:
+        print("ensure server watch error:", e)
+        return False
+
 
 @app.route("/api/find_stock")
 def api_find_stock():
@@ -1207,12 +1185,7 @@ def api_server_holdings():
             item = _check_single_holding_and_alert(item)
             holdings.append(item)
             _write_server_holdings(holdings)
-            SERVER_WATCH_STATE["running"] = True
-            thread = SERVER_WATCH_STATE.get("thread")
-            if thread is None or not thread.is_alive():
-                thread = threading.Thread(target=_server_monitor_loop, daemon=True)
-                SERVER_WATCH_STATE["thread"] = thread
-                thread.start()
+            _ensure_server_watch_running()
         return jsonify({"ok": True, "holdings": holdings})
 
     if action == "remove":
@@ -1238,12 +1211,7 @@ def api_server_holdings():
 
 @app.route("/api/server_watch/start", methods=["POST", "GET"])
 def api_server_watch_start():
-    SERVER_WATCH_STATE["running"] = True
-    thread = SERVER_WATCH_STATE.get("thread")
-    if thread is None or not thread.is_alive():
-        thread = threading.Thread(target=_server_monitor_loop, daemon=True)
-        SERVER_WATCH_STATE["thread"] = thread
-        thread.start()
+    _ensure_server_watch_running()
     return jsonify({"ok": True, "running": True, "holdings": len(_read_server_holdings())})
 
 @app.route("/api/server_watch/stop", methods=["POST", "GET"])
@@ -1281,6 +1249,19 @@ def api_server_holdings_repair():
     repaired = _dedupe_holdings_by_code(repaired)
     _write_server_holdings(repaired)
     return jsonify({"ok": True, "holdings": repaired})
+
+
+
+@app.route("/api/live_price/<code>")
+def api_live_price(code):
+    code = str(code).zfill(6)
+    price = _get_price_for_code(code)
+    return jsonify({
+        "ok": price >= 10,
+        "code": code,
+        "price": price,
+        "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S")
+    })
 
 
 
@@ -1359,12 +1340,7 @@ def auto_resume_server_watch():
             return
         holdings = _read_server_holdings()
         if holdings and not SERVER_WATCH_STATE.get("running"):
-            SERVER_WATCH_STATE["running"] = True
-            thread = SERVER_WATCH_STATE.get("thread")
-            if thread is None or not thread.is_alive():
-                thread = threading.Thread(target=_server_monitor_loop, daemon=True)
-                SERVER_WATCH_STATE["thread"] = thread
-                thread.start()
+            _ensure_server_watch_running()
     except Exception as e:
         print("auto resume watch error:", e)
 
@@ -1386,6 +1362,24 @@ def api_login_check():
     except Exception as e:
         return jsonify({"ok": False, "message": str(e)}), 200
 
+
+
+
+@app.route("/api/version")
+def api_version():
+    return jsonify({
+        "ok": True,
+        "version": "final-clean-v58",
+        "watch_interval": SERVER_WATCH_INTERVAL,
+        "features": [
+            "server-side holding watch",
+            "telegram detailed alerts",
+            "master/user password",
+            "theme classification",
+            "AI holding comments",
+            "deduplicated monitor thread"
+        ]
+    })
 
 
 @app.route("/api/telegram_status")
@@ -1519,7 +1513,7 @@ def api_scalping_learn():
         )
 
     try:
-        initial_cash = safe_float(request.args.get("cash", 10000000), 10000000)
+        initial_cash = safe_float(request.args.get("cash", 20000000), 20000000)
 
         df = get_market_df(limit=400)
         if df is None or df.empty:
@@ -1724,7 +1718,7 @@ HTML = """
   <!-- REALTIME_SAFARI_FETCH_FIXED_V33 -->
   <title>K-Stock AI Trend</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js">
-    window.addEventListener('load', () => { try { syncHoldingsFromServer(); renderHoldings();        ["holdBuyPrice","holdBuyAmount"].forEach(id => {         const el = document.getElementById(id);         if (el) el.addEventListener("input", autoCalcHoldingFields);       });       const nameEl = document.getElementById("holdName");       if (nameEl) nameEl.addEventListener("blur", autoFillStockCode);  } catch(e){} });
+    window.addEventListener('load', () => { try { syncHoldingsFromServer(); renderHoldings(); startHoldingLiveRefresh();        ["holdBuyPrice","holdBuyAmount"].forEach(id => {         const el = document.getElementById(id);         if (el) el.addEventListener("input", autoCalcHoldingFields);       });       const nameEl = document.getElementById("holdName");       if (nameEl) nameEl.addEventListener("blur", autoFillStockCode);  } catch(e){} });
   </script>
   <script>
     
@@ -2198,7 +2192,7 @@ function fmtProfitMoney(v) {
       display:none;
       position:fixed;
       inset:0;
-      z-index:100000;
+      z-index:200000;
       background:rgba(36,48,37,.45);
       backdrop-filter:blur(9px);
       align-items:center;
@@ -3636,7 +3630,7 @@ function fmtProfitMoney(v) {
         <div class="monitor-grid">
           <div class="monitor-card">
             <b>기본 감시</b>
-            <span>10초마다 현재가 확인</span>
+            <span>20초마다 현재가 확인</span>
           </div>
 
           <div class="monitor-card fast">
@@ -3694,7 +3688,7 @@ function fmtProfitMoney(v) {
           <input id="holdName" placeholder="종목명 예: 하나마이크론">
           <input id="holdCode" placeholder="종목코드 예: 067310 (종목명 입력 후 자동검색)">
           <input id="holdBuyPrice" placeholder="매수가 예: 52900">
-          <input id="holdBuyAmount" placeholder="매수금액 예: 1000000">
+          <input id="holdBuyAmount" placeholder="매수금액 예: 2000000">
           <input id="holdQty" placeholder="수량 자동계산 또는 직접입력">
           <input id="holdTarget" placeholder="목표가 자동계산 +3.5%">
           <input id="holdStop" placeholder="손절가 자동계산 -2.5%">
@@ -3714,10 +3708,10 @@ function fmtProfitMoney(v) {
       <div class="ai-filter-box">
         <div class="detail-title">💰 가상 학습 투자금</div>
         <div class="quick-amounts">
-          <button onclick="setScalpCash(1000000)">100만원</button>
-          <button onclick="setScalpCash(10000000)">1000만원</button>
+          <button onclick="setScalpCash(2000000)">100만원</button>
+          <button onclick="setScalpCash(20000000)">1000만원</button>
           <button onclick="setScalpCash(50000000)">5000만원</button>
-          <button onclick="setScalpCash(100000000)">1억원</button>
+          <button onclick="setScalpCash(200000000)">1억원</button>
         </div>
         <input id="scalpCash" class="trade-input" value="10,000,000">
       </div>
@@ -4104,8 +4098,8 @@ function fmtProfitMoney(v) {
 
     function defaultPortfolio() {
       return {
-        cash: 10000000,
-        initialCash: 10000000,
+        cash: 20000000,
+        initialCash: 20000000,
         holdings: {},
         history: []
       };
@@ -4179,13 +4173,13 @@ function fmtProfitMoney(v) {
         </div>
 
         <div class="trade-input-label">${isDeposit ? "입금 금액" : "출금 금액"}</div>
-        <input id="cashAmountInput" class="trade-input" inputmode="numeric" value="1000000" oninput="updateCashPreview('${mode}')">
+        <input id="cashAmountInput" class="trade-input" inputmode="numeric" value="2000000" oninput="updateCashPreview('${mode}')">
 
         <div class="quick-buttons">
-          <button onclick="setInputValue('cashAmountInput', 100000)">10만원</button>
-          <button onclick="setInputValue('cashAmountInput', 1000000)">100만원</button>
+          <button onclick="setInputValue('cashAmountInput', 200000)">10만원</button>
+          <button onclick="setInputValue('cashAmountInput', 2000000)">100만원</button>
           <button onclick="setInputValue('cashAmountInput', 5000000)">500만원</button>
-          <button onclick="setInputValue('cashAmountInput', 10000000)">1000만원</button>
+          <button onclick="setInputValue('cashAmountInput', 20000000)">1000만원</button>
           <button onclick="setInputValue('cashAmountInput', ${Math.max(0, pf.cash)})">최대</button>
           <button onclick="setInputValue('cashAmountInput', 0)">지우기</button>
         </div>
@@ -4292,12 +4286,12 @@ function fmtProfitMoney(v) {
         </div>
 
         <div class="trade-input-label">매수 금액</div>
-        <input id="buyAmountInput" class="trade-input" inputmode="numeric" value="${Math.min(1000000, pf.cash)}" oninput="syncBuyQtyFromAmount()">
+        <input id="buyAmountInput" class="trade-input" inputmode="numeric" value="${Math.min(2000000, pf.cash)}" oninput="syncBuyQtyFromAmount()">
 
         <div class="quick-buttons">
-          <button onclick="setBuyAmount(10000)">1만원</button>
-          <button onclick="setBuyAmount(100000)">10만원</button>
-          <button onclick="setBuyAmount(1000000)">100만원</button>
+          <button onclick="setBuyAmount(20000)">1만원</button>
+          <button onclick="setBuyAmount(200000)">10만원</button>
+          <button onclick="setBuyAmount(2000000)">100만원</button>
           <button onclick="setBuyAmount(5000000)">500만원</button>
           <button onclick="setBuyAmount(${pf.cash})">최대</button>
           <button onclick="setBuyQty(1)">최소 1주</button>
@@ -4717,8 +4711,8 @@ function fmtProfitMoney(v) {
 
     function getAiStartAmount() {
       const input = document.getElementById("aiStartAmount");
-      const amount = parseMoney(input ? input.value : 10000000);
-      return amount > 0 ? amount : 10000000;
+      const amount = parseMoney(input ? input.value : 20000000);
+      return amount > 0 ? amount : 20000000;
     }
 
     function defaultStrategyState(amount) {
@@ -4748,9 +4742,9 @@ function fmtProfitMoney(v) {
     function loadAiSim() {
       try {
         const saved = localStorage.getItem(AI_SIM_KEY);
-        return saved ? JSON.parse(saved) : defaultStrategyState(10000000);
+        return saved ? JSON.parse(saved) : defaultStrategyState(20000000);
       } catch(e) {
-        return defaultStrategyState(10000000);
+        return defaultStrategyState(20000000);
       }
     }
 
@@ -5298,7 +5292,7 @@ function fmtProfitMoney(v) {
       if (summaryEl) summaryEl.innerText = `${rangeLabels[aiViewRange] || "전체"} 기준 성과를 표시합니다.`;
 
       const strategyRows = Object.keys(AI_STRATEGIES).map(key => {
-        const st = sim.strategies?.[key] || defaultStrategyState(sim.initialCash || 10000000).strategies[key];
+        const st = sim.strategies?.[key] || defaultStrategyState(sim.initialCash || 20000000).strategies[key];
         const snap = calcStrategySnapshot(st);
         const viewReturn = rangeReturn(st.equity || [], snap.total);
         const totalReturn = st.initialCash > 0 ? ((snap.total - st.initialCash) / st.initialCash * 100) : 0;
@@ -5470,7 +5464,7 @@ function fmtProfitMoney(v) {
 
     function getBacktestCash() {
       const el = document.getElementById("backtestCash");
-      return parseMoney(el ? el.value : 10000000) || 10000000;
+      return parseMoney(el ? el.value : 20000000) || 20000000;
     }
 
     async function runBacktest(days=365) {
@@ -5861,7 +5855,35 @@ async function autoFillStockCode() {
 
     
 
-    function holdingAiComment(h, last, rate, hasValidCurrent) {
+    
+
+    let holdingLiveTimer = null;
+
+    async function refreshHoldingsLivePrice() {
+      try {
+        const res = await fetch("/api/server_watch/check_now?t=" + Date.now(), {
+          cache:"no-store",
+          headers:{"Accept":"application/json", "Cache-Control":"no-cache"}
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.holdings)) {
+          const repaired = repairLocalHoldings(data.holdings);
+          saveHoldings(repaired);
+          renderHoldings();
+        }
+      } catch(e) {
+        console.log("refreshHoldingsLivePrice error", e);
+      }
+    }
+
+    function startHoldingLiveRefresh() {
+      if (holdingLiveTimer) return;
+      refreshHoldingsLivePrice();
+      holdingLiveTimer = setInterval(refreshHoldingsLivePrice, 20000);
+    }
+
+
+function holdingAiComment(h, last, rate, hasValidCurrent) {
       if (!hasValidCurrent) {
         return "AI 코멘트: 현재가 자동조회가 불안정합니다. MTS 현재가를 직접 입력하면 목표가/손절가 기준으로 다시 판단합니다.";
       }
@@ -5984,9 +6006,9 @@ function renderHoldings() {
               ${holdingAiComment(h, last, rate, hasValidCurrent)}
             </div>
             <div class="manual-price-row">
-              <input id="manualPrice_${h.id}" placeholder="현재가 직접입력 예: 12150">
-              <button onclick="manualUpdateHoldingPrice(${h.id})">현재가 반영</button>
-              <button onclick="normalizeHoldingTargetStop(${h.id})">목표/손절 자동정리</button>
+              <input id="manualPrice_${h.id}" placeholder="자동조회 실패 시만 직접입력">
+              <button onclick="manualUpdateHoldingPrice(${h.id})">수동반영</button>
+              <button onclick="normalizeHoldingTargetStop(${h.id})">목표/손절 정리</button>
             </div>
           </div>
         `;
@@ -6122,7 +6144,7 @@ let scalpWatchTimer = null;
         const data = await res.json();
         const status = document.getElementById("watchStatus");
         if (status && data.ok) {
-          status.innerText = `🟢 서버 백그라운드 감시 시작. 앱을 닫아도 서버가 보유종목 ${data.holdings}개를 10초 간격으로 확인합니다.`;
+          status.innerText = `🟢 서버 백그라운드 감시 시작. 앱을 닫아도 서버가 보유종목 ${data.holdings}개를 20초 간격으로 확인합니다.`;
         }
       } catch(e) {
         console.log("startServerWatch error", e);
@@ -6178,7 +6200,7 @@ let scalpWatchTimer = null;
 
     async function runScalpWatchCycle(forceFast=false) {
       try {
-        const cash = getScalpCash ? getScalpCash() : 10000000;
+        const cash = getScalpCash ? getScalpCash() : 20000000;
 
         const params = new URLSearchParams();
         params.set("days", "365");
@@ -6306,7 +6328,7 @@ let scalpChart = null;
 
     function getScalpCash() {
       const el = document.getElementById("scalpCash");
-      return parseMoney(el ? el.value : 10000000) || 10000000;
+      return parseMoney(el ? el.value : 20000000) || 20000000;
     }
 
     async function runScalpingLearn(days=365) {
@@ -6626,5 +6648,5 @@ let scalpChart = null;
 """
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "10000"))
+    port = int(os.environ.get("PORT", "20000"))
     app.run(host="0.0.0.0", port=port)
