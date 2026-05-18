@@ -538,7 +538,8 @@ def get_company_profile(item):
 
 @app.route("/")
 def index():
-    return render_template_string(HTML)
+    # v71: 기존 대형 HTML의 가상학습/시뮬레이션 화면 대신 실전 감시 대시보드를 기본 화면으로 사용합니다.
+    return dashboard_v71_page() if "dashboard_v71_page" in globals() else dashboard_v70_page()
 
 
 
@@ -1771,6 +1772,317 @@ def check_and_alert_pre_surge_v70(force=False):
         return {"ok": False, "message": str(e)}
 
 
+
+# =========================================================
+# v71 실전 단타 필터 / 다음 후보 보기 / 가상학습 제거 구조
+# =========================================================
+
+SCALP_FILTER_STATE_V71 = {
+    "rank_index": 0,
+    "last_filters": {},
+    "last_pick": None,
+}
+
+PRICE_RANGE_TABLE_V71 = [
+    ("0원 ~ 5,000원", 0, 5000),
+    ("5,000원 ~ 10,000원", 5000, 10000),
+    ("10,000원 ~ 30,000원", 10000, 30000),
+    ("30,000원 ~ 50,000원", 30000, 50000),
+    ("50,000원 ~ 100,000원", 50000, 100000),
+    ("100,000원 ~ 200,000원", 100000, 200000),
+    ("200,000원 이상", 200000, None),
+]
+
+DEFAULT_PRICE_RANGES_V71 = [
+    "5,000원 ~ 10,000원",
+    "10,000원 ~ 30,000원",
+    "30,000원 ~ 50,000원",
+]
+
+
+def _parse_bool_v71(v, default=False):
+    if v is None:
+        return default
+    return str(v).strip().lower() in ["1", "true", "y", "yes", "on", "checked", "예", "사용"]
+
+
+def _parse_price_ranges_v71(value):
+    if value is None or str(value).strip() == "":
+        return DEFAULT_PRICE_RANGES_V71[:]
+    if isinstance(value, list):
+        items = value
+    else:
+        # URL에서는 콤마로 전달, JSON에서는 리스트로 전달 가능
+        items = [x.strip() for x in str(value).split(",") if x.strip()]
+    valid = [name for name, _, _ in PRICE_RANGE_TABLE_V71]
+    selected = [x for x in items if x in valid]
+    return selected or DEFAULT_PRICE_RANGES_V71[:]
+
+
+def is_price_in_selected_ranges_v71(price, selected_ranges):
+    price = safe_float(price)
+    selected = set(selected_ranges or [])
+    for name, low, high in PRICE_RANGE_TABLE_V71:
+        if name not in selected:
+            continue
+        if high is None and price >= low:
+            return True
+        if high is not None and low <= price < high:
+            return True
+    return False
+
+
+def _get_filter_options_v71():
+    return {
+        "priceRanges": [name for name, _, _ in PRICE_RANGE_TABLE_V71],
+        "defaultPriceRanges": DEFAULT_PRICE_RANGES_V71,
+        "defaultInvestmentAmount": 500000,
+        "defaultMinBuyQty": 5,
+        "defaultMaxChangeRate": 7.0,
+        "defaultMinTradeValue": 1_000_000_000,
+        "defaultExcludeOverheated": True,
+        "removedFeatures": [
+            "가상학습",
+            "시뮬레이션",
+            "전략별 모의매매",
+            "가상 보유수익률",
+            "AI 백테스트",
+        ],
+    }
+
+
+def _read_filters_from_request_v71():
+    """화면/URL에서 전달된 필터값을 읽습니다."""
+    price_ranges = _parse_price_ranges_v71(request.args.get("priceRanges", ""))
+    investment_amount = int(safe_float(request.args.get("investmentAmount", 500000), 500000))
+    min_buy_qty = int(safe_float(request.args.get("minBuyQty", 5), 5))
+    max_change_rate = safe_float(request.args.get("maxChangeRate", 7.0), 7.0)
+    min_trade_value = safe_float(request.args.get("minTradeValue", 1_000_000_000), 1_000_000_000)
+    exclude_overheated = _parse_bool_v71(request.args.get("excludeOverheated", "true"), True)
+    min_score = safe_float(request.args.get("minScore", 70), 70)
+    limit = int(safe_float(request.args.get("limit", 500), 500))
+
+    return {
+        "priceRanges": price_ranges,
+        "investmentAmount": max(100000, investment_amount),
+        "minBuyQty": max(1, min_buy_qty),
+        "maxChangeRate": max_change_rate,
+        "minTradeValue": max(0, min_trade_value),
+        "excludeOverheated": exclude_overheated,
+        "minScore": min_score,
+        "limit": max(100, min(limit, 1200)),
+    }
+
+
+def apply_scalp_filters_v71(candidates, filters):
+    """
+    v71 최종 필터.
+    - 투자금으로 종목을 단순 제외하는 방식이 아니라, 가격 구간과 최소 매수 가능 수량을 함께 봅니다.
+    - 삼성전자처럼 1순위가 비싸서 제외/추가 버튼을 눌렀을 때 다음 순위 후보를 볼 수 있게 rank_index와 함께 사용합니다.
+    """
+    filtered = []
+    filters = filters or {}
+    price_ranges = filters.get("priceRanges") or DEFAULT_PRICE_RANGES_V71
+    investment_amount = safe_float(filters.get("investmentAmount", 500000), 500000)
+    min_buy_qty = int(safe_float(filters.get("minBuyQty", 5), 5))
+    max_change_rate = safe_float(filters.get("maxChangeRate", 7.0), 7.0)
+    min_trade_value = safe_float(filters.get("minTradeValue", 1_000_000_000), 1_000_000_000)
+    exclude_overheated = bool(filters.get("excludeOverheated", True))
+    min_score = safe_float(filters.get("minScore", 70), 70)
+
+    for raw in candidates or []:
+        item = dict(raw)
+        price = safe_float(item.get("price", 0))
+        change_rate = safe_float(item.get("dayChange", item.get("change_rate", 0)))
+        trade_value = safe_float(item.get("amount", item.get("trade_value", 0)))
+        score = safe_float(item.get("preSurgeScore", item.get("score", 0)))
+        buyable_qty = int(investment_amount // price) if price > 0 else 0
+
+        fail_reasons = []
+        if not is_price_in_selected_ranges_v71(price, price_ranges):
+            fail_reasons.append("선택 가격 구간 제외")
+        if buyable_qty < min_buy_qty:
+            fail_reasons.append(f"최소 매수 가능 수량 미달({buyable_qty}주)")
+        if change_rate > max_change_rate:
+            fail_reasons.append("당일 등락률 기준 초과")
+        if trade_value < min_trade_value:
+            fail_reasons.append("거래대금 기준 미달")
+        if exclude_overheated and change_rate >= 10:
+            fail_reasons.append("과열 급등주 제외")
+        if score < min_score:
+            fail_reasons.append("AI 점수 기준 미달")
+
+        item["buyableQty"] = buyable_qty
+        item["filterPassed"] = not fail_reasons
+        item["filterFailReasons"] = fail_reasons
+
+        # UI 호환 필드
+        item["buy_price"] = item.get("buyZone", 0)
+        item["target_price"] = item.get("target1", 0)
+        item["stop_price"] = item.get("stop", 0)
+        item["comment"] = (item.get("ai") or {}).get("view", "조건을 통과한 단타 후보입니다.")
+
+        if not fail_reasons:
+            filtered.append(item)
+
+    ranked = sorted(filtered, key=lambda x: safe_float(x.get("preSurgeScore", x.get("score", 0))), reverse=True)
+    for i, item in enumerate(ranked, 1):
+        item["filteredRank"] = i
+    return ranked
+
+
+def get_filtered_pre_surge_candidates_v71(filters=None):
+    filters = filters or _read_filters_from_request_v71()
+    raw = build_pre_surge_candidates_v70(limit=int(filters.get("limit", 500)))
+    return apply_scalp_filters_v71(raw, filters), raw
+
+
+def _select_ranked_pick_v71(items, rank_index=0):
+    if not items:
+        return None
+    idx = int(safe_float(rank_index, 0)) % len(items)
+    pick = dict(items[idx])
+    pick["selectedIndex"] = idx
+    pick["selectedLabel"] = f"#{idx + 1} 다음 순위 후보"
+    return pick
+
+
+@app.route("/api/filter_options_v71")
+def api_filter_options_v71():
+    return jsonify(safe_json({"ok": True, "options": _get_filter_options_v71()}))
+
+
+@app.route("/api/pre_surge_v71")
+def api_pre_surge_v71():
+    filters = _read_filters_from_request_v71()
+    rank_index = int(safe_float(request.args.get("rankIndex", SCALP_FILTER_STATE_V71.get("rank_index", 0)), 0))
+    items, raw = get_filtered_pre_surge_candidates_v71(filters)
+    pick = _select_ranked_pick_v71(items, rank_index)
+    SCALP_FILTER_STATE_V71["last_filters"] = filters
+    SCALP_FILTER_STATE_V71["last_pick"] = pick
+    return jsonify(safe_json({
+        "ok": bool(items),
+        "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+        "filters": filters,
+        "rankIndex": rank_index,
+        "pick": pick,
+        "items": items[:30],
+        "rawCount": len(raw),
+        "filteredCount": len(items),
+        "message": "필터 조건에 맞는 단타 후보입니다." if items else "현재 필터 조건에 맞는 단타 후보가 없습니다. 가격 구간 또는 거래대금 조건을 완화해보세요.",
+    }))
+
+
+@app.route("/api/pre_surge_v71/next", methods=["GET", "POST"])
+def api_pre_surge_v71_next():
+    filters = _read_filters_from_request_v71()
+    current = int(safe_float(request.args.get("rankIndex", SCALP_FILTER_STATE_V71.get("rank_index", 0)), 0))
+    # 추가/다음 버튼을 누르면 삼성전자 같은 현재 후보를 건너뛰고 다음 순위로 이동
+    SCALP_FILTER_STATE_V71["rank_index"] = current + 1
+    items, raw = get_filtered_pre_surge_candidates_v71(filters)
+    pick = _select_ranked_pick_v71(items, SCALP_FILTER_STATE_V71["rank_index"])
+    SCALP_FILTER_STATE_V71["last_filters"] = filters
+    SCALP_FILTER_STATE_V71["last_pick"] = pick
+    return jsonify(safe_json({
+        "ok": bool(pick),
+        "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+        "rankIndex": SCALP_FILTER_STATE_V71["rank_index"],
+        "pick": pick,
+        "items": items[:30],
+        "rawCount": len(raw),
+        "filteredCount": len(items),
+    }))
+
+
+@app.route("/api/pre_surge_v71/reset_rank", methods=["GET", "POST"])
+def api_pre_surge_v71_reset_rank():
+    SCALP_FILTER_STATE_V71["rank_index"] = 0
+    return jsonify({"ok": True, "rankIndex": 0})
+
+
+@app.route("/api/ai_dashboard_v71")
+def api_ai_dashboard_v71():
+    filters = _read_filters_from_request_v71()
+    rank_index = int(safe_float(request.args.get("rankIndex", SCALP_FILTER_STATE_V71.get("rank_index", 0)), 0))
+    filtered, raw = get_filtered_pre_surge_candidates_v71(filters)
+    pick = _select_ranked_pick_v71(filtered, rank_index)
+    return jsonify(safe_json({
+        "ok": True,
+        "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+        "version": "v71-final-scalp-filter",
+        "menus": ["오늘의 AI 단타", "급등 예상 감시", "보유종목", "테마 강세", "텔레그램 기록", "필터설정"],
+        "removedFeatures": _get_filter_options_v71()["removedFeatures"],
+        "filters": filters,
+        "rankIndex": rank_index,
+        "todayOnePick": pick,
+        "preSurgeBest": pick,
+        "preSurgeWatch": filtered[:10],
+        "rawCount": len(raw),
+        "filteredCount": len(filtered),
+        "holdings": _read_server_holdings() if "_read_server_holdings" in globals() else [],
+        "telegramHistory": _read_telegram_history()[:20] if "_read_telegram_history" in globals() else [],
+        "priceCache": PRICE_STATUS_CACHE if "PRICE_STATUS_CACHE" in globals() else {},
+    }))
+
+
+@app.route("/dashboard_v71")
+def dashboard_v71_page():
+    """v71 최종 실전감시 대시보드. 가상학습/시뮬레이션 메뉴는 노출하지 않습니다."""
+    return """
+<!doctype html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>성일의 AI 주식바람 v71</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(180deg,#f6faef,#eef5e6);color:#1f2a24;margin:0;padding:16px}
+.wrap{max-width:1100px;margin:0 auto}.card{background:white;border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 8px 24px rgba(0,0,0,.08);border:1px solid rgba(30,60,30,.08)}
+h1{font-size:26px;margin:10px 0 4px}h2{font-size:19px;margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+label{font-size:13px;font-weight:700;color:#345}input,select{width:100%;box-sizing:border-box;border:1px solid #d7dfd0;border-radius:14px;padding:11px;background:#fbfdf9}select[multiple]{min-height:124px}
+button{border:0;border-radius:14px;background:#5f8d65;color:white;padding:12px 16px;font-weight:800;margin:3px}.btn2{background:#394b59}.btn3{background:#8b5e34}.badge{display:inline-block;background:#e9f5dd;border-radius:999px;padding:6px 10px;margin:2px;font-size:13px}.muted{color:#64748b;font-size:13px}.danger{color:#b91c1c}.ok{color:#166534}.big{font-size:22px;font-weight:900}pre{white-space:pre-wrap;background:#f3f4f6;border-radius:14px;padding:12px;overflow:auto;max-height:160px}
+</style></head><body><div class='wrap'>
+<h1>🌿 성일의 AI 주식바람 v71</h1>
+<div class='muted'>가상학습/시뮬레이션 제거 · 가격구간/수량/거래대금 필터 · 다음 순위 후보 보기 적용</div>
+<div class='card'><h2>⚙️ 단타AI 필터 설정</h2>
+ <div class='row'>
+  <div><label>종목 가격 구간</label><select id='priceRanges' multiple>
+   <option>0원 ~ 5,000원</option><option selected>5,000원 ~ 10,000원</option><option selected>10,000원 ~ 30,000원</option><option selected>30,000원 ~ 50,000원</option><option>50,000원 ~ 100,000원</option><option>100,000원 ~ 200,000원</option><option>200,000원 이상</option>
+  </select></div>
+  <div><label>내 투자금</label><input id='investmentAmount' type='number' value='500000' step='100000'></div>
+  <div><label>최소 매수 가능 수량</label><input id='minBuyQty' type='number' value='5' min='1'></div>
+  <div><label>최대 당일 등락률(%)</label><input id='maxChangeRate' type='number' value='7' step='0.5'></div>
+  <div><label>최소 거래대금(원)</label><input id='minTradeValue' type='number' value='1000000000' step='100000000'></div>
+  <div><label>최소 AI 점수</label><input id='minScore' type='number' value='70' step='1'></div>
+ </div>
+ <p><label><input id='excludeOverheated' type='checkbox' checked style='width:auto'> 과열 급등주 제외</label></p>
+ <button onclick='resetRank();loadData()'>필터 적용/새로고침</button><button class='btn2' onclick='nextPick()'>🔄 다음 단타 후보 보기</button><button class='btn3' onclick='testAlert()'>텔레그램 테스트 알림</button>
+</div>
+<div class='grid'>
+  <div class='card'><h2>⚡ AI 단타 최종 후보</h2><div id='onepick'>로딩중...</div></div>
+  <div class='card'><h2>👀 급등 예상 감시 후보</h2><div id='presurge'>로딩중...</div></div>
+</div>
+<div class='grid'>
+  <div class='card'><h2>💼 보유종목 관리</h2><div id='holdings'>로딩중...</div></div>
+  <div class='card'><h2>📨 텔레그램 기록</h2><div id='history'>로딩중...</div></div>
+</div>
+</div><script>
+let rankIndex=0;
+function won(x){return Number(x||0).toLocaleString('ko-KR')+'원'}
+function selectedRanges(){return Array.from(document.getElementById('priceRanges').selectedOptions).map(o=>o.value).join(',')}
+function params(){const p=new URLSearchParams();p.set('priceRanges',selectedRanges());p.set('investmentAmount',document.getElementById('investmentAmount').value);p.set('minBuyQty',document.getElementById('minBuyQty').value);p.set('maxChangeRate',document.getElementById('maxChangeRate').value);p.set('minTradeValue',document.getElementById('minTradeValue').value);p.set('minScore',document.getElementById('minScore').value);p.set('excludeOverheated',document.getElementById('excludeOverheated').checked?'true':'false');p.set('rankIndex',rankIndex);return p;}
+async function resetRank(){rankIndex=0; await fetch('/api/pre_surge_v71/reset_rank');}
+async function loadData(){
+ const r=await fetch('/api/ai_dashboard_v71?'+params().toString()); const d=await r.json();
+ const p=d.todayOnePick||{};
+ document.getElementById('onepick').innerHTML=p.name?`<div class='big'>#${(p.selectedIndex||0)+1} ${p.name}</div><span class='badge'>${p.grade||'-'}</span><span class='badge'>${p.theme||'-'}</span><br><br>현재가: <b>${won(p.price)}</b><br>매수 가능 수량: <b>약 ${p.buyableQty||0}주</b><br>등락률: <b>${p.dayChange||0}%</b><br>AI점수: <b>${p.preSurgeScore||0}</b><br><br>매수 관찰가: ${won(p.buyZone)}<br>돌파 확인가: ${won(p.breakout)}<br>1차 목표가: ${won(p.target1)}<br>손절가: ${won(p.stop)}<br><br><span class='ok'>AI 판단</span><br>${(p.ai&&p.ai.view)||p.comment||''}<br><br><button class='btn2' onclick='nextPick()'>이 종목 제외하고 다음 후보 보기</button>`:`<span class='danger'>현재 필터 조건에 맞는 단타 후보가 없습니다.</span><br>가격 구간 또는 거래대금 조건을 완화해보세요.`;
+ const items=d.preSurgeWatch||[]; document.getElementById('presurge').innerHTML=items.length?items.map(x=>`<div class='card'><b>${x.filteredRank}. ${x.name}</b> <span class='badge'>${x.grade}</span><br>현재가 ${won(x.price)} / ${x.dayChange}% / 매수가능 ${x.buyableQty||0}주<br>점수 ${x.preSurgeScore}<br><small>${(x.ai&&x.ai.view)||''}</small></div>`).join(''):'후보 없음';
+ const h=d.holdings||[]; document.getElementById('holdings').innerHTML=h.length?h.map(x=>`<div><b>${x.name}</b> ${won(x.lastPrice)}<br>매수가 ${won(x.buyPrice)} / 목표 ${won(x.target)} / 손절 ${won(x.stop)}<br><small>${x.priceError||x.lastCheckedAt||''}</small></div><hr>`).join(''):'보유종목 없음';
+ const his=d.telegramHistory||[]; document.getElementById('history').innerHTML=his.length?his.map(x=>`<div><b>${x.time}</b> ${x.status}<br><pre>${x.text}</pre></div>`).join(''):'기록 없음';
+}
+async function nextPick(){rankIndex+=1; await loadData();}
+async function testAlert(){ const r=await fetch('/api/pre_surge/test_alert'); alert(JSON.stringify(await r.json()).slice(0,500)); loadData(); }
+loadData();
+</script></body></html>
+"""
+
+
 @app.route("/api/pre_surge")
 def api_pre_surge_v70():
     items = build_pre_surge_candidates_v70(limit=int(request.args.get("limit", "500")))
@@ -1887,7 +2199,7 @@ def api_best_pick_test_alert():
 def api_version():
     return jsonify({
         "ok": True,
-        "version": "final-ai-stock-wind-v70",
+        "version": "final-ai-stock-wind-v71",
         "watch_interval": SERVER_WATCH_INTERVAL,
         "features": [
             "server-side holding watch",
@@ -1904,7 +2216,11 @@ def api_version():
             "news keyword score",
             "foreign/institution/program supply score ready",
             "intraday pullback proxy score",
-            "separated v70 dashboard"
+            "separated v70 dashboard",
+            "v71 scalp price range filter",
+            "v71 minimum buyable quantity filter",
+            "v71 next ranked candidate refresh",
+            "virtual learning and simulation UI removed from default dashboard"
         ]
     })
 
