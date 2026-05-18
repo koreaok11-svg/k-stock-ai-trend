@@ -733,7 +733,7 @@ def api_analyze():
 
 def send_telegram_message(text):
     """
-    Telegram Bot API 알림 발송.
+    Telegram Bot API 알림 발송 + 최근 알림 기록 저장(v70).
     Render Environment Variables:
     - TELEGRAM_BOT_TOKEN
     - TELEGRAM_CHAT_ID
@@ -742,6 +742,7 @@ def send_telegram_message(text):
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
     if not token or not chat_id:
+        _append_telegram_history("FAILED", text, "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 설정되지 않았습니다.") if "_append_telegram_history" in globals() else None
         return False, "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 설정되지 않았습니다."
 
     try:
@@ -754,29 +755,13 @@ def send_telegram_message(text):
         }
         r = requests.post(url, json=payload, timeout=8)
         if r.status_code != 200:
+            _append_telegram_history("FAILED", text, r.text[:500]) if "_append_telegram_history" in globals() else None
             return False, r.text[:500]
+        _append_telegram_history("SENT", text, "sent") if "_append_telegram_history" in globals() else None
         return True, "sent"
     except Exception as e:
+        _append_telegram_history("FAILED", text, str(e)) if "_append_telegram_history" in globals() else None
         return False, str(e)
-
-
-
-# ============================
-# Server-side holding monitor
-# ============================
-SERVER_HOLDINGS_FILE = os.getenv("SERVER_HOLDINGS_FILE", "/tmp/sungil_holdings.json")
-SERVER_WATCH_STATE = {"running": False, "thread": None, "last_alerts": {}, "last_check": None, "last_prices": {}}
-SERVER_WATCH_INTERVAL = int(os.getenv("SERVER_WATCH_INTERVAL", "20"))
-SERVER_WATCH_LOCK = threading.Lock()
-BEST_PICK_WATCH_STATE = {
-    "last_code": "",
-    "last_score": 0,
-    "last_alert_at": "",
-    "enabled": True
-}
-BEST_PICK_MIN_SCORE_GAP = float(os.getenv("BEST_PICK_MIN_SCORE_GAP", "3.0"))
-
-
 
 def _dedupe_holdings_by_code(holdings):
     result = []
@@ -1072,70 +1057,68 @@ def _send_holding_alert(kind, h, cur):
 
 
 def _server_monitor_loop():
+    """
+    v70 통합 감시 루프.
+    1) 보유종목 목표/손절 감시
+    2) 기존 최우선 단타 1종목 감시
+    3) 신규 급등 예상 후보 감시
+    """
+    last_pre_surge_ts = 0
+
     while SERVER_WATCH_STATE.get("running"):
         try:
             holdings = _read_server_holdings()
             SERVER_WATCH_STATE["last_check"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
             changed = False
-            today = now_kst().strftime("%Y-%m-%d")
 
             for h in holdings:
-                code = _normalize_holding_code(h)
-                if not code or code == "000000":
-                    h["priceError"] = "종목코드를 찾지 못했습니다."
+                before = json.dumps(h, ensure_ascii=False, sort_keys=True)
+                h = _check_single_holding_and_alert(h)
+                after = json.dumps(h, ensure_ascii=False, sort_keys=True)
+                if before != after:
                     changed = True
-                    continue
-                cur = _get_price_for_code(code)
-                if cur < 10:
-                    h["priceError"] = "현재가 조회 실패. 이전 가격 유지"
-                    if safe_float(h.get("lastPrice", 0)) < 10:
-                        h["lastPrice"] = safe_float(h.get("manualPrice", 0)) if safe_float(h.get("manualPrice", 0)) >= 10 else safe_float(h.get("buyPrice", 0))
-                    changed = True
-                    continue
-
-                h["code"] = code
-                h["lastPrice"] = cur
-                h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
-                SERVER_WATCH_STATE["last_prices"][code] = cur
-                changed = True
-
-                name = h.get("name", code)
-                buy_price = safe_float(h.get("buyPrice", 0))
-                qty = safe_float(h.get("qty", 0))
-                target = safe_float(h.get("target", 0))
-                stop = safe_float(h.get("stop", 0))
-                pnl = (cur - buy_price) * qty if buy_price and qty else 0
-
-                if target and cur >= target:
-                    _send_holding_alert("target", h, cur)
-
-                if stop and cur <= stop:
-                    _send_holding_alert("stop", h, cur)
 
             if changed:
+                holdings = _dedupe_holdings_by_code(holdings)
                 _write_server_holdings(holdings)
 
-            # 보유종목 감시와 함께 더 좋은 단타 1종목 후보도 확인
-            check_and_alert_better_pick()
+            # 기존 최우선 단타 1종목 후보 감시
+            if "check_and_alert_better_pick" in globals():
+                check_and_alert_better_pick()
+
+            # 신규: 급등 예상 후보 감시
+            now_ts = time.time()
+            interval = int(os.getenv("PRE_SURGE_INTERVAL", "60"))
+            if now_ts - last_pre_surge_ts >= interval:
+                if "check_and_alert_pre_surge_v70" in globals():
+                    check_and_alert_pre_surge_v70(force=False)
+                last_pre_surge_ts = now_ts
 
         except Exception as e:
             print("server monitor error:", e)
 
         time.sleep(SERVER_WATCH_INTERVAL)
 
-
 def _ensure_server_watch_running():
     """
-    서버 보유종목 감시 thread를 중복 없이 시작합니다.
+    서버 보유종목/최우선 단타/급등예상 감시 thread를 중복 없이 시작합니다.
+    기존 코드의 자기 자신 재호출 버그를 제거했습니다.
     """
     try:
         with SERVER_WATCH_LOCK:
-            _ensure_server_watch_running()
-        return True
+            th = SERVER_WATCH_STATE.get("thread")
+            if SERVER_WATCH_STATE.get("running") and th and th.is_alive():
+                return True
+
+            SERVER_WATCH_STATE["running"] = True
+            th = threading.Thread(target=_server_monitor_loop, daemon=True)
+            SERVER_WATCH_STATE["thread"] = th
+            th.start()
+            return True
     except Exception as e:
         print("ensure server watch error:", e)
+        SERVER_WATCH_STATE["running"] = False
         return False
-
 
 @app.route("/api/find_stock")
 def api_find_stock():
@@ -1376,6 +1359,509 @@ def api_login_check():
 
 
 
+# =========================================================
+# 성일의 AI 주식바람 v70 - 급등 예상/뉴스/수급/분봉/UI/알림기록 확장
+# =========================================================
+TELEGRAM_HISTORY_FILE = os.getenv("TELEGRAM_HISTORY_FILE", "/tmp/sungil_telegram_history.json")
+PRE_SURGE_STATE = {
+    "last_alerts": {},
+    "last_pick": None,
+    "enabled": True,
+}
+PRICE_STATUS_CACHE = {}
+
+PRE_SURGE_MIN_SCORE = float(os.getenv("PRE_SURGE_MIN_SCORE", "78"))
+PRE_SURGE_ALERT_COOLDOWN_MIN = int(os.getenv("PRE_SURGE_ALERT_COOLDOWN_MIN", "10"))
+PRE_SURGE_SCORE_RE_ALERT_GAP = float(os.getenv("PRE_SURGE_SCORE_RE_ALERT_GAP", "10"))
+PRE_SURGE_INTERVAL = int(os.getenv("PRE_SURGE_INTERVAL", "60"))
+
+NEWS_KEYWORDS = {
+    "HBM": 15, "AI": 12, "엔비디아": 15, "반도체": 9, "데이터센터": 10,
+    "수주": 13, "계약": 12, "양산": 10, "공급": 8, "증설": 8,
+    "실적": 7, "흑자전환": 10, "상향": 8, "승인": 8, "특허": 7,
+    "로봇": 8, "전력": 8, "원전": 9, "방산": 8, "바이오": 7,
+}
+
+EXCLUDE_STOCK_KEYWORDS = [
+    "스팩", "SPAC", "우선주", "리츠", "ETN", "ETF", "인버스", "레버리지",
+    "선물", "합성", "KODEX", "TIGER", "KBSTAR", "ARIRANG", "HANARO",
+]
+
+
+def _append_telegram_history(status, text, message=""):
+    """텔레그램 발송 이력을 최근 100건까지 저장합니다."""
+    try:
+        history = []
+        if os.path.exists(TELEGRAM_HISTORY_FILE):
+            with open(TELEGRAM_HISTORY_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                history = data if isinstance(data, list) else []
+        history.insert(0, {
+            "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "status": status,
+            "message": message,
+            "text": str(text)[:2500],
+        })
+        history = history[:100]
+        with open(TELEGRAM_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("telegram history error:", e)
+
+
+def _read_telegram_history():
+    try:
+        if os.path.exists(TELEGRAM_HISTORY_FILE):
+            with open(TELEGRAM_HISTORY_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+    except Exception:
+        pass
+    return []
+
+
+def _is_market_time():
+    """한국장 기준 감시 시간. 장전/장중/장후 초반까지 허용."""
+    n = now_kst()
+    if n.weekday() >= 5:
+        return False
+    hhmm = n.hour * 100 + n.minute
+    return 850 <= hhmm <= 1540
+
+
+def _safe_amount_to_eok(amount):
+    return safe_float(amount, 0) / 100000000
+
+
+def _is_excluded_stock_name(name):
+    n = str(name or "").upper().strip()
+    return n.endswith("우") or n.endswith("우B") or any(k.upper() in n for k in EXCLUDE_STOCK_KEYWORDS)
+
+
+def _get_price_status_for_code(code, fallback_price=0):
+    """
+    현재가 상태 표시용.
+    1순위 네이버 모바일/HTML, 실패 시 기존 FDR/마지막 정상가/수동가 구조를 유지합니다.
+    """
+    code = str(code).zfill(6)
+    now_txt = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+    old = PRICE_STATUS_CACHE.get(code, {})
+
+    try:
+        live = _get_naver_current_price(code) if "_get_naver_current_price" in globals() else 0
+        if safe_float(live) >= 10:
+            status = {"ok": True, "price": safe_float(live), "source": "NAVER_REALTIME", "updated": now_txt, "message": "정상"}
+            PRICE_STATUS_CACHE[code] = status
+            return status
+    except Exception as e:
+        print("price status naver error:", code, e)
+
+    try:
+        p = _get_price_for_code(code)
+        if safe_float(p) >= 10:
+            status = {"ok": True, "price": safe_float(p), "source": "BACKUP_PRICE", "updated": now_txt, "message": "보조 가격 사용"}
+            PRICE_STATUS_CACHE[code] = status
+            return status
+    except Exception:
+        pass
+
+    if safe_float(old.get("price", 0)) >= 10:
+        return {"ok": False, "price": safe_float(old.get("price")), "source": "LAST_NORMAL_PRICE", "updated": old.get("updated", now_txt), "message": "현재가 조회 실패, 마지막 정상가 유지"}
+
+    if safe_float(fallback_price) >= 10:
+        return {"ok": False, "price": safe_float(fallback_price), "source": "FALLBACK_PRICE", "updated": now_txt, "message": "현재가 조회 실패, 기본 가격 사용"}
+
+    return {"ok": False, "price": 0, "source": "NO_PRICE", "updated": now_txt, "message": "현재가 조회 실패"}
+
+
+def calc_news_score_from_text(news_text):
+    text = str(news_text or "")
+    score = 0
+    hits = []
+    for key, val in NEWS_KEYWORDS.items():
+        if key in text:
+            score += val
+            hits.append(key)
+    return min(score, 100), hits[:8]
+
+
+def _theme_news_text(name, theme):
+    """
+    실제 뉴스 API가 없는 환경에서도 테마/종목명 기반 기본 뉴스 점수를 제공합니다.
+    추후 네이버뉴스/공시 API를 연결하면 이 함수만 교체하면 됩니다.
+    """
+    return f"{name} {theme} AI 반도체 데이터센터 수주 계약 양산"
+
+
+def _calc_supply_score(row):
+    """
+    외국인/기관/프로그램 수급 데이터가 있으면 반영하고, 없으면 '미연동'으로 표시합니다.
+    KRX/증권사 API 연결 시 ForeignNetBuy, InstitutionNetBuy, ProgramNetBuy 컬럼을 넣으면 자동 반영됩니다.
+    """
+    score = 0
+    reasons = []
+    fields = {
+        "foreignBuy": row.get("ForeignNetBuy", None),
+        "institutionBuy": row.get("InstitutionNetBuy", None),
+        "programNetBuy": row.get("ProgramNetBuy", None),
+    }
+    any_linked = False
+    for label, val in fields.items():
+        if val is not None and not pd.isna(val):
+            any_linked = True
+            v = safe_float(val)
+            if v > 0:
+                score += 10 if label != "programNetBuy" else 8
+                reasons.append(label)
+    if not any_linked:
+        return 0, ["수급API 미연동"]
+    return min(score, 28), reasons or ["순매수 약함"]
+
+
+def _calc_intraday_signal(row):
+    """
+    분봉 API가 없을 때는 당일 등락률/거래대금 순위로 눌림 후 재상승 가능성을 대체 추정합니다.
+    추후 1분/5분봉 API 연결 시 VWAP·전고점·눌림목 로직으로 교체 가능합니다.
+    """
+    chg = safe_float(row.get("dayChange", 0))
+    amount_rank = safe_float(row.get("amountRank", 0))
+    volume_rank = safe_float(row.get("volumeRank", 0))
+    score = 0
+    reasons = []
+    if 1.0 <= chg <= 6.5:
+        score += 8
+        reasons.append("급등 전 초기 등락률")
+    if amount_rank >= 70 and volume_rank >= 70:
+        score += 10
+        reasons.append("거래대금/거래량 동시 증가")
+    if 2.0 <= chg <= 5.5 and amount_rank >= 80:
+        score += 7
+        reasons.append("눌림 후 돌파 후보권")
+    return min(score, 25), reasons or ["분봉API 미연동"]
+
+
+def _pre_surge_grade(score):
+    score = safe_float(score)
+    if score >= 92:
+        return "S", "최우선 단타 후보"
+    if score >= 84:
+        return "A+", "급등 예상 강함"
+    if score >= 78:
+        return "A", "관심 감시"
+    if score >= 70:
+        return "B", "관찰"
+    return "C", "보류"
+
+
+def _pre_surge_ai_comment_v70(item):
+    score = safe_float(item.get("preSurgeScore", 0))
+    grade, grade_text = _pre_surge_grade(score)
+    change = safe_float(item.get("dayChange", 0))
+    theme = item.get("theme", "기타/개별이슈")
+    reasons = []
+    reasons.extend(item.get("newsHits", []) or [])
+    reasons.extend(item.get("supplyReasons", []) or [])
+    reasons.extend(item.get("intradayReasons", []) or [])
+    reasons = [str(x) for x in reasons if x]
+
+    if score >= 84:
+        view = "거래대금, 테마, 초기 등락률 조건이 동시에 붙어 급등 전조가 강한 후보입니다."
+    elif score >= 78:
+        view = "아직 과열권은 아니지만 수급 유입 가능성이 있어 관심 감시가 필요한 구간입니다."
+    else:
+        view = "점수는 낮지 않지만 추가 거래량과 돌파 확인이 필요합니다."
+
+    if change >= 9:
+        risk = "이미 상승률이 높아졌습니다. 신규 진입은 눌림 확인 전까지 보수적으로 보세요."
+    elif change <= 0:
+        risk = "아직 양봉 전환이 약합니다. 돌파 실패 시 바로 제외하는 기준이 필요합니다."
+    else:
+        risk = "추격매수보다 관심가·돌파가·손절가를 먼저 정하고 대응하는 것이 안전합니다."
+
+    return {
+        "grade": grade,
+        "gradeText": grade_text,
+        "view": view,
+        "reason": f"{theme} 테마, 당일 등락률 {change:.2f}%, 거래대금 {_safe_amount_to_eok(item.get('amount', 0)):,.1f}억원, 뉴스/수급/분봉 대체점수를 합산했습니다.",
+        "detailReasons": reasons[:10],
+        "risk": risk,
+    }
+
+
+def build_pre_surge_candidates_v70(limit=500):
+    """
+    이미 급등한 종목이 아니라 급등 예상 후보를 찾는 v70 스캐너.
+    반영 항목:
+    - 실시간/보조 가격 상태
+    - 거래대금/거래량/테마
+    - 뉴스 키워드 점수
+    - 외국인/기관/프로그램 수급 컬럼 연동 준비
+    - 분봉 눌림목 대체 신호
+    - 추천 제외 조건
+    """
+    df = get_market_df(limit=limit)
+    if df is None or df.empty:
+        return []
+
+    df = df.copy()
+    change_col = "ChagesRatio" if "ChagesRatio" in df.columns else ("Change" if "Change" in df.columns else None)
+    df["Close"] = pd.to_numeric(df.get("Close", 0), errors="coerce").fillna(0)
+    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+    df["Amount"] = pd.to_numeric(df.get("Amount", 0), errors="coerce").fillna(0)
+    df["Marcap"] = pd.to_numeric(df.get("Marcap", 0), errors="coerce").fillna(0)
+    df["dayChange"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0) if change_col else 0
+    df["Name"] = df["Name"].astype(str)
+    df["Code"] = df["Code"].astype(str).str.zfill(6)
+
+    # 추천 제외 조건
+    df = df[~df["Name"].apply(_is_excluded_stock_name)].copy()
+    df = df[
+        (df["Close"] >= 500) &
+        (df["Amount"] >= 2_000_000_000) &
+        (df["Marcap"] >= 80_000_000_000) &
+        (df["dayChange"] >= 0.8) &
+        (df["dayChange"] <= 8.5)
+    ].copy()
+    if df.empty:
+        return []
+
+    df["theme"] = df["Name"].apply(classify_theme)
+    df["themeWeight"] = df["theme"].apply(lambda x: WEIGHT.get(x, 1.0))
+    df["amountRank"] = df["Amount"].rank(pct=True) * 100
+    df["volumeRank"] = df["Volume"].rank(pct=True) * 100
+    df["marcapRank"] = df["Marcap"].rank(pct=True) * 100
+    df["earlyMoveScore"] = df["dayChange"].apply(lambda x: 100 if 2.0 <= x <= 5.5 else (82 if 0.8 <= x < 2.0 or 5.5 < x <= 8.5 else 40))
+
+    rows = []
+    for _, row in df.iterrows():
+        news_text = _theme_news_text(row.get("Name", ""), row.get("theme", ""))
+        news_score, news_hits = calc_news_score_from_text(news_text)
+        supply_score, supply_reasons = _calc_supply_score(row)
+        intraday_score, intraday_reasons = _calc_intraday_signal(row)
+
+        base_score = (
+            safe_float(row["earlyMoveScore"]) * 0.22 +
+            safe_float(row["amountRank"]) * 0.25 +
+            safe_float(row["volumeRank"]) * 0.18 +
+            safe_float(row["marcapRank"]) * 0.07 +
+            news_score * 0.12 +
+            supply_score * 0.08 +
+            intraday_score * 0.08
+        ) * safe_float(row["themeWeight"], 1.0)
+
+        price_status = _get_price_status_for_code(row["Code"], row["Close"])
+        price = safe_float(price_status.get("price", 0)) or safe_float(row["Close"])
+        score = round(base_score, 2)
+        buy_zone = round(price * 0.992)
+        breakout = round(price * 1.012)
+        target1 = round(price * 1.035)
+        target2 = round(price * 1.065)
+        stop = round(price * 0.973)
+
+        item = {
+            "rank": 0,
+            "code": str(row["Code"]).zfill(6),
+            "name": str(row["Name"]),
+            "market": str(row.get("Market", "")),
+            "theme": normalize_output_theme(str(row["theme"])),
+            "price": price,
+            "priceStatus": price_status,
+            "dayChange": round(safe_float(row["dayChange"]), 2),
+            "amount": safe_float(row["Amount"]),
+            "volume": safe_float(row["Volume"]),
+            "newsScore": round(news_score, 2),
+            "newsHits": news_hits,
+            "supplyScore": round(supply_score, 2),
+            "supplyReasons": supply_reasons,
+            "intradayScore": round(intraday_score, 2),
+            "intradayReasons": intraday_reasons,
+            "preSurgeScore": score,
+            "buyZone": buy_zone,
+            "breakout": breakout,
+            "target1": target1,
+            "target2": target2,
+            "stop": stop,
+        }
+        grade, grade_text = _pre_surge_grade(score)
+        item["grade"] = grade
+        item["gradeText"] = grade_text
+        item["ai"] = _pre_surge_ai_comment_v70(item)
+        rows.append(item)
+
+    rows = sorted(rows, key=lambda x: safe_float(x.get("preSurgeScore", 0)), reverse=True)
+    for i, item in enumerate(rows[:30], 1):
+        item["rank"] = i
+    return rows[:30]
+
+
+def get_pre_surge_best_pick_v70():
+    items = build_pre_surge_candidates_v70(limit=500)
+    if not items:
+        return None
+    return items[0]
+
+
+def _can_send_pre_surge_alert_v70(code, score):
+    key = str(code)
+    now_ts = time.time()
+    last = PRE_SURGE_STATE["last_alerts"].get(key, {})
+    last_ts = safe_float(last.get("ts", 0))
+    last_score = safe_float(last.get("score", 0))
+
+    if now_ts - last_ts < PRE_SURGE_ALERT_COOLDOWN_MIN * 60 and score < last_score + PRE_SURGE_SCORE_RE_ALERT_GAP:
+        return False
+
+    PRE_SURGE_STATE["last_alerts"][key] = {"ts": now_ts, "score": score}
+    return True
+
+
+def send_pre_surge_alert_v70(item, force=False):
+    if not item:
+        return False
+    code = item.get("code", "")
+    name = item.get("name", code)
+    score = safe_float(item.get("preSurgeScore", 0))
+    if not force:
+        if score < PRE_SURGE_MIN_SCORE:
+            return False
+        if not _can_send_pre_surge_alert_v70(code, score):
+            return False
+
+    ai = item.get("ai", {})
+    price_status = item.get("priceStatus", {})
+    detail = ", ".join(ai.get("detailReasons", [])[:6]) or "거래대금/테마/초기 등락률 조건"
+    msg = (
+        "🔥 <b>AI 급등 예상 후보 포착</b>\n"
+        f"종목: <b>{name}</b> ({code})\n"
+        f"테마: {item.get('theme', '-')}\n"
+        f"현재가: {safe_float(item.get('price', 0)):,.0f}원\n"
+        f"등락률: {safe_float(item.get('dayChange', 0)):.2f}%\n"
+        f"거래대금: {_safe_amount_to_eok(item.get('amount', 0)):,.1f}억원\n"
+        f"데이터상태: {price_status.get('message', '-')} / {price_status.get('source', '-')}\n"
+        f"업데이트: {price_status.get('updated', now_kst().strftime('%H:%M:%S'))}\n"
+        f"AI 점수: {score:.2f} / 등급 {ai.get('grade', item.get('grade', '-'))} ({ai.get('gradeText', item.get('gradeText', '-'))})\n\n"
+        f"AI 판단: {ai.get('view', '')}\n"
+        f"세부 근거: {detail}\n\n"
+        f"관심 진입가: {safe_float(item.get('buyZone', 0)):,.0f}원\n"
+        f"돌파 확인가: {safe_float(item.get('breakout', 0)):,.0f}원\n"
+        f"1차 목표가: {safe_float(item.get('target1', 0)):,.0f}원\n"
+        f"2차 목표가: {safe_float(item.get('target2', 0)):,.0f}원\n"
+        f"손절가: {safe_float(item.get('stop', 0)):,.0f}원\n\n"
+        f"주의: {ai.get('risk', '')}\n"
+        "※ 자동매매가 아닙니다. 실제 주문 전 HTS/MTS 현재가·호가·거래대금을 최종 확인하세요."
+    )
+    ok, _ = send_telegram_message(msg)
+    return ok
+
+
+def check_and_alert_pre_surge_v70(force=False):
+    try:
+        if not PRE_SURGE_STATE.get("enabled", True):
+            return {"ok": False, "message": "disabled"}
+        if not force and not _is_market_time():
+            return {"ok": False, "message": "not market time"}
+        pick = get_pre_surge_best_pick_v70()
+        if not pick:
+            return {"ok": False, "message": "no pre-surge pick"}
+        alerted = send_pre_surge_alert_v70(pick, force=force)
+        PRE_SURGE_STATE["last_pick"] = pick
+        return {"ok": True, "alerted": alerted, "pick": pick}
+    except Exception as e:
+        print("pre surge v70 check error:", e)
+        return {"ok": False, "message": str(e)}
+
+
+@app.route("/api/pre_surge")
+def api_pre_surge_v70():
+    items = build_pre_surge_candidates_v70(limit=int(request.args.get("limit", "500")))
+    best = items[0] if items else None
+    return jsonify(safe_json({
+        "ok": bool(items),
+        "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+        "best": best,
+        "items": items[:20],
+        "state": PRE_SURGE_STATE,
+    }))
+
+
+@app.route("/api/pre_surge/test_alert", methods=["GET", "POST"])
+def api_pre_surge_test_alert_v70():
+    result = check_and_alert_pre_surge_v70(force=True)
+    return jsonify(safe_json(result))
+
+
+@app.route("/api/pre_surge/status")
+def api_pre_surge_status_v70():
+    return jsonify(safe_json({
+        "ok": True,
+        "enabled": PRE_SURGE_STATE.get("enabled", True),
+        "minScore": PRE_SURGE_MIN_SCORE,
+        "cooldownMin": PRE_SURGE_ALERT_COOLDOWN_MIN,
+        "scoreReAlertGap": PRE_SURGE_SCORE_RE_ALERT_GAP,
+        "intervalSec": PRE_SURGE_INTERVAL,
+        "lastPick": PRE_SURGE_STATE.get("last_pick"),
+    }))
+
+
+@app.route("/api/telegram_history")
+def api_telegram_history():
+    return jsonify(safe_json({"ok": True, "items": _read_telegram_history()}))
+
+
+@app.route("/api/ai_dashboard_v70")
+def api_ai_dashboard_v70():
+    """앱 메뉴 분리용 통합 데이터 API."""
+    pre_items = build_pre_surge_candidates_v70(limit=int(request.args.get("limit", "500")))
+    best_pick = get_best_scalping_pick() if "get_best_scalping_pick" in globals() else None
+    return jsonify(safe_json({
+        "ok": True,
+        "updated": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+        "menus": ["오늘의 AI 단타", "급등 예상 감시", "보유종목", "테마 강세", "텔레그램 기록"],
+        "todayOnePick": best_pick,
+        "preSurgeBest": pre_items[0] if pre_items else None,
+        "preSurgeWatch": pre_items[:10],
+        "holdings": _read_server_holdings() if "_read_server_holdings" in globals() else [],
+        "telegramHistory": _read_telegram_history()[:20],
+        "priceCache": PRICE_STATUS_CACHE,
+    }))
+
+
+@app.route("/dashboard_v70")
+def dashboard_v70_page():
+    """기존 HTML을 크게 건드리지 않고 추가로 보는 v70 요약 화면."""
+    return """
+<!doctype html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>성일의 AI 주식바람 v70</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f7ee;color:#1f2a24;margin:0;padding:18px}
+.card{background:white;border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+h1{font-size:26px} h2{font-size:20px;margin:0 0 10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.badge{display:inline-block;background:#e9f5dd;border-radius:999px;padding:6px 10px;margin:2px;font-size:13px}.danger{color:#b91c1c}.ok{color:#166534}
+button{border:0;border-radius:14px;background:#5f8d65;color:white;padding:12px 16px;font-weight:700}
+pre{white-space:pre-wrap;background:#f3f4f6;border-radius:14px;padding:12px;overflow:auto}
+</style></head><body>
+<h1>🌿 성일의 AI 주식바람 v70</h1>
+<button onclick='loadData()'>새로고침</button> <button onclick='testAlert()'>텔레그램 테스트 알림</button>
+<div class='grid'>
+  <div class='card'><h2>오늘의 AI 단타 1종목</h2><div id='onepick'>로딩중...</div></div>
+  <div class='card'><h2>급등 예상 감시</h2><div id='presurge'>로딩중...</div></div>
+  <div class='card'><h2>보유종목 관리</h2><div id='holdings'>로딩중...</div></div>
+  <div class='card'><h2>텔레그램 기록</h2><div id='history'>로딩중...</div></div>
+</div>
+<script>
+function won(x){return Number(x||0).toLocaleString('ko-KR')+'원'}
+async function loadData(){
+ const r=await fetch('/api/ai_dashboard_v70'); const d=await r.json();
+ const p=d.todayOnePick||{}; document.getElementById('onepick').innerHTML=p.name?`<b>${p.name}</b><br>현재가 ${won(p.price)}<br>AI점수 ${p.score||'-'}<br><span class='badge'>${p.theme||'-'}</span>`:'후보 없음';
+ const items=d.preSurgeWatch||[]; document.getElementById('presurge').innerHTML=items.length?items.map(x=>`<div class='card'><b>${x.rank}. ${x.name}</b> <span class='badge'>${x.grade}</span><br>현재가 ${won(x.price)} / ${x.dayChange}%<br>점수 ${x.preSurgeScore}<br>관심 ${won(x.buyZone)} / 돌파 ${won(x.breakout)}<br><small>${(x.ai&&x.ai.view)||''}</small></div>`).join(''):'후보 없음';
+ const h=d.holdings||[]; document.getElementById('holdings').innerHTML=h.length?h.map(x=>`<div><b>${x.name}</b> ${won(x.lastPrice)}<br>매수가 ${won(x.buyPrice)} / 목표 ${won(x.target)} / 손절 ${won(x.stop)}<br><small>${x.priceError||x.lastCheckedAt||''}</small></div><hr>`).join(''):'보유종목 없음';
+ const his=d.telegramHistory||[]; document.getElementById('history').innerHTML=his.length?his.map(x=>`<div><b>${x.time}</b> ${x.status}<br><pre>${x.text}</pre></div>`).join(''):'기록 없음';
+}
+async function testAlert(){ const r=await fetch('/api/pre_surge/test_alert'); alert(JSON.stringify(await r.json()).slice(0,500)); loadData(); }
+loadData();
+</script></body></html>
+"""
+
 @app.route("/api/best_pick")
 def api_best_pick():
     pick = get_best_scalping_pick()
@@ -1401,18 +1887,26 @@ def api_best_pick_test_alert():
 def api_version():
     return jsonify({
         "ok": True,
-        "version": "final-onepick-v59",
+        "version": "final-ai-stock-wind-v70",
         "watch_interval": SERVER_WATCH_INTERVAL,
         "features": [
             "server-side holding watch",
-            "telegram detailed alerts",
+            "telegram detailed alerts and history",
             "master/user password",
             "theme classification",
             "AI holding comments",
-            "deduplicated monitor thread"
+            "deduplicated monitor thread fixed",
+            "pre-surge scanner",
+            "pre-surge telegram alert",
+            "10 minute cooldown duplicate prevention",
+            "score gap re-alert",
+            "price status display",
+            "news keyword score",
+            "foreign/institution/program supply score ready",
+            "intraday pullback proxy score",
+            "separated v70 dashboard"
         ]
     })
-
 
 @app.route("/api/telegram_status")
 def api_telegram_status():
