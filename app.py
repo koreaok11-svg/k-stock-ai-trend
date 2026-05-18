@@ -797,7 +797,8 @@ def send_telegram_message(text):
 # Server-side holding monitor
 # ============================
 SERVER_HOLDINGS_FILE = os.getenv("SERVER_HOLDINGS_FILE", "/tmp/sungil_holdings.json")
-SERVER_WATCH_STATE = {"running": False, "thread": None, "last_alerts": {}}
+SERVER_WATCH_STATE = {"running": False, "thread": None, "last_alerts": {}, "last_check": None, "last_prices": {}}
+SERVER_WATCH_INTERVAL = int(os.getenv("SERVER_WATCH_INTERVAL", "10"))
 
 def _read_server_holdings():
     try:
@@ -817,8 +818,50 @@ def _write_server_holdings(items):
     except Exception:
         return False
 
+def _get_naver_current_price(code):
+    code = str(code).zfill(6)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://finance.naver.com/"
+    }
+
+    try:
+        url = f"https://finance.naver.com/item/main.naver?code={code}"
+        r = requests.get(url, headers=headers, timeout=6)
+        if r.status_code == 200 and r.text:
+            m = re.search(r'<p class="no_today">[\s\S]*?<span class="blind">([\d,]+)</span>', r.text)
+            if m:
+                return safe_float(m.group(1).replace(",", ""))
+            vals = re.findall(r'<span class="blind">([\d,]+)</span>', r.text)
+            for v in vals[:10]:
+                n = safe_float(v.replace(",", ""))
+                if n > 0:
+                    return n
+    except Exception as e:
+        print("naver pc price error:", code, e)
+
+    try:
+        url = f"https://m.stock.naver.com/api/stock/{code}/basic"
+        r = requests.get(url, headers=headers, timeout=6)
+        if r.status_code == 200 and r.text:
+            data = r.json()
+            for key in ["closePrice", "now", "lastPrice", "currentPrice"]:
+                if key in data:
+                    return safe_float(str(data.get(key)).replace(",", ""))
+    except Exception as e:
+        print("naver mobile price error:", code, e)
+
+    return 0
+
+
 def _get_price_for_code(code):
     code = str(code).zfill(6)
+
+    price = _get_naver_current_price(code)
+    if price > 0:
+        return price
+
     try:
         df = get_market_df(limit=400)
         if df is not None and not df.empty:
@@ -838,12 +881,68 @@ def _get_price_for_code(code):
             return safe_float(hist.iloc[-1].get("Close", 0))
     except Exception:
         pass
+
     return 0
+
+
+def _check_single_holding_and_alert(h):
+    try:
+        code = str(h.get("code", "")).zfill(6)
+        if not code:
+            return h
+        cur = _get_price_for_code(code)
+        if cur <= 0:
+            return h
+
+        h["lastPrice"] = cur
+        h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+        SERVER_WATCH_STATE["last_prices"][code] = cur
+
+        today = now_kst().strftime("%Y-%m-%d")
+        name = h.get("name", code)
+        buy_price = safe_float(h.get("buyPrice", 0))
+        qty = safe_float(h.get("qty", 0))
+        target = safe_float(h.get("target", 0))
+        stop = safe_float(h.get("stop", 0))
+        pnl = (cur - buy_price) * qty if buy_price and qty else 0
+
+        if target and cur >= target:
+            key = f"target_{code}_{today}"
+            if not SERVER_WATCH_STATE["last_alerts"].get(key):
+                SERVER_WATCH_STATE["last_alerts"][key] = True
+                send_telegram_message(
+                    f"🎯 <b>보유종목 목표가 도달</b>\n"
+                    f"종목: <b>{name}</b> ({code})\n"
+                    f"현재가: {cur:,.0f}원\n"
+                    f"목표가: {target:,.0f}원\n"
+                    f"손절가: {stop:,.0f}원\n"
+                    f"평가손익: {pnl:,.0f}원\n\n"
+                    "※ 자동매매가 아닙니다. 증권앱에서 직접 매도 여부를 확인하세요."
+                )
+
+        if stop and cur <= stop:
+            key = f"stop_{code}_{today}"
+            if not SERVER_WATCH_STATE["last_alerts"].get(key):
+                SERVER_WATCH_STATE["last_alerts"][key] = True
+                send_telegram_message(
+                    f"⚠️ <b>보유종목 손절가 이탈</b>\n"
+                    f"종목: <b>{name}</b> ({code})\n"
+                    f"현재가: {cur:,.0f}원\n"
+                    f"목표가: {target:,.0f}원\n"
+                    f"손절가: {stop:,.0f}원\n"
+                    f"평가손익: {pnl:,.0f}원\n\n"
+                    "※ 자동매매가 아닙니다. 증권앱에서 직접 손절 여부를 확인하세요."
+                )
+    except Exception as e:
+        print("single holding check error:", e)
+    return h
+
 
 def _server_monitor_loop():
     while SERVER_WATCH_STATE.get("running"):
         try:
             holdings = _read_server_holdings()
+            SERVER_WATCH_STATE["last_check"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
             changed = False
             today = now_kst().strftime("%Y-%m-%d")
 
@@ -856,6 +955,8 @@ def _server_monitor_loop():
                     continue
 
                 h["lastPrice"] = cur
+                h["lastCheckedAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+                SERVER_WATCH_STATE["last_prices"][code] = cur
                 changed = True
 
                 name = h.get("name", code)
@@ -899,7 +1000,7 @@ def _server_monitor_loop():
         except Exception as e:
             print("server monitor error:", e)
 
-        time.sleep(15)
+        time.sleep(SERVER_WATCH_INTERVAL)
 
 @app.route("/api/server_holdings", methods=["GET", "POST"])
 def api_server_holdings():
@@ -917,8 +1018,15 @@ def api_server_holdings():
             code = str(item.get("code", "")).zfill(6)
             item["code"] = code
             holdings = [h for h in holdings if str(h.get("code", "")).zfill(6) != code]
+            item = _check_single_holding_and_alert(item)
             holdings.append(item)
             _write_server_holdings(holdings)
+            SERVER_WATCH_STATE["running"] = True
+            thread = SERVER_WATCH_STATE.get("thread")
+            if thread is None or not thread.is_alive():
+                thread = threading.Thread(target=_server_monitor_loop, daemon=True)
+                SERVER_WATCH_STATE["thread"] = thread
+                thread.start()
         return jsonify({"ok": True, "holdings": holdings})
 
     if action == "remove":
@@ -930,6 +1038,11 @@ def api_server_holdings():
         ]
         _write_server_holdings(holdings)
         return jsonify({"ok": True, "holdings": holdings})
+
+    if action == "refresh":
+        refreshed = [_check_single_holding_and_alert(h) for h in holdings]
+        _write_server_holdings(refreshed)
+        return jsonify({"ok": True, "holdings": refreshed, "last_check": SERVER_WATCH_STATE.get("last_check")})
 
     if action == "clear":
         _write_server_holdings([])
@@ -952,15 +1065,49 @@ def api_server_watch_stop():
     SERVER_WATCH_STATE["running"] = False
     return jsonify({"ok": True, "running": False})
 
+
+@app.route("/api/server_watch/check_now", methods=["GET", "POST"])
+def api_server_watch_check_now():
+    holdings = _read_server_holdings()
+    refreshed = [_check_single_holding_and_alert(h) for h in holdings]
+    _write_server_holdings(refreshed)
+    return jsonify({
+        "ok": True,
+        "holdings": refreshed,
+        "last_check": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+        "running": bool(SERVER_WATCH_STATE.get("running"))
+    })
+
 @app.route("/api/server_watch/status")
 def api_server_watch_status():
     return jsonify({
         "ok": True,
         "running": bool(SERVER_WATCH_STATE.get("running")),
-        "holdings": len(_read_server_holdings())
+        "holdings": len(_read_server_holdings()),
+        "interval": SERVER_WATCH_INTERVAL,
+        "last_check": SERVER_WATCH_STATE.get("last_check"),
+        "last_prices": SERVER_WATCH_STATE.get("last_prices", {}),
+        "items": _read_server_holdings()
     })
 
 
+
+
+@app.before_request
+def auto_resume_server_watch():
+    try:
+        if request.path.startswith("/static"):
+            return
+        holdings = _read_server_holdings()
+        if holdings and not SERVER_WATCH_STATE.get("running"):
+            SERVER_WATCH_STATE["running"] = True
+            thread = SERVER_WATCH_STATE.get("thread")
+            if thread is None or not thread.is_alive():
+                thread = threading.Thread(target=_server_monitor_loop, daemon=True)
+                SERVER_WATCH_STATE["thread"] = thread
+                thread.start()
+    except Exception as e:
+        print("auto resume watch error:", e)
 
 @app.route("/api/login_check", methods=["POST"])
 def api_login_check():
@@ -3183,7 +3330,7 @@ function fmtProfitMoney(v) {
         <div class="monitor-grid">
           <div class="monitor-card">
             <b>기본 감시</b>
-            <span>15초마다 현재가 확인</span>
+            <span>10초마다 현재가 확인</span>
           </div>
 
           <div class="monitor-card fast">
@@ -3249,6 +3396,7 @@ function fmtProfitMoney(v) {
 
         <div class="holding-buttons">
           <button class="primary-btn" onclick="addHolding()">➕ 보유종목 등록</button>
+          <button class="primary-btn" onclick="syncHoldingsFromServer()">🔍 즉시 가격확인</button>
           <button class="primary-btn sub master-only" onclick="clearHoldings()">🧹 전체 삭제</button>
         </div>
 
@@ -5413,7 +5561,7 @@ let scalpWatchTimer = null;
 
     async function syncHoldingsFromServer() {
       try {
-        const res = await fetch("/api/server_holdings", {cache:"no-store", headers:{"Accept":"application/json"}});
+        const res = await fetch("/api/server_watch/check_now", {cache:"no-store", headers:{"Accept":"application/json"}});
         const data = await res.json();
         if (data.ok && Array.isArray(data.holdings)) {
           saveHoldings(data.holdings);
@@ -5466,7 +5614,7 @@ let scalpWatchTimer = null;
         const data = await res.json();
         const status = document.getElementById("watchStatus");
         if (status && data.ok) {
-          status.innerText = `🟢 서버 백그라운드 감시 시작. 앱을 닫아도 서버가 보유종목 ${data.holdings}개를 15초 간격으로 확인합니다.`;
+          status.innerText = `🟢 서버 백그라운드 감시 시작. 앱을 닫아도 서버가 보유종목 ${data.holdings}개를 10초 간격으로 확인합니다.`;
         }
       } catch(e) {
         console.log("startServerWatch error", e);
@@ -5489,7 +5637,7 @@ let scalpWatchTimer = null;
 
       const status = document.getElementById("watchStatus");
       if (status) {
-        status.innerText = "🟢 단타 실전 감시 시작. 기본 15초 감시 모드로 동작합니다.";
+        status.innerText = "🟢 단타 실전 감시 시작. 기본 10초 감시 모드로 동작합니다.";
       }
 
       await startServerWatch();
@@ -5570,7 +5718,7 @@ let scalpWatchTimer = null;
           }
         } else {
           if (status) {
-            status.innerText = "🟢 기본 15초 감시 모드 동작 중.";
+            status.innerText = "🟢 기본 10초 감시 모드 동작 중.";
           }
 
           if (scalpFastTimer) {
