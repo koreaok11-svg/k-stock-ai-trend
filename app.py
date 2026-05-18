@@ -818,6 +818,62 @@ def _write_server_holdings(items):
     except Exception:
         return False
 
+
+STOCK_CODE_FALLBACK = {
+    "휴림로봇": "090710",
+    "제주반도체": "080220",
+    "SFA반도체": "036540",
+    "하나마이크론": "067310",
+    "두산로보틱스": "454910",
+    "SK하이닉스": "000660",
+    "삼성전자": "005930",
+}
+
+def _resolve_stock_code_by_name(name):
+    """
+    종목명으로 종목코드를 찾습니다.
+    저장된 코드가 000000 이거나 비어 있을 때 보정용.
+    """
+    name = str(name or "").strip()
+    if not name:
+        return ""
+
+    if name in STOCK_CODE_FALLBACK:
+        return STOCK_CODE_FALLBACK[name]
+
+    try:
+        df = get_market_df(limit=3000)
+        if df is not None and not df.empty:
+            d = df.copy()
+            d["Name"] = d["Name"].astype(str)
+            d["Code"] = d["Code"].astype(str).str.zfill(6)
+
+            exact = d[d["Name"] == name]
+            if not exact.empty:
+                return str(exact.iloc[0]["Code"]).zfill(6)
+
+            contains = d[d["Name"].str.contains(name, case=False, na=False)]
+            if not contains.empty:
+                return str(contains.iloc[0]["Code"]).zfill(6)
+    except Exception as e:
+        print("resolve stock code error:", name, e)
+
+    return ""
+
+def _normalize_holding_code(h):
+    """
+    보유종목 코드가 000000/빈값이면 종목명으로 보정합니다.
+    """
+    code = str(h.get("code", "") or "").strip().zfill(6)
+    if code in ["", "000000"] or not code.isdigit():
+        fixed = _resolve_stock_code_by_name(h.get("name", ""))
+        if fixed:
+            h["code"] = fixed
+            return fixed
+    h["code"] = code
+    return code
+
+
 def _get_naver_current_price(code):
     """
     네이버 현재가 조회.
@@ -875,6 +931,8 @@ def _get_naver_current_price(code):
 
 def _get_price_for_code(code):
     code = str(code).zfill(6)
+    if code == "000000" or not code.isdigit():
+        return 0
 
     price = _get_naver_current_price(code)
     if price > 0:
@@ -907,11 +965,13 @@ def _get_price_for_code(code):
 
 def _check_single_holding_and_alert(h):
     try:
-        code = str(h.get("code", "")).zfill(6)
-        if not code:
+        code = _normalize_holding_code(h)
+        if not code or code == "000000":
+            h["priceError"] = "종목코드를 찾지 못했습니다. 종목코드를 직접 입력해 주세요."
             return h
         cur = _get_price_for_code(code)
-        if cur <= 0:
+        if cur < 10:
+            h["priceError"] = "현재가 조회 실패. 이전 가격을 유지합니다."
             return h
 
         h["lastPrice"] = cur
@@ -967,11 +1027,15 @@ def _server_monitor_loop():
             today = now_kst().strftime("%Y-%m-%d")
 
             for h in holdings:
-                code = str(h.get("code", "")).zfill(6)
-                if not code:
+                code = _normalize_holding_code(h)
+                if not code or code == "000000":
+                    h["priceError"] = "종목코드를 찾지 못했습니다."
+                    changed = True
                     continue
                 cur = _get_price_for_code(code)
-                if cur <= 0:
+                if cur < 10:
+                    h["priceError"] = "현재가 조회 실패. 이전 가격 유지"
+                    changed = True
                     continue
 
                 h["lastPrice"] = cur
@@ -1029,6 +1093,11 @@ def api_find_stock():
     """
     q = str(request.args.get("q", "")).strip()
     try:
+        if q in STOCK_CODE_FALLBACK:
+            fixed_code = STOCK_CODE_FALLBACK[q]
+            fixed_price = _get_price_for_code(fixed_code)
+            return jsonify({"ok": True, "name": q, "code": fixed_code, "price": fixed_price, "market": ""})
+
         df = get_market_df(limit=2000)
         if df is None or df.empty or not q:
             return jsonify({"ok": False, "message": "검색 결과 없음"})
@@ -1070,9 +1139,9 @@ def api_server_holdings():
         item = data.get("item", {})
         if item:
             # same code existing item replace
-            code = str(item.get("code", "")).zfill(6)
+            code = _normalize_holding_code(item)
             item["code"] = code
-            holdings = [h for h in holdings if str(h.get("code", "")).zfill(6) != code]
+            holdings = [h for h in holdings if str(h.get("code", "")).zfill(6) != code or code == "000000"]
             item = _check_single_holding_and_alert(item)
             holdings.append(item)
             _write_server_holdings(holdings)
@@ -1120,6 +1189,21 @@ def api_server_watch_stop():
     SERVER_WATCH_STATE["running"] = False
     return jsonify({"ok": True, "running": False})
 
+
+
+
+@app.route("/api/server_holdings/repair", methods=["GET", "POST"])
+def api_server_holdings_repair():
+    holdings = _read_server_holdings()
+    repaired = []
+    for h in holdings:
+        _normalize_holding_code(h)
+        # 1원 등 비정상 현재가는 매수가로 되돌림
+        if safe_float(h.get("lastPrice", 0)) < 10:
+            h["lastPrice"] = safe_float(h.get("buyPrice", 0))
+        repaired.append(h)
+    _write_server_holdings(repaired)
+    return jsonify({"ok": True, "holdings": repaired})
 
 @app.route("/api/server_watch/check_now", methods=["GET", "POST"])
 def api_server_watch_check_now():
@@ -3234,6 +3318,17 @@ function fmtProfitMoney(v) {
       box-shadow:0 8px 20px rgba(70,90,70,.10);
     }
 
+
+    .holding-error {
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      background:#fff3cd;
+      color:#7a4b00;
+      font-weight:800;
+      line-height:1.45;
+    }
+
   </style>
 </head>
 <body>
@@ -5102,6 +5197,7 @@ function fmtProfitMoney(v) {
                 return `<div class="strategy-stock"><b>#${i+1} ${p.name}</b><br>${p.market} · ${p.code} · ${p.theme}<br>현재가 ${fmtPrice(live.price || p.pickPrice)} · 선정점수 ${Number(p.strategyScore || 0).toFixed(1)}<br>${p.reason}</div>`;
               }).join("") : `<div class="empty-box">아직 선정 종목이 없습니다.</div>`}
             </div>
+            ${h.priceError ? `<div class="holding-error">⚠️ ${h.priceError}</div>` : ""}
           </div>
         `;
       }).join("");
@@ -5460,14 +5556,33 @@ let sentTelegramAlerts = {};
 
 
 
-    async function autoFillStockCode() {
+    
+    const STOCK_CODE_FALLBACK_JS = {
+      "휴림로봇": "090710",
+      "제주반도체": "080220",
+      "SFA반도체": "036540",
+      "하나마이크론": "067310",
+      "두산로보틱스": "454910",
+      "SK하이닉스": "000660",
+      "삼성전자": "005930"
+    };
+
+async function autoFillStockCode() {
       const nameEl = document.getElementById("holdName");
       const codeEl = document.getElementById("holdCode");
       const priceEl = document.getElementById("holdBuyPrice");
       if (!nameEl || !codeEl) return;
 
       const name = nameEl.value.trim();
-      if (!name || codeEl.value.trim()) return;
+      if (!name) return;
+
+      const currentCode = codeEl.value.trim();
+      if (currentCode && currentCode !== "000000") return;
+
+      if (STOCK_CODE_FALLBACK_JS[name]) {
+        codeEl.value = STOCK_CODE_FALLBACK_JS[name];
+        autoCalcHoldingFields();
+      }
 
       try {
         const res = await fetch("/api/find_stock?q=" + encodeURIComponent(name), {cache:"no-store"});
@@ -5510,7 +5625,12 @@ let sentTelegramAlerts = {};
 
     function addHolding() {
       const name = document.getElementById("holdName").value.trim();
-      const code = document.getElementById("holdCode").value.trim().padStart(6, "0");
+      let rawCode = document.getElementById("holdCode").value.trim();
+      if ((!rawCode || rawCode === "000000") && STOCK_CODE_FALLBACK_JS[name]) {
+        rawCode = STOCK_CODE_FALLBACK_JS[name];
+        document.getElementById("holdCode").value = rawCode;
+      }
+      const code = rawCode.padStart(6, "0");
       const buyPrice = numOnly(document.getElementById("holdBuyPrice").value);
       const buyAmount = numOnly(document.getElementById("holdBuyAmount").value);
       let qty = numOnly(document.getElementById("holdQty").value);
@@ -5583,7 +5703,8 @@ let sentTelegramAlerts = {};
       }
 
       box.innerHTML = list.map(h => {
-        const last = Number(h.lastPrice || h.buyPrice || 0);
+        let last = Number(h.lastPrice || h.buyPrice || 0);
+        if (last < 10) last = Number(h.buyPrice || 0);
         const pnl = (last - h.buyPrice) * h.qty;
         const rate = h.buyPrice ? ((last - h.buyPrice) / h.buyPrice * 100) : 0;
         return `
@@ -5675,6 +5796,7 @@ let scalpWatchTimer = null;
 
     async function syncHoldingsFromServer() {
       try {
+        await fetch("/api/server_holdings/repair", {cache:"no-store"});
         const res = await fetch("/api/server_watch/check_now", {cache:"no-store", headers:{"Accept":"application/json"}});
         const data = await res.json();
         if (data.ok && Array.isArray(data.holdings)) {
