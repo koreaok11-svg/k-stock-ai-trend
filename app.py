@@ -259,6 +259,8 @@ KIWOOM_REAL_TRADING = os.getenv("KIWOOM_REAL_TRADING", "false").lower() == "true
 KIWOOM_DRY_RUN = os.getenv("KIWOOM_DRY_RUN", "true").lower() == "true"
 AUTO_BUY_IN_WATCH_LOOP = os.getenv("AUTO_BUY_IN_WATCH_LOOP", "false").lower() == "true"
 AUTO_REBUY_AFTER_SELL = os.getenv("AUTO_REBUY_AFTER_SELL", "true").lower() == "true"
+ORDER_CASH_SAFETY_RATE = safe_float(os.getenv("ORDER_CASH_SAFETY_RATE", "0.96"), 0.96)
+
 
 
 PRICE_DIFF_LIMIT = safe_float(os.getenv("PRICE_DIFF_LIMIT", "0.01"), 0.01)
@@ -395,6 +397,33 @@ def write_trade_state(state):
         return False
 
 
+
+def extract_available_qty(obj):
+    """
+    키움 주문 실패 메시지에서 '13주 매수가능' 같은 문구를 찾아 수량을 추출합니다.
+    """
+    text = str(obj or "")
+    m = re.search(r"(\d+)\s*주\s*매수가능", text)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"매수가능[^0-9]*(\d+)\s*주", text)
+    if m:
+        return int(m.group(1))
+    return 0
+
+
+def calc_safe_order_qty(max_order_cash, live_price):
+    """
+    실전 주문 수량 계산.
+    현재가 급변/수수료/증거금 여유를 위해 기본 96%만 사용합니다.
+    """
+    cash = safe_float(max_order_cash, 0) * ORDER_CASH_SAFETY_RATE
+    price = safe_float(live_price, 0)
+    if cash <= 0 or price <= 0:
+        return 0
+    return int(cash // price)
+
+
 def recommend_auto_trade_settings(total_cash):
     """
     총 투자금 기준으로 단타 실전용 추천 설정을 자동 계산합니다.
@@ -405,8 +434,8 @@ def recommend_auto_trade_settings(total_cash):
     if cash <= 0:
         cash = 100000
 
-    # 현금 여유 10%, 1회 진입 최대 90%
-    max_order = math.floor(cash * 0.90)
+    # 현금 여유 15%, 1회 진입 최대 85%
+    max_order = math.floor(cash * 0.85)
     buffer_cash = max(0, math.floor(cash - max_order))
 
     # 하루 최대 손실: 총 투자금의 약 -3%, 최소 -3천원, 최대 -3만원
@@ -753,7 +782,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
         return {"ok": False, "message": reason, "pick": pick}
 
     max_order_cash = safe_float(state.get("max_order_cash", 450000))
-    qty = int(max_order_cash // live)
+    qty = calc_safe_order_qty(max_order_cash, live)
 
     if qty <= 0:
         reason = "주문 가능 수량이 0입니다."
@@ -821,6 +850,66 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
     else:
         reason = order.get("message") or order.get("response") or order
+        avail_qty = extract_available_qty(reason)
+
+        if avail_qty > 0 and avail_qty < qty:
+            retry_qty = max(1, avail_qty)
+            update_trade_status("수량 조정 재주문", f"증거금 부족으로 {qty}주 → {retry_qty}주 재주문합니다.", candidate=pick, order=order)
+
+            retry_order = kiwoom_order("buy", code, retry_qty, price=0, order_type="market")
+            retry_amount = live * retry_qty
+
+            if retry_order.get("ok"):
+                target_rate = normalize_rate_input(state.get("target_rate", 0.027), 0.027)
+                stop_rate = normalize_rate_input(state.get("stop_rate", -0.018), -0.018)
+                holding = {
+                    "id": int(time.time() * 1000),
+                    "name": pick["name"],
+                    "code": code,
+                    "buyPrice": live,
+                    "buyAmount": retry_amount,
+                    "qty": retry_qty,
+                    "target": round(live * (1 + target_rate)),
+                    "stop": round(live * (1 + stop_rate)),
+                    "lastPrice": live,
+                    "priceSource": price_src,
+                    "autoTrade": True,
+                    "buyOrder": retry_order,
+                    "createdAt": now_kst().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                write_holdings([holding])
+                state = read_trade_state()
+                state["last_buy_code"] = code
+                state["last_buy_time"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+                trade_log_append(state, {
+                    "type": "BUY_RETRY",
+                    "name": pick["name"],
+                    "code": code,
+                    "qty": retry_qty,
+                    "price": live,
+                    "amount": retry_amount,
+                    "order": retry_order
+                })
+
+                update_trade_status("수량 조정 매수 성공", f"{pick['name']} {retry_qty}주 매수 처리 완료", candidate=pick, order=retry_order)
+                send_trade_telegram(
+                    f"🚀 <b>AI 자동매수 수량조정 진행</b>\n"
+                    f"종목: <b>{pick['name']}</b> ({code})\n"
+                    f"매수가 기준: {live:,.0f}원 ({price_src})\n"
+                    f"최초 수량: {qty:,}주 → 조정 수량: {retry_qty:,}주\n"
+                    f"매수금액: {retry_amount:,.0f}원\n"
+                    f"목표가: {holding['target']:,.0f}원\n"
+                    f"손절가: {holding['stop']:,.0f}원\n"
+                    f"AI 점수: {safe_float(pick.get('score', 0)):.2f}\n"
+                    f"시간: {now_kst().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    "※ 키움 매수가능 수량 기준으로 자동 조정했습니다. HTS/MTS 체결 여부를 확인하세요.",
+                    "buy_retry_success"
+                )
+                return {"ok": True, "pick": pick, "order": retry_order, "adjusted_qty": retry_qty}
+
+            reason = retry_order.get("message") or retry_order.get("response") or retry_order
+            order = retry_order
+
         update_trade_status("매수 실패", reason, candidate=pick, order=order)
         send_trade_telegram(
             f"⚠️ <b>AI 자동매수 실패</b>\n"
@@ -828,7 +917,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
             f"현재가: {live:,.0f}원\n"
             f"수량: {qty:,}주\n"
             f"사유: {reason}\n\n"
-            "앱 자동 탭 상태창과 Render Logs를 확인하세요.",
+            "증거금 부족이면 1회 최대 진입금을 낮추거나 키움 예수금을 확인하세요.",
             "buy_fail"
         )
 
@@ -1043,6 +1132,7 @@ def api_auto_trade_status():
         'kiwoom_price_required': KIWOOM_PRICE_REQUIRED,
         'auto_buy_in_watch_loop': AUTO_BUY_IN_WATCH_LOOP,
         'auto_rebuy_after_sell': AUTO_REBUY_AFTER_SELL,
+        'order_cash_safety_rate': ORDER_CASH_SAFETY_RATE,
         'kiwoom_debug': state.get('last_kiwoom_debug', {}),
         'target_rate_percent': round(normalize_rate_input(state.get('target_rate', 0.027), 0.027)*100, 3),
         'stop_rate_percent': round(normalize_rate_input(state.get('stop_rate', -0.018), -0.018)*100, 3)
@@ -1102,11 +1192,11 @@ def api_kiwoom_price_test(code):
 
 
 @app.route('/api/version')
-def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-holdingflow-v80','watch_interval':WATCH_INTERVAL})
+def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-orderqtyfix-v81','watch_interval':WATCH_INTERVAL})
 
-HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v80</title><style>
+HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v81</title><style>
 :root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}}
-</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v80</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div><label>최소 매수 가능 수량</label><input id="minQty" value="5"></div><div><label>최대 당일 등락률(%)</label><input id="maxChange" value="7"></div><div><label>최소 거래대금(원)</label><input id="minAmount" value="1000000000"></div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card"><h2>💼 보유종목 관리</h2><p class="muted">실제 자동매수 체결 종목은 이곳에 자동 등록됩니다. 삭제 전까지 유지되며, 서버가 현재가·목표가·손절가를 감시합니다.</p><div class="grid"><input id="hName" placeholder="종목명 예: 휴림로봇"><input id="hCode" placeholder="종목코드 예: 090710"><input id="hBuy" placeholder="매수가 예: 13120"><input id="hAmount" placeholder="매수금액 예: 500000"><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
+</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v81</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div><label>최소 매수 가능 수량</label><input id="minQty" value="5"></div><div><label>최대 당일 등락률(%)</label><input id="maxChange" value="7"></div><div><label>최소 거래대금(원)</label><input id="minAmount" value="1000000000"></div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card"><h2>💼 보유종목 관리</h2><p class="muted">실제 자동매수 체결 종목은 이곳에 자동 등록됩니다. 삭제 전까지 유지되며, 서버가 현재가·목표가·손절가를 감시합니다.</p><div class="grid"><input id="hName" placeholder="종목명 예: 휴림로봇"><input id="hCode" placeholder="종목코드 예: 090710"><input id="hBuy" placeholder="매수가 예: 13120"><input id="hAmount" placeholder="매수금액 예: 500000"><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
 <section id="autotrade" class="card">
   <h2>🤖 키움 실전 자동매매</h2>
   <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 처음에는 반드시 소액으로 체결 여부를 확인하세요.<br><b>AI 추천 설정</b>은 총 투자금 기준으로 1회 진입금·하루손실·목표/손절을 자동 계산합니다. 수동 설정도 가능합니다.<br>목표/손절 수익률은 <b>2.5 = +2.5%</b>, <b>-1.8 = -1.8%</b>처럼 입력하면 됩니다.</p>
@@ -1209,7 +1299,7 @@ async function applyAiSettings(){
 function manualSettingsGuide(){
   $("aiSettingBox").innerHTML=`✍️ <b>수동 설정 모드</b><br>
   성일님이 직접 값을 입력한 뒤 <b>실전 자동매매 ON</b>을 누르면 해당 값이 적용됩니다.<br>
-  추천 예시: 목표 2.5 / 손절 -1.8 / 1회 진입금은 총 투자금의 80~90%`;
+  추천 예시: 목표 2.5 / 손절 -1.8 / 1회 진입금은 총 투자금의 80~85%`;
 }
 
 
@@ -1219,7 +1309,7 @@ async function autoTradeStatus(){
   $("autoTradeBox").innerHTML=`상태: <b>${s.auto_trade_enabled?"ON":"OFF"}</b> · 키움설정 ${d.kiwoom_ready?"완료":"필요"} · 실전ENV ${d.real_trading_env?"true":"false"} · DRY_RUN ${d.dry_run?"true":"false"} · 장중 ${d.market_open?"예":"아니오"}<br>
   금일손익 ${Number(s.daily_realized_pnl||0).toLocaleString()}원 · 하루손실제한 ${Number(s.daily_max_loss||-30000).toLocaleString()}원<br>
   적용 목표/손절: +${d.target_rate_percent||0}% / ${d.stop_rate_percent||0}%<br>
-  <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span><br><span class="muted">가격정책: 키움현재가 필수 ${d.kiwoom_price_required?"ON":"OFF"} · 허용오차 ${d.price_diff_limit_pct}% · 백그라운드 자동매수 ${d.auto_buy_in_watch_loop?"ON":"OFF"} · 매도 후 신규매수 ${d.auto_rebuy_after_sell?"ON":"OFF"}</span>`;
+  <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span><br><span class="muted">가격정책: 키움현재가 필수 ${d.kiwoom_price_required?"ON":"OFF"} · 허용오차 ${d.price_diff_limit_pct}% · 백그라운드 자동매수 ${d.auto_buy_in_watch_loop?"ON":"OFF"} · 매도 후 신규매수 ${d.auto_rebuy_after_sell?"ON":"OFF"} · 주문안전비율 ${d.order_cash_safety_rate||0.96}</span>`;
 
   const cand=s.last_candidate||{};
   const tg=s.last_telegram_status||{};
