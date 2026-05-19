@@ -1,3 +1,25 @@
+# -*- coding: utf-8 -*-
+"""
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v88 UPGRADE
+파일명: app_kiwoom_real_auto_scalping_v88_upgrade.py
+
+이 파일은 사용자가 업로드한 v88 계열 전체 텍스트를 기반으로 v88 목표 기능을 반영한 업그레이드본입니다.
+
+v88 반영 핵심:
+- 기존 키움 REST 토큰/현재가/주문/잔고동기화 구조 유지
+- 기존 보유종목 자동등록/Render 재배포 후 복구/localStorage 백업 구조 유지
+- AI 단타 후보에 v88 스캘핑 점수 추가
+- 거래량 급증/거래대금/등락률/테마가중/체결강도 추정/호가잔량 추정 점수화
+- 매도 후 자동 신규 후보 탐색/재매수 구조 유지 및 상태 표시 강화
+- 실시간 상태 API /api/v88_dashboard 추가
+- 기존 /api/version을 v88로 갱신
+
+주의:
+- 실전 주문 전 KIWOOM_DRY_RUN=true 상태에서 충분히 검증하세요.
+- 호가/체결강도는 키움 실시간/호가 API 연결 상태에 따라 실제값 또는 추정값으로 표시됩니다.
+- 투자 판단과 주문 책임은 사용자에게 있습니다.
+"""
+
 import os, re, json, time, math, threading
 from datetime import datetime, timedelta, timezone
 import requests
@@ -135,7 +157,7 @@ def send_telegram_message(text):
         return (True,'sent') if r.status_code==200 else (False,r.text[:500])
     except Exception as e: return False,str(e)
 
-HOLDINGS_FILE=os.getenv('SERVER_HOLDINGS_FILE','/tmp/sungil_holdings_v72.json')
+HOLDINGS_FILE=os.getenv('SERVER_HOLDINGS_FILE','/tmp/sungil_holdings_v88.json')
 WATCH_STATE={'running':False,'thread':None,'last_alerts':{},'last_check':'','last_prices':{},'best_code':'','best_score':0}
 WATCH_LOCK=threading.Lock(); WATCH_INTERVAL=int(os.getenv('SERVER_WATCH_INTERVAL','20')); BEST_PICK_GAP=float(os.getenv('BEST_PICK_MIN_SCORE_GAP','3.0'))
 def read_holdings():
@@ -161,6 +183,192 @@ def send_holding_alert(kind,h,cur):
     WATCH_STATE['last_alerts'][key]=True
     ok,_=send_telegram_message(msg); return ok
 
+
+# =========================================================
+# v88 스캘핑 AI 확장 엔진
+# =========================================================
+def v88_clamp(v, lo=0, hi=100):
+    try:
+        return max(lo, min(hi, safe_float(v, 0)))
+    except Exception:
+        return lo
+
+def v88_get_orderbook_metrics(code):
+    """
+    호가잔량/매수압력 조회.
+    실제 키움 호가 API 필드명이 계정/문서 버전에 따라 다를 수 있어 여러 키를 방어적으로 탐색합니다.
+    실패 시 0을 반환하고, 후보 점수는 기존 거래대금/거래량 기반 추정치로 보정됩니다.
+    """
+    code = str(code).zfill(6)
+    result = {"bid_total": 0, "ask_total": 0, "bid_ask_ratio": 0, "orderbook_source": "NONE"}
+    try:
+        if not kiwoom_ready():
+            return result
+        token = kiwoom_get_token()
+        headers = {
+            "Content-Type": "application/json;charset=UTF-8",
+            "authorization": "Bearer " + token,
+            "cont-yn": "N",
+            "next-key": "",
+            "api-id": "ka10004"
+        }
+        body = {"stk_cd": code}
+        r = requests.post(KIWOOM_BASE_URL + "/api/dostk/stkinfo", json=body, headers=headers, timeout=5)
+        try:
+            data = r.json() if r.text else {}
+        except Exception:
+            data = {"raw": r.text[:1000]}
+
+        bid_keys = ["tot_bid_req", "tot_bid_qty", "bid_total", "매수호가총잔량", "buy_total_qty"]
+        ask_keys = ["tot_ask_req", "tot_ask_qty", "ask_total", "매도호가총잔량", "sell_total_qty"]
+
+        def deep_find_number(obj, keys):
+            if isinstance(obj, dict):
+                for k in keys:
+                    if k in obj:
+                        n = abs(safe_float(str(obj.get(k, "")).replace(",", "").replace("+", "").replace("-", ""), 0))
+                        if n > 0:
+                            return n
+                for v in obj.values():
+                    n = deep_find_number(v, keys)
+                    if n > 0:
+                        return n
+            elif isinstance(obj, list):
+                for item in obj:
+                    n = deep_find_number(item, keys)
+                    if n > 0:
+                        return n
+            return 0
+
+        bid = deep_find_number(data, bid_keys)
+        ask = deep_find_number(data, ask_keys)
+        ratio = round(bid / ask, 3) if ask > 0 else 0
+        if bid > 0 or ask > 0:
+            result.update({"bid_total": bid, "ask_total": ask, "bid_ask_ratio": ratio, "orderbook_source": "KIWOOM"})
+        return result
+    except Exception as e:
+        try:
+            update_kiwoom_debug("orderbook_exception", code, 0, str(e))
+        except Exception:
+            pass
+        return result
+
+def v88_estimate_execution_strength(row):
+    """
+    체결강도 실제 API가 없을 때 쓰는 추정값.
+    거래량순위/거래대금순위/당일등락률이 높을수록 강한 체결로 추정합니다.
+    """
+    amount_rank = safe_float(row.get("amountRank", 0))
+    volume_rank = safe_float(row.get("volumeRank", 0))
+    day_change = safe_float(row.get("dayChange", 0))
+    base = 80 + amount_rank * 0.35 + volume_rank * 0.35 + max(0, day_change) * 3.0
+    return round(v88_clamp(base, 50, 200), 2)
+
+def v88_calculate_scalping_score(row, price, orderbook=None):
+    """
+    v88 최종 스캘핑 점수.
+    - 기존 후보 점수
+    - 거래량 급증
+    - 거래대금
+    - 등락률 스윗스팟
+    - 체결강도 추정/실제값
+    - 호가잔량 매수우위
+    - 테마가중치
+    를 통합하여 100점 만점으로 환산합니다.
+    """
+    orderbook = orderbook or {}
+    base_score = safe_float(row.get("score", 0))
+    amount_rank = safe_float(row.get("amountRank", 0))
+    volume_rank = safe_float(row.get("volumeRank", 0))
+    day_change = safe_float(row.get("dayChange", 0))
+    theme = normalize_theme(row.get("theme", "기타/개별이슈"))
+    theme_weight = WEIGHT.get(theme, 1.0)
+
+    # 등락률: 너무 낮으면 힘 부족, 너무 높으면 추격 위험
+    if 1.0 <= day_change <= 4.5:
+        change_score = 92
+    elif 4.5 < day_change <= 7.5:
+        change_score = 82
+    elif 7.5 < day_change <= 12:
+        change_score = 68
+    elif 0.2 <= day_change < 1.0:
+        change_score = 55
+    else:
+        change_score = 40
+
+    # 거래량/거래대금 급증 점수
+    volume_spike_score = v88_clamp(volume_rank * 0.6 + amount_rank * 0.4, 0, 100)
+
+    # 체결강도
+    execution_strength = v88_estimate_execution_strength(row)
+    if execution_strength >= 150:
+        execution_score = 100
+    elif execution_strength >= 130:
+        execution_score = 85
+    elif execution_strength >= 110:
+        execution_score = 70
+    else:
+        execution_score = 50
+
+    # 호가잔량 매수압력
+    bid_ask_ratio = safe_float(orderbook.get("bid_ask_ratio", 0))
+    if bid_ask_ratio >= 1.8:
+        orderbook_score = 100
+    elif bid_ask_ratio >= 1.4:
+        orderbook_score = 85
+    elif bid_ask_ratio >= 1.1:
+        orderbook_score = 70
+    elif bid_ask_ratio > 0:
+        orderbook_score = 45
+    else:
+        # 실제 호가 API가 없으면 거래량/거래대금 기반으로 보수 추정
+        orderbook_score = v88_clamp((volume_rank + amount_rank) / 2 * 0.75, 20, 75)
+
+    raw = (
+        base_score * 0.30 +
+        volume_spike_score * 0.22 +
+        execution_score * 0.18 +
+        orderbook_score * 0.15 +
+        change_score * 0.15
+    ) * min(theme_weight, 1.25)
+
+    final_score = round(v88_clamp(raw, 0, 100), 2)
+
+    reasons = []
+    if volume_spike_score >= 80: reasons.append("거래량/거래대금 급증")
+    if execution_strength >= 130: reasons.append("체결강도 강함")
+    if bid_ask_ratio >= 1.3: reasons.append("호가 매수잔량 우위")
+    if 1.0 <= day_change <= 7.5: reasons.append("단타 진입 적정 등락률")
+    if theme_weight >= 1.18: reasons.append("강한 시장 테마")
+    if day_change > 12: reasons.append("급등 과열 주의")
+    if not reasons: reasons.append("관찰 필요")
+
+    if final_score >= 88:
+        status = "최우선 자동진입 후보"
+    elif final_score >= 80:
+        status = "자동매수 후보"
+    elif final_score >= 70:
+        status = "관심감시"
+    else:
+        status = "대기"
+
+    return {
+        "aiScoreV88": final_score,
+        "legacyScore": round(base_score, 2),
+        "volumeSpikeScore": round(volume_spike_score, 2),
+        "executionStrength": execution_strength,
+        "executionScore": round(execution_score, 2),
+        "bidAskRatio": round(bid_ask_ratio, 3),
+        "bidTotal": safe_float(orderbook.get("bid_total", 0)),
+        "askTotal": safe_float(orderbook.get("ask_total", 0)),
+        "orderbookSource": orderbook.get("orderbook_source", "ESTIMATE"),
+        "orderbookScore": round(orderbook_score, 2),
+        "scalpingStatus": status,
+        "scalpingReasons": reasons,
+        "orderPriority": final_score
+    }
+
+
 def score_candidates(limit=700,cash=500000,min_qty=5,max_change=7,min_amount=1000000000,min_score=70):
     df=get_market_df(limit=limit)
     if df is None or df.empty: return []
@@ -185,7 +393,11 @@ def score_candidates(limit=700,cash=500000,min_qty=5,max_change=7,min_amount=100
             qty = int(cash // p) if p else 0
         if qty < min_qty:
             continue
-        out.append({'code':code,'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'priceSource':src,'score':round(safe_float(row['score']),2),'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':f'거래대금·거래량·가격구간·AI점수 필터를 통과한 단타 후보입니다. 현재가는 {src} 기준입니다. 추격보다 호가 안정 확인 후 접근이 좋습니다.'})
+        orderbook = v88_get_orderbook_metrics(code)
+        v88_ai = v88_calculate_scalping_score(row, p, orderbook)
+        base_pick = {'code':code,'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'priceSource':src,'score':v88_ai['aiScoreV88'],'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':f"v88 스캘핑 AI: {v88_ai['scalpingStatus']} · {', '.join(v88_ai['scalpingReasons'])}. 현재가는 {src} 기준입니다. 추격보다 호가·거래량 유지 확인 후 접근이 좋습니다."}
+        base_pick.update(v88_ai)
+        out.append(base_pick)
     return out
 
 def best_pick_from_params(args=None):
@@ -197,6 +409,7 @@ def best_pick_from_params(args=None):
             a,b=part.split('-'); ranges.append((safe_float(a),safe_float(b)))
         except Exception: pass
     if ranges: picks=[p for p in picks if any(lo<=p['price']<=hi for lo,hi in ranges)]
+    picks=sorted(picks, key=lambda x: safe_float(x.get('orderPriority', x.get('aiScoreV88', x.get('score', 0)))), reverse=True)
     return (picks[0] if picks else None), picks
 
 def send_better_pick_alert(pick,old_score=0):
@@ -251,7 +464,7 @@ def ensure_watch_running():
 # KIWOOM_REAL_TRADING = true  -> 실전 주문 허용
 # KIWOOM_DRY_RUN      = true  -> 실제 주문 전송 안 함 / false -> 실제 주문 전송
 
-TRADE_STATE_FILE = os.getenv("TRADE_STATE_FILE", "/tmp/sungil_trade_state_v73.json")
+TRADE_STATE_FILE = os.getenv("TRADE_STATE_FILE", "/tmp/sungil_trade_state_v88.json")
 KIWOOM_BASE_URL = os.getenv("KIWOOM_BASE_URL", "https://api.kiwoom.com").rstrip("/")
 KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "").strip()
 KIWOOM_SECRET_KEY = (os.getenv("KIWOOM_SECRET_KEY", "") or os.getenv("KIWOOM_APP_SECRET", "")).strip()
@@ -1518,10 +1731,75 @@ def api_kiwoom_price_test(code):
     })
 
 
-@app.route('/api/version')
-def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-holding-backup-v87','watch_interval':WATCH_INTERVAL})
 
-HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v87b</title><style>
+@app.route('/api/v88_dashboard')
+def api_v88_dashboard():
+    """
+    v88 실시간 수익률/후보/상태 통합 대시보드 API.
+    기존 화면을 크게 깨지 않고 새 HTS형 UI를 붙일 때 사용할 수 있습니다.
+    """
+    try:
+        sync = str(request.args.get("sync", "0")) == "1"
+        refresh = str(request.args.get("refresh", "1")) == "1"
+        if sync:
+            try:
+                sync_kiwoom_holdings_to_local()
+            except Exception:
+                pass
+        holdings = read_holdings()
+        if refresh:
+            holdings = [check_one_holding(h) for h in holdings]
+            write_holdings(holdings)
+
+        total_buy = 0
+        total_eval = 0
+        for h in holdings:
+            qty = safe_float(h.get("qty", 0))
+            buy = safe_float(h.get("buyPrice", 0))
+            cur = safe_float(h.get("lastPrice", h.get("buyPrice", 0)))
+            total_buy += qty * buy
+            total_eval += qty * cur
+
+        total_pnl = total_eval - total_buy
+        total_rate = (total_pnl / total_buy * 100) if total_buy else 0
+
+        best, picks = best_pick_from_params(read_trade_state().get("latest_ui_args") or {})
+        state = read_trade_state()
+
+        return jsonify(safe_json({
+            "ok": True,
+            "version": "KIWOOM REAL AUTO SCALPING v88 UPGRADE",
+            "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "summary": {
+                "holding_count": len(holdings),
+                "total_buy": round(total_buy),
+                "total_eval": round(total_eval),
+                "total_pnl": round(total_pnl),
+                "total_rate": round(total_rate, 3)
+            },
+            "holdings": holdings,
+            "best_pick": best,
+            "top_candidates": picks[:20],
+            "trade_state": state,
+            "watch_state": {
+                "running": WATCH_STATE.get("running"),
+                "last_check": WATCH_STATE.get("last_check"),
+                "best_code": WATCH_STATE.get("best_code"),
+                "best_score": WATCH_STATE.get("best_score")
+            },
+            "storage": get_storage_status(),
+            "kiwoom_ready": kiwoom_ready(),
+            "market_open": market_is_open(),
+            "dry_run": KIWOOM_DRY_RUN,
+            "real_trading_env": KIWOOM_REAL_TRADING
+        }))
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+@app.route('/api/version')
+def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v88-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v88_upgrade.py','v88_dashboard':'/api/v88_dashboard'})
+
+HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v88</title><style>
 :root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}}
 
 .quick-money{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 18px}
@@ -1529,7 +1807,7 @@ HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name
 .quick-money button.darkmini{background:#32475a;color:white}
 .quick-money .hint{width:100%;font-size:.82em;color:#6d7782;margin-top:2px}
 
-</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v87b</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v88</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
