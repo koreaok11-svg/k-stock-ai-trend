@@ -20,6 +20,24 @@ def safe_float(v, default=0.0):
 def safe_int(v, default=0):
     try: return int(safe_float(v, default))
     except Exception: return default
+
+def normalize_rate_input(v, default=0.0):
+    """
+    수익률 입력값을 자동 변환합니다.
+    - 5    -> 0.05  (+5%)
+    - -5   -> -0.05 (-5%)
+    - 0.025 -> 0.025 (+2.5%)
+    """
+    r = safe_float(v, default)
+    if abs(r) >= 1:
+        r = r / 100.0
+    return r
+
+def rate_to_percent_text(v):
+    r = safe_float(v, 0)
+    return f"{r*100:.2f}%"
+
+
 def safe_json(obj):
     if isinstance(obj, dict): return {str(k): safe_json(v) for k,v in obj.items()}
     if isinstance(obj, list): return [safe_json(v) for v in obj]
@@ -687,8 +705,8 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
     buy_amount = live * qty
 
     if order.get("ok"):
-        target_rate = safe_float(state.get("target_rate", 0.027))
-        stop_rate = safe_float(state.get("stop_rate", -0.018))
+        target_rate = normalize_rate_input(state.get("target_rate", 0.027), 0.027)
+        stop_rate = normalize_rate_input(state.get("stop_rate", -0.018), -0.018)
         holding = {
             "id": int(time.time() * 1000),
             "name": pick["name"],
@@ -880,7 +898,9 @@ def api_auto_trade_status():
         'price_diff_limit_pct': round(PRICE_DIFF_LIMIT*100, 3),
         'kiwoom_price_required': KIWOOM_PRICE_REQUIRED,
         'auto_buy_in_watch_loop': AUTO_BUY_IN_WATCH_LOOP,
-        'kiwoom_debug': state.get('last_kiwoom_debug', {})
+        'kiwoom_debug': state.get('last_kiwoom_debug', {}),
+        'target_rate_percent': round(normalize_rate_input(state.get('target_rate', 0.027), 0.027)*100, 3),
+        'stop_rate_percent': round(normalize_rate_input(state.get('stop_rate', -0.018), -0.018)*100, 3)
     })
 
 @app.route('/api/auto_trade/set', methods=['POST'])
@@ -890,9 +910,14 @@ def api_auto_trade_set():
     for key in ['auto_trade_enabled', 'panic_stop']:
         if key in data:
             state[key] = bool(data[key])
-    for key in ['max_total_cash', 'max_order_cash', 'cash_buffer', 'daily_max_loss', 'target_rate', 'stop_rate', 'cooldown_minutes']:
+    for key in ['max_total_cash', 'max_order_cash', 'cash_buffer', 'daily_max_loss', 'cooldown_minutes']:
         if key in data:
             state[key] = safe_float(data[key], state.get(key, TRADE_DEFAULTS.get(key, 0)))
+
+    if 'target_rate' in data:
+        state['target_rate'] = normalize_rate_input(data.get('target_rate'), state.get('target_rate', TRADE_DEFAULTS.get('target_rate', 0.027)))
+    if 'stop_rate' in data:
+        state['stop_rate'] = normalize_rate_input(data.get('stop_rate'), state.get('stop_rate', TRADE_DEFAULTS.get('stop_rate', -0.018)))
     write_trade_state(state)
     if state.get('auto_trade_enabled'):
         ensure_watch_running()
@@ -932,21 +957,21 @@ def api_kiwoom_price_test(code):
 
 
 @app.route('/api/version')
-def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-syncpick-v77','watch_interval':WATCH_INTERVAL})
+def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-ratefix-v78','watch_interval':WATCH_INTERVAL})
 
-HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v77</title><style>
+HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v78</title><style>
 :root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}}
-</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v77</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div><label>최소 매수 가능 수량</label><input id="minQty" value="5"></div><div><label>최대 당일 등락률(%)</label><input id="maxChange" value="7"></div><div><label>최소 거래대금(원)</label><input id="minAmount" value="1000000000"></div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card"><h2>💼 보유종목 관리</h2><p class="muted">등록한 종목은 삭제 전까지 유지되며, 서버가 목표가/손절가를 감시합니다.</p><div class="grid"><input id="hName" placeholder="종목명 예: 휴림로봇"><input id="hCode" placeholder="종목코드 예: 090710"><input id="hBuy" placeholder="매수가 예: 13120"><input id="hAmount" placeholder="매수금액 예: 500000"><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
+</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v78</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div><label>최소 매수 가능 수량</label><input id="minQty" value="5"></div><div><label>최대 당일 등락률(%)</label><input id="maxChange" value="7"></div><div><label>최소 거래대금(원)</label><input id="minAmount" value="1000000000"></div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card"><h2>💼 보유종목 관리</h2><p class="muted">등록한 종목은 삭제 전까지 유지되며, 서버가 목표가/손절가를 감시합니다.</p><div class="grid"><input id="hName" placeholder="종목명 예: 휴림로봇"><input id="hCode" placeholder="종목코드 예: 090710"><input id="hBuy" placeholder="매수가 예: 13120"><input id="hAmount" placeholder="매수금액 예: 500000"><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
 <section id="autotrade" class="card">
   <h2>🤖 키움 실전 자동매매</h2>
-  <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 처음에는 반드시 소액으로 체결 여부를 확인하세요.</p>
+  <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 처음에는 반드시 소액으로 체결 여부를 확인하세요.<br>목표/손절 수익률은 <b>2.5 = +2.5%</b>, <b>-1.8 = -1.8%</b>처럼 입력하면 됩니다.</p>
   <div class="grid">
     <div><label>총 투자금</label><input id="atTotal" value="500000"></div>
     <div><label>1회 최대 진입금</label><input id="atOrder" value="450000"></div>
     <div><label>하루 최대 손실</label><input id="atLoss" value="-30000"></div>
     <div><label>재진입 금지(분)</label><input id="atCool" value="30"></div>
-    <div><label>목표 수익률</label><input id="atTarget" value="0.027"></div>
-    <div><label>손절 수익률</label><input id="atStop" value="-0.018"></div>
+    <div><label>목표 수익률(%)</label><input id="atTarget" value="2.5"></div>
+    <div><label>손절 수익률(%)</label><input id="atStop" value="-1.8"></div>
   </div>
   <div class="row" style="margin-top:14px">
     <button class="green" onclick="setAutoTrade(true)">실전 자동매매 ON</button>
@@ -965,6 +990,7 @@ async function autoTradeStatus(){
   const s=d.state||{};
   $("autoTradeBox").innerHTML=`상태: <b>${s.auto_trade_enabled?"ON":"OFF"}</b> · 키움설정 ${d.kiwoom_ready?"완료":"필요"} · 실전ENV ${d.real_trading_env?"true":"false"} · DRY_RUN ${d.dry_run?"true":"false"} · 장중 ${d.market_open?"예":"아니오"}<br>
   금일손익 ${Number(s.daily_realized_pnl||0).toLocaleString()}원 · 하루손실제한 ${Number(s.daily_max_loss||-30000).toLocaleString()}원<br>
+  적용 목표/손절: +${d.target_rate_percent||0}% / ${d.stop_rate_percent||0}%<br>
   <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span><br><span class="muted">가격정책: 키움현재가 필수 ${d.kiwoom_price_required?"ON":"OFF"} · 허용오차 ${d.price_diff_limit_pct}% · 백그라운드 자동매수 ${d.auto_buy_in_watch_loop?"ON":"OFF"}</span>`;
 
   const cand=s.last_candidate||{};
@@ -979,13 +1005,13 @@ async function autoTradeStatus(){
   `;
 }
 async function setAutoTrade(on){
-  const body={auto_trade_enabled:on,panic_stop:false,max_total_cash:num($("atTotal").value),max_order_cash:num($("atOrder").value),daily_max_loss:num($("atLoss").value),cooldown_minutes:num($("atCool").value),target_rate:Number($("atTarget").value||0.027),stop_rate:Number($("atStop").value||-0.018)};
+  const body={auto_trade_enabled:on,panic_stop:false,max_total_cash:num($("atTotal").value),max_order_cash:num($("atOrder").value),daily_max_loss:num($("atLoss").value),cooldown_minutes:num($("atCool").value),target_rate:Number($("atTarget").value||2.5),stop_rate:Number($("atStop").value||-1.8)};
   const d=await fetchJson("/api/auto_trade/set",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   await autoTradeStatus();
   alert(on?"실전 자동매매 ON 요청 완료":"자동매매 OFF 완료");
 }
 async function buyNow(){
-  if(!confirm("현재 화면 필터 기준 AI 최종 1종목을 키움 API로 즉시 매수 시도할까요?")) return;
+  if(!confirm("현재 화면 필터 기준 AI 최종 1종목을 키움 API로 즉시 매수 시도할까요?\n\n목표/손절은 % 기준입니다. 예: 2.5 = +2.5%, -1.8 = -1.8%")) return;
   const d=await fetchJson("/api/auto_trade/buy_now?"+getParams().toString(),{method:"POST"});
   await autoTradeStatus();
   alert(d.ok?"매수 요청 완료. 텔레그램/HTS 체결 여부를 확인하세요.":"매수 실패/보류: "+(d.message||JSON.stringify(d.order||d)));
