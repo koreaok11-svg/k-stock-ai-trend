@@ -160,7 +160,14 @@ def score_candidates(limit=700,cash=500000,min_qty=5,max_change=7,min_amount=100
     for _,row in df.head(20).iterrows():
         p=safe_float(row['Close']); qty=int(cash//p) if p else 0
         if qty<min_qty: continue
-        out.append({'code':str(row['Code']).zfill(6),'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'score':round(safe_float(row['score']),2),'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':'거래대금·거래량·가격구간·AI점수 필터를 통과한 단타 후보입니다. 추격보다 호가 안정 확인 후 접근이 좋습니다.'})
+        code = str(row['Code']).zfill(6)
+        live_p, src = get_trade_live_price(code, fallback=True)
+        if live_p >= 10:
+            p = live_p
+            qty = int(cash // p) if p else 0
+        if qty < min_qty:
+            continue
+        out.append({'code':code,'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'priceSource':src,'score':round(safe_float(row['score']),2),'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':f'거래대금·거래량·가격구간·AI점수 필터를 통과한 단타 후보입니다. 현재가는 {src} 기준입니다. 추격보다 호가 안정 확인 후 접근이 좋습니다.'})
     return out
 
 def best_pick_from_params(args=None):
@@ -189,9 +196,9 @@ def check_better_pick():
 def check_one_holding(h):
     h=normalize_holding(h); code=h.get('code','')
     if not code or code=='000000': h['priceError']='종목코드를 확인해 주세요.'; return h
-    cur=get_live_price(code)
+    cur, price_src = get_trade_live_price(code, fallback=True)
     if cur<10: h['priceError']='현재가 자동조회 실패. 다음 주기에 재시도합니다.'; return h
-    h['lastPrice']=cur; h['lastCheckedAt']=now_kst().strftime('%Y-%m-%d %H:%M:%S'); h.pop('priceError',None); WATCH_STATE['last_prices'][code]=cur
+    h['lastPrice']=cur; h['priceSource']=price_src; h['lastCheckedAt']=now_kst().strftime('%Y-%m-%d %H:%M:%S'); h.pop('priceError',None); WATCH_STATE['last_prices'][code]=cur
     target=safe_float(h.get('target',0)); stop=safe_float(h.get('stop',0))
     if target and cur>=target: auto_sell_holding('target',h,cur)
     if stop and cur<=stop: auto_sell_holding('stop',h,cur)
@@ -231,6 +238,9 @@ KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "").strip()
 KIWOOM_SECRET_KEY = (os.getenv("KIWOOM_SECRET_KEY", "") or os.getenv("KIWOOM_APP_SECRET", "")).strip()
 KIWOOM_REAL_TRADING = os.getenv("KIWOOM_REAL_TRADING", "false").lower() == "true"
 KIWOOM_DRY_RUN = os.getenv("KIWOOM_DRY_RUN", "true").lower() == "true"
+PRICE_DIFF_LIMIT = safe_float(os.getenv("PRICE_DIFF_LIMIT", "0.01"), 0.01)
+KIWOOM_PRICE_REQUIRED = os.getenv("KIWOOM_PRICE_REQUIRED", "true").lower() == "true"
+
 
 TRADE_DEFAULTS = {
     "auto_trade_enabled": False,
@@ -341,6 +351,110 @@ def kiwoom_get_token():
     _TOKEN_CACHE["expires"] = time.time() + 60 * 50
     return _TOKEN_CACHE["token"]
 
+
+def parse_kiwoom_price(data):
+    """
+    키움 REST 현재가 응답에서 현재가를 안전하게 추출합니다.
+    현재가는 부호가 붙어 내려올 수 있어 절대값 처리합니다.
+    """
+    if not isinstance(data, dict):
+        return 0
+
+    keys = [
+        "cur_prc", "curPrice", "currentPrice", "now", "price",
+        "stck_prpr", "현재가", "closePrice", "lastPrice"
+    ]
+
+    for k in keys:
+        if k in data:
+            raw = str(data.get(k, "")).replace(",", "").replace("+", "").replace("-", "").strip()
+            p = abs(safe_float(raw, 0))
+            if p >= 10:
+                return p
+
+    for v in data.values():
+        if isinstance(v, dict):
+            p = parse_kiwoom_price(v)
+            if p >= 10:
+                return p
+        elif isinstance(v, list):
+            for item in v:
+                if isinstance(item, dict):
+                    p = parse_kiwoom_price(item)
+                    if p >= 10:
+                        return p
+    return 0
+
+
+def get_kiwoom_live_price(code):
+    """
+    키움 REST API 기준 현재가 조회.
+    실전 주문/수량계산/목표·손절 계산의 1순위 가격입니다.
+    """
+    code = str(code).zfill(6)
+    if code == "000000" or not code.isdigit():
+        return 0
+
+    if not kiwoom_ready():
+        return 0
+
+    try:
+        token = kiwoom_get_token()
+        headers = {
+            "Content-Type": "application/json;charset=UTF-8",
+            "authorization": "Bearer " + token,
+            "api-id": "ka10001"
+        }
+        body = {"stk_cd": code}
+        r = requests.post(KIWOOM_BASE_URL + "/api/dostk/stkinfo", json=body, headers=headers, timeout=8)
+
+        try:
+            data = r.json()
+        except Exception:
+            data = {"raw": r.text}
+
+        p = parse_kiwoom_price(data)
+        if p >= 10:
+            return p
+
+        print("kiwoom live price parse failed:", code, r.status_code, str(data)[:300])
+        return 0
+    except Exception as e:
+        print("kiwoom live price error:", code, e)
+        return 0
+
+
+def get_trade_live_price(code, fallback=True):
+    """
+    실전 매매 기준 현재가.
+    1순위: 키움 REST
+    2순위: 네이버 현재가
+    """
+    p = get_kiwoom_live_price(code)
+    if p >= 10:
+        return p, "KIWOOM"
+
+    if fallback:
+        p2 = get_live_price(code)
+        if p2 >= 10:
+            return p2, "NAVER"
+
+    return 0, "NONE"
+
+
+def validate_price_gap(ai_price, live_price):
+    """
+    AI 후보가격과 주문 직전 키움 현재가 차이를 확인합니다.
+    기본 1% 초과 시 매수 보류.
+    """
+    ai_price = safe_float(ai_price, 0)
+    live_price = safe_float(live_price, 0)
+    if ai_price <= 0 or live_price <= 0:
+        return False, 999
+    gap = abs(ai_price - live_price) / live_price
+    return gap <= PRICE_DIFF_LIMIT, gap
+
+
 def kiwoom_order(side, code, qty, price=0, order_type="market"):
     code = str(code).zfill(6)
     qty = int(qty)
@@ -421,7 +535,41 @@ def auto_buy_best_pick():
     code = pick["code"]
     update_trade_status("후보 발견", f"{pick.get('name')}({code}) 후보 확인. 현재가 조회 중입니다.", candidate=pick)
 
-    live = get_live_price(code) or safe_float(pick.get("price", 0))
+    ai_price = safe_float(pick.get("price", 0))
+    live, price_src = get_trade_live_price(code, fallback=not KIWOOM_PRICE_REQUIRED)
+
+    if live < 10:
+        reason = "키움 현재가 조회 실패로 실전 매수를 보류합니다."
+        update_trade_status("매수 보류", reason, candidate=pick)
+        send_trade_telegram(
+            f"⏸ <b>AI 자동매수 보류</b>\n"
+            f"후보: <b>{pick.get('name')}</b> ({code})\n"
+            f"사유: {reason}\n\n"
+            "※ 실전 주문 전 키움 현재가가 확인되어야 합니다.",
+            "buy_hold_price"
+        )
+        return {"ok": False, "message": reason, "pick": pick}
+
+    gap_ok, gap = validate_price_gap(ai_price, live)
+    pick["orderLivePrice"] = live
+    pick["orderPriceSource"] = price_src
+    pick["priceGapRate"] = round(gap * 100, 3)
+
+    if not gap_ok:
+        reason = f"AI 후보가격({ai_price:,.0f}원)과 키움 현재가({live:,.0f}원) 차이가 {gap*100:.2f}%로 커서 매수를 보류합니다."
+        update_trade_status("매수 보류", reason, candidate=pick)
+        send_trade_telegram(
+            f"⏸ <b>AI 자동매수 보류</b>\n"
+            f"후보: <b>{pick.get('name')}</b> ({code})\n"
+            f"AI 후보가격: {ai_price:,.0f}원\n"
+            f"키움 현재가: {live:,.0f}원\n"
+            f"가격차: {gap*100:.2f}%\n"
+            f"사유: 실시간 가격 차이 과다\n\n"
+            "※ 다음 감시 주기에 다시 확인합니다.",
+            "buy_hold_price_gap"
+        )
+        return {"ok": False, "message": reason, "pick": pick}
+
     allowed, reason = trade_can_buy(code, live)
 
     if not allowed:
@@ -494,7 +642,7 @@ def auto_buy_best_pick():
         send_trade_telegram(
             f"🚀 <b>AI 자동매수 {'DRY-RUN ' if order.get('dry_run') else ''}진행</b>\n"
             f"종목: <b>{pick['name']}</b> ({code})\n"
-            f"매수가 기준: {live:,.0f}원\n"
+            f"매수가 기준: {live:,.0f}원 ({price_src})\n"
             f"수량: {qty:,}주\n"
             f"매수금액: {buy_amount:,.0f}원\n"
             f"목표가: {holding['target']:,.0f}원\n"
@@ -593,7 +741,7 @@ def api_server_holdings():
     data=request.get_json(force=True,silent=True) or {}; action=data.get('action','add'); holdings=read_holdings()
     if action=='add':
         item=normalize_holding(data.get('item',{})); code=item.get('code',''); buy=safe_float(item.get('buyPrice',0)); amount=safe_float(item.get('buyAmount',0)); qty=safe_float(item.get('qty',0)) or (math.floor(amount/buy) if buy and amount else 0)
-        item.update({'qty':qty,'target':safe_float(item.get('target',0)) or round(buy*1.035),'stop':safe_float(item.get('stop',0)) or round(buy*.975),'id':item.get('id') or int(time.time()*1000),'lastPrice':get_live_price(code) or buy})
+        item.update({'qty':qty,'target':safe_float(item.get('target',0)) or round(buy*1.035),'stop':safe_float(item.get('stop',0)) or round(buy*.975),'id':item.get('id') or int(time.time()*1000),'lastPrice':(get_trade_live_price(code, fallback=True)[0] or buy)})
         holdings=[h for h in holdings if str(h.get('code','')).zfill(6)!=code]; holdings.append(item); write_holdings(holdings); ensure_watch_running()
     elif action=='remove':
         rid=str(data.get('id','')); code=str(data.get('code','')).zfill(6); holdings=[h for h in holdings if str(h.get('id',''))!=rid and str(h.get('code','')).zfill(6)!=code]; write_holdings(holdings)
@@ -607,10 +755,12 @@ def api_watch_stop(): WATCH_STATE['running']=False; return jsonify({'ok':True,'r
 @app.route('/api/server_watch/status')
 def api_watch_status(): return jsonify({'ok':True,'state':{k:v for k,v in WATCH_STATE.items() if k!='thread'},'holdings':read_holdings(),'interval':WATCH_INTERVAL})
 @app.route('/api/live_price/<code>')
-def api_live_price(code): p=get_live_price(code); return jsonify({'ok':p>=10,'code':str(code).zfill(6),'price':p,'updated':now_kst().strftime('%Y-%m-%d %H:%M:%S')})
+def api_live_price(code):
+    p, src = get_trade_live_price(code, fallback=True)
+    return jsonify({'ok':p>=10,'code':str(code).zfill(6),'price':p,'source':src,'updated':now_kst().strftime('%Y-%m-%d %H:%M:%S')})
 @app.route('/api/find_stock')
 def api_find_stock():
-    q=str(request.args.get('q','')).strip(); code=resolve_code_by_name(q); price=get_live_price(code) if code else 0; return jsonify({'ok':bool(code),'name':q,'code':code,'price':price})
+    q=str(request.args.get('q','')).strip(); code=resolve_code_by_name(q); price=(get_trade_live_price(code, fallback=True)[0] if code else 0); return jsonify({'ok':bool(code),'name':q,'code':code,'price':price})
 @app.route('/api/telegram_status')
 def api_telegram_status():
     token=os.getenv('TELEGRAM_BOT_TOKEN','').strip(); chat_id=os.getenv('TELEGRAM_CHAT_ID','').strip(); return jsonify({'ok':bool(token and chat_id),'tokenSet':bool(token),'chatIdSet':bool(chat_id)})
@@ -634,7 +784,9 @@ def api_auto_trade_status():
         'dry_run': KIWOOM_DRY_RUN,
         'market_open': market_is_open(),
         'required_env_keys': ['KIWOOM_APP_KEY', 'KIWOOM_SECRET_KEY', 'KIWOOM_REAL_TRADING', 'KIWOOM_DRY_RUN'],
-        'secret_alias_supported': 'KIWOOM_APP_SECRET'
+        'secret_alias_supported': 'KIWOOM_APP_SECRET',
+        'price_diff_limit_pct': round(PRICE_DIFF_LIMIT*100, 3),
+        'kiwoom_price_required': KIWOOM_PRICE_REQUIRED
     })
 
 @app.route('/api/auto_trade/set', methods=['POST'])
@@ -668,11 +820,11 @@ def api_auto_trade_panic_stop():
 
 
 @app.route('/api/version')
-def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-status-v74','watch_interval':WATCH_INTERVAL})
+def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-kiwoom-price-v75','watch_interval':WATCH_INTERVAL})
 
-HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v74</title><style>
+HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v75</title><style>
 :root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}}
-</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v74</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div><label>최소 매수 가능 수량</label><input id="minQty" value="5"></div><div><label>최대 당일 등락률(%)</label><input id="maxChange" value="7"></div><div><label>최소 거래대금(원)</label><input id="minAmount" value="1000000000"></div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card"><h2>💼 보유종목 관리</h2><p class="muted">등록한 종목은 삭제 전까지 유지되며, 서버가 목표가/손절가를 감시합니다.</p><div class="grid"><input id="hName" placeholder="종목명 예: 휴림로봇"><input id="hCode" placeholder="종목코드 예: 090710"><input id="hBuy" placeholder="매수가 예: 13120"><input id="hAmount" placeholder="매수금액 예: 500000"><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
+</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v75</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div><label>최소 매수 가능 수량</label><input id="minQty" value="5"></div><div><label>최대 당일 등락률(%)</label><input id="maxChange" value="7"></div><div><label>최소 거래대금(원)</label><input id="minAmount" value="1000000000"></div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card"><h2>💼 보유종목 관리</h2><p class="muted">등록한 종목은 삭제 전까지 유지되며, 서버가 목표가/손절가를 감시합니다.</p><div class="grid"><input id="hName" placeholder="종목명 예: 휴림로봇"><input id="hCode" placeholder="종목코드 예: 090710"><input id="hBuy" placeholder="매수가 예: 13120"><input id="hAmount" placeholder="매수금액 예: 500000"><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
 <section id="autotrade" class="card">
   <h2>🤖 키움 실전 자동매매</h2>
   <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 처음에는 반드시 소액으로 체결 여부를 확인하세요.</p>
@@ -695,13 +847,13 @@ HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name
 </section>
 
 <section id="telegram" class="card"><h2>✉️ 텔레그램 기록/설정</h2><div class="row"><button class="green" onclick="telegramStatus()">설정 확인</button><button class="brown" onclick="telegramTest()">테스트 발송</button><button class="dark" onclick="startWatch()">실전 감시 시작</button></div><div id="telegramBox" class="empty" style="margin-top:14px">텔레그램 상태를 확인해 주세요.</div></section></main><script>
-const $=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString()+"원",num=v=>Number(String(v||"").replace(/[^0-9.-]/g,""))||0;function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),t=setTimeout(()=>c.abort(),20000);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString());$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString());$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"refresh"})});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}function renderHoldings(list){$("holdingStatus").innerHTML=`등록 보유종목 ${list.length}개 감시 중`;$("holdingList").innerHTML=list.map(h=>{const cur=Number(h.lastPrice||0),buy=Number(h.buyPrice||0),qty=Number(h.qty||0),pnl=(cur-buy)*qty,rate=buy?((cur-buy)/buy*100):0;return`<div class="holding"><b>${h.name} (${h.code})</b><br>매수가 ${fmt(buy)} · 현재가 ${cur?fmt(cur):"조회중"}<br>목표가 <span class="red">${fmt(h.target)}</span> · 손절가 <span class="blue">${fmt(h.stop)}</span><br>평가손익 <b class="${pnl>=0?'red':'blue'}">${pnl.toLocaleString()}원</b> · ${rate.toFixed(2)}% · 수량 ${qty}주${h.priceError?`<div class="empty">⚠️ ${h.priceError}</div>`:""}<div class="row" style="margin-top:10px"><button class="light" onclick="removeHolding('${h.id}','${h.code}')">삭제</button></div></div>`}).join("")}async function removeHolding(id,code){const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"remove",id,code})});renderHoldings(d.holdings||[])}async function loadHoldings(){const d=await fetchJson("/api/server_holdings");renderHoldings(d.holdings||[])}
+const $=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString()+"원",num=v=>Number(String(v||"").replace(/[^0-9.-]/g,""))||0;function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),t=setTimeout(()=>c.abort(),20000);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString());$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString());$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"refresh"})});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}function renderHoldings(list){$("holdingStatus").innerHTML=`등록 보유종목 ${list.length}개 감시 중`;$("holdingList").innerHTML=list.map(h=>{const cur=Number(h.lastPrice||0),buy=Number(h.buyPrice||0),qty=Number(h.qty||0),pnl=(cur-buy)*qty,rate=buy?((cur-buy)/buy*100):0;return`<div class="holding"><b>${h.name} (${h.code})</b><br>매수가 ${fmt(buy)} · 현재가 ${cur?fmt(cur):"조회중"}<br>목표가 <span class="red">${fmt(h.target)}</span> · 손절가 <span class="blue">${fmt(h.stop)}</span><br>평가손익 <b class="${pnl>=0?'red':'blue'}">${pnl.toLocaleString()}원</b> · ${rate.toFixed(2)}% · 수량 ${qty}주${h.priceError?`<div class="empty">⚠️ ${h.priceError}</div>`:""}<div class="row" style="margin-top:10px"><button class="light" onclick="removeHolding('${h.id}','${h.code}')">삭제</button></div></div>`}).join("")}async function removeHolding(id,code){const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"remove",id,code})});renderHoldings(d.holdings||[])}async function loadHoldings(){const d=await fetchJson("/api/server_holdings");renderHoldings(d.holdings||[])}
 async function autoTradeStatus(){
   const d=await fetchJson("/api/auto_trade/status");
   const s=d.state||{};
   $("autoTradeBox").innerHTML=`상태: <b>${s.auto_trade_enabled?"ON":"OFF"}</b> · 키움설정 ${d.kiwoom_ready?"완료":"필요"} · 실전ENV ${d.real_trading_env?"true":"false"} · DRY_RUN ${d.dry_run?"true":"false"} · 장중 ${d.market_open?"예":"아니오"}<br>
   금일손익 ${Number(s.daily_realized_pnl||0).toLocaleString()}원 · 하루손실제한 ${Number(s.daily_max_loss||-30000).toLocaleString()}원<br>
-  <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span>`;
+  <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span><br><span class="muted">가격정책: 키움현재가 필수 ${d.kiwoom_price_required?"ON":"OFF"} · 허용오차 ${d.price_diff_limit_pct}%</span>`;
 
   const cand=s.last_candidate||{};
   const tg=s.last_telegram_status||{};
@@ -709,7 +861,7 @@ async function autoTradeStatus(){
     <b>최근 진행상태:</b> ${s.last_status||"대기중"}<br>
     <b>상태시간:</b> ${s.last_status_time||"-"}<br>
     <b>메시지:</b> ${s.last_order_message||"-"}<br>
-    <b>최근 후보:</b> ${cand.name?`${cand.name} (${cand.code}) · AI ${cand.score} · ${Number(cand.price||0).toLocaleString()}원`:"-"}<br>
+    <b>최근 후보:</b> ${cand.name?`${cand.name} (${cand.code}) · AI ${cand.score} · 후보가 ${Number(cand.price||0).toLocaleString()}원 · 주문가 ${cand.orderLivePrice?Number(cand.orderLivePrice).toLocaleString()+"원":""} ${cand.orderPriceSource||""}`:"-"}<br>
     <b>텔레그램:</b> ${tg.ok===true?"발송 성공":tg.ok===false?"발송 실패":"-"} ${tg.message?`· ${tg.message}`:""}
   `;
 }
