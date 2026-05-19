@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v88 FETCH FIX
-파일명: app_kiwoom_real_auto_scalping_v88_fetch_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v88 CASH MULTI FIX
+파일명: app_kiwoom_real_auto_scalping_v88_cash_multi_fix.py
 
 이 파일은 사용자가 업로드한 v88 계열 전체 텍스트를 기반으로 v88 목표 기능을 반영한 업그레이드본입니다.
 
@@ -495,9 +495,12 @@ KIWOOM_PRICE_REQUIRED = os.getenv("KIWOOM_PRICE_REQUIRED", "true").lower() == "t
 
 TRADE_DEFAULTS = {
     "auto_trade_enabled": False,
+    # v88 cash multi fix: 화면 입력 총투자금이 아니라 키움 예수금/주문가능금액을 우선 사용합니다.
     "max_total_cash": 500000,
     "max_order_cash": 450000,
     "cash_buffer": 50000,
+    "max_positions": 3,
+    "min_order_cash": 50000,
     "daily_max_loss": -30000,
     "target_rate": 0.027,
     "stop_rate": -0.018,
@@ -700,10 +703,14 @@ def recommend_auto_trade_settings(total_cash):
         mode = "보수 단타형"
         note = "금액이 커질수록 목표수익률보다 리스크 관리가 중요합니다."
 
+    max_positions = 1 if cash <= 200000 else (2 if cash <= 500000 else 3)
+
     return {
         "max_total_cash": int(cash),
         "max_order_cash": int(max_order),
         "cash_buffer": int(buffer_cash),
+        "max_positions": int(max_positions),
+        "min_order_cash": 50000,
         "daily_max_loss": int(daily_loss),
         "cooldown_minutes": int(cooldown),
         "target_rate_percent": target_pct,
@@ -899,6 +906,173 @@ def kiwoom_order(side, code, qty, price=0, order_type="market"):
         data = {"raw": r.text}
     return {"ok": r.status_code == 200 and str(data.get("return_code", "0")) in ["0", ""], "status": r.status_code, "api_id": api_id, "request": body, "response": data}
 
+
+# ===============================
+# v88 CASH MULTI FIX: 키움 예수금/주문가능금액 기반 매수금 계산
+# ===============================
+
+def _recursive_find_number_by_keys(obj, keywords):
+    """
+    키움 계좌/예수금 응답 필드명이 환경마다 다를 수 있어
+    dict/list 전체를 돌면서 주문가능금액/예수금/현금 관련 숫자를 찾습니다.
+    """
+    best = 0
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            ks = str(k)
+            if any(w in ks for w in keywords):
+                val = abs(safe_float(v, 0))
+                if val > best:
+                    best = val
+            nested = _recursive_find_number_by_keys(v, keywords)
+            if nested > best:
+                best = nested
+    elif isinstance(obj, list):
+        for item in obj:
+            nested = _recursive_find_number_by_keys(item, keywords)
+            if nested > best:
+                best = nested
+    return best
+
+
+def parse_kiwoom_cash(data):
+    """
+    키움 REST 응답에서 실제 매수에 사용할 수 있는 예수금/주문가능금액을 추출합니다.
+    우선순위: 주문가능금액 > 출금가능/추정인출가능 > 예수금
+    """
+    if not isinstance(data, dict):
+        return 0
+
+    order_cash_keys = [
+        "ord_psbl", "ordPsbl", "buyAble", "buy_psbl", "주문가능", "매수가능", "현금주문가능",
+        "ord_alow_amt", "ord_psbl_cash", "avail", "available"
+    ]
+    deposit_keys = [
+        "예수금", "dpst", "deposit", "dps", "추정인출", "인출가능", "cash", "현금"
+    ]
+
+    order_cash = _recursive_find_number_by_keys(data, order_cash_keys)
+    if order_cash > 0:
+        return order_cash
+
+    deposit_cash = _recursive_find_number_by_keys(data, deposit_keys)
+    return deposit_cash
+
+
+def get_kiwoom_account_cash():
+    """
+    키움 예수금/주문가능금액 조회.
+    성공 시 {ok:True, cash:금액, source:'KIWOOM', ...}
+    실패 시 기존 설정값으로 주문하지 않도록 ok=False를 반환합니다.
+    """
+    if not kiwoom_ready():
+        return {"ok": False, "cash": 0, "source": "NONE", "message": "키움 환경변수 미설정"}
+
+    endpoints = [
+        ("/api/dostk/acnt", "kt00001", {}),
+        ("/api/dostk/acnt", "kt00004", {}),
+        ("/api/dostk/acnt", "kt00018", {}),
+    ]
+    last_error = ""
+    for path, api_id, body in endpoints:
+        try:
+            token = kiwoom_get_token()
+            headers = {
+                "Content-Type": "application/json;charset=UTF-8",
+                "authorization": "Bearer " + token,
+                "cont-yn": "N",
+                "next-key": "",
+                "api-id": api_id
+            }
+            r = requests.post(KIWOOM_BASE_URL + path, json=body, headers=headers, timeout=8)
+            try:
+                data = r.json() if r.text else {}
+            except Exception:
+                data = {"raw": r.text[:1000]}
+
+            cash = parse_kiwoom_cash(data)
+            if r.status_code == 200 and cash > 0:
+                update_kiwoom_debug("cash_ok", "", r.status_code, f"키움 주문가능금액 {cash:,.0f}원 조회 성공", {"cash": cash, "api_id": api_id})
+                return {"ok": True, "cash": cash, "source": "KIWOOM", "api_id": api_id, "message": "키움 예수금 조회 성공"}
+
+            last_error = str(data)[:500]
+            update_kiwoom_debug("cash_fail", "", r.status_code, last_error, data)
+        except Exception as e:
+            last_error = str(e)
+            update_kiwoom_debug("cash_exception", "", 0, last_error)
+
+    return {"ok": False, "cash": 0, "source": "NONE", "message": last_error or "키움 예수금 조회 실패"}
+
+
+def get_trade_cash_info():
+    """
+    실전 매매용 현금 정보.
+    실전 주문에서는 키움 예수금이 확인되어야 신규 매수합니다.
+    DRY_RUN에서는 테스트 편의를 위해 설정값을 fallback으로 사용합니다.
+    """
+    res = get_kiwoom_account_cash()
+    if res.get("ok") and safe_float(res.get("cash", 0)) > 0:
+        return res
+
+    state = read_trade_state()
+    if KIWOOM_DRY_RUN:
+        fallback = safe_float(state.get("max_total_cash", 0), 0)
+        return {"ok": True, "cash": fallback, "source": "DRY_RUN_SETTING", "message": "DRY_RUN 설정금액 사용"}
+
+    return res
+
+
+def calc_dynamic_order_cash(live_price=0):
+    """
+    실제 키움 예수금을 기준으로 1회 진입금을 자동 계산합니다.
+    여러 종목 동시 단타를 위해 남은 슬롯 수로 나눠 과도한 1종목 몰빵을 방지합니다.
+    """
+    state = read_trade_state()
+    cash_info = get_trade_cash_info()
+    available_cash = safe_float(cash_info.get("cash", 0), 0)
+    cash_buffer = safe_float(state.get("cash_buffer", 0), 0)
+    max_order_cash = safe_float(state.get("max_order_cash", 0), 0)
+    min_order_cash = safe_float(state.get("min_order_cash", 50000), 50000)
+    max_positions = max(1, int(safe_float(state.get("max_positions", 3), 3)))
+    holding_count = len(read_holdings())
+    remaining_slots = max(1, max_positions - holding_count)
+
+    usable_cash = max(0, available_cash - cash_buffer)
+    slot_cash = usable_cash / remaining_slots if remaining_slots > 0 else 0
+    order_cash = min(max_order_cash if max_order_cash > 0 else slot_cash, slot_cash)
+
+    if order_cash < min_order_cash:
+        return 0, {
+            "ok": False,
+            "cash": available_cash,
+            "usable_cash": usable_cash,
+            "order_cash": order_cash,
+            "source": cash_info.get("source"),
+            "message": f"주문가능금액 부족: 주문가능 {available_cash:,.0f}원 / 최소진입 {min_order_cash:,.0f}원"
+        }
+
+    if live_price and safe_float(live_price, 0) > 0 and order_cash < safe_float(live_price, 0):
+        return 0, {
+            "ok": False,
+            "cash": available_cash,
+            "usable_cash": usable_cash,
+            "order_cash": order_cash,
+            "source": cash_info.get("source"),
+            "message": "현재가보다 주문가능금액이 작아 매수 불가"
+        }
+
+    return order_cash, {
+        "ok": True,
+        "cash": available_cash,
+        "usable_cash": usable_cash,
+        "order_cash": order_cash,
+        "source": cash_info.get("source"),
+        "max_positions": max_positions,
+        "holding_count": holding_count,
+        "remaining_slots": remaining_slots,
+        "message": "키움 예수금 기반 주문금액 계산 완료"
+    }
+
 def trade_log_append(state, event):
     event["time"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
     state.setdefault("trade_log", []).insert(0, event)
@@ -918,8 +1092,12 @@ def trade_can_buy(code, price):
         return False, "하루 최대 손실 제한 도달로 자동매매를 중지했습니다."
     if not market_is_open():
         return False, "정규장 시간이 아닙니다."
-    if read_holdings():
-        return False, "동시 보유 1종목 제한으로 신규 매수하지 않습니다."
+    holdings = read_holdings()
+    max_positions = max(1, int(safe_float(state.get("max_positions", 3), 3)))
+    if any(str(h.get("code", "")).zfill(6) == str(code).zfill(6) for h in holdings):
+        return False, "이미 보유 중인 동일 종목은 추가 매수하지 않습니다."
+    if len(holdings) >= max_positions:
+        return False, f"동시 보유 한도 {max_positions}종목에 도달했습니다."
     cooldown = state.get("same_stock_cooldown", {})
     last = safe_float(cooldown.get(str(code).zfill(6), 0))
     if last and time.time() - last < safe_float(state.get("cooldown_minutes", 30)) * 60:
@@ -1231,22 +1409,34 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
     update_trade_status("종목 탐색중", "현재 화면 필터 기준으로 AI 최종 1종목 후보를 찾는 중입니다.")
 
+    held_codes = {str(h.get("code", "")).zfill(6) for h in read_holdings()}
+
     if args is not None:
-        pick, _ = best_pick_from_params(args)
+        first_pick, picks = best_pick_from_params(args)
     elif use_latest_ui_pick and state.get("latest_ui_pick"):
-        pick = state.get("latest_ui_pick")
+        first_pick = state.get("latest_ui_pick")
+        picks = [first_pick] if first_pick else []
     else:
-        pick, _ = best_pick_from_params({
-            "cash": state.get("max_order_cash", 450000),
+        cash_info = get_trade_cash_info()
+        scan_cash = safe_float(cash_info.get("cash", 0), state.get("max_order_cash", 450000))
+        first_pick, picks = best_pick_from_params({
+            "cash": scan_cash,
             "minQty": 1,
             "maxChange": 7,
             "minAmount": 1000000000,
             "minScore": 70
         })
 
+    pick = None
+    for candidate in (picks or []):
+        c = str(candidate.get("code", "")).zfill(6)
+        if c not in held_codes:
+            pick = candidate
+            break
+
     if not pick:
-        update_trade_status("매수 보류", "현재 조건을 만족하는 AI 후보가 없습니다.")
-        return {"ok": False, "message": "candidate not found"}
+        update_trade_status("매수 보류", "조건을 만족하는 신규 AI 후보가 없거나 모두 이미 보유 중입니다.")
+        return {"ok": False, "message": "candidate not found or already held"}
 
     code = pick["code"]
     update_trade_status("후보 발견", f"{pick.get('name')}({code}) 후보 확인. 현재가 조회 중입니다.", candidate=pick)
@@ -1308,15 +1498,16 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
         return {"ok": False, "message": reason, "pick": pick}
 
-    max_order_cash = safe_float(state.get("max_order_cash", 450000))
-    qty = calc_safe_order_qty(max_order_cash, live)
+    order_cash, cash_meta = calc_dynamic_order_cash(live)
+    qty = calc_safe_order_qty(order_cash, live)
+    pick["kiwoomCash"] = cash_meta
 
     if qty <= 0:
-        reason = "주문 가능 수량이 0입니다."
+        reason = cash_meta.get("message") or "키움 예수금 기준 주문 가능 수량이 0입니다."
         update_trade_status("매수 보류", reason, candidate=pick)
-        return {"ok": False, "message": reason, "pick": pick}
+        return {"ok": False, "message": reason, "pick": pick, "cash": cash_meta}
 
-    update_trade_status("주문 전송중", f"키움 매수 주문 전송 중: {pick.get('name')} {qty}주", candidate=pick)
+    update_trade_status("주문 전송중", f"키움 예수금 기준 매수 주문 전송 중: {pick.get('name')} {qty}주 / 주문금액 {order_cash:,.0f}원", candidate=pick)
 
     order = kiwoom_order("buy", code, qty, price=0, order_type="market")
     buy_amount = live * qty
@@ -1335,6 +1526,8 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
             "amount": buy_amount,
             "order": order
         })
+
+        mark_scalp_trade_opened()
 
         update_trade_status(
             "매수 성공" if not order.get("dry_run") else "DRY-RUN 매수 성공",
@@ -1442,9 +1635,7 @@ def try_rebuy_after_sell(sold_code=""):
             update_trade_status("재매수 대기", "장중이 아니므로 신규 매수를 진행하지 않습니다.")
             return {"ok": False, "message": "market closed"}
 
-        if read_holdings():
-            update_trade_status("재매수 대기", "기존 보유종목이 있어 신규 매수를 진행하지 않습니다.")
-            return {"ok": False, "message": "holding exists"}
+        # v88 CASH MULTI FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
 
         if safe_float(state.get("daily_realized_pnl", 0)) <= safe_float(state.get("daily_max_loss", -30000)):
             update_trade_status("재매수 중지", "하루 최대 손실 제한에 도달하여 신규 매수를 중지합니다.")
@@ -1644,20 +1835,28 @@ def api_auto_trade_apply_recommend_settings():
     state["max_total_cash"] = rec["max_total_cash"]
     state["max_order_cash"] = rec["max_order_cash"]
     state["cash_buffer"] = rec["cash_buffer"]
+    state["max_positions"] = rec.get("max_positions", state.get("max_positions", 3))
+    state["min_order_cash"] = rec.get("min_order_cash", state.get("min_order_cash", 50000))
     state["daily_max_loss"] = rec["daily_max_loss"]
     state["cooldown_minutes"] = rec["cooldown_minutes"]
     state["target_rate"] = rec["target_rate"]
     state["stop_rate"] = rec["stop_rate"]
     state["last_status"] = "AI 추천 설정 적용"
     state["last_status_time"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
-    state["last_order_message"] = f"{rec['mode']} 적용: 목표 {rec['target_rate_percent']}%, 손절 {rec['stop_rate_percent']}%, 1회 진입 {rec['max_order_cash']:,}원"
+    state["last_order_message"] = f"{rec['mode']} 적용: 목표 {rec['target_rate_percent']}%, 손절 {rec['stop_rate_percent']}%, 키움 예수금 기준 1회 진입 상한 {rec['max_order_cash']:,}원, 동시 {rec.get('max_positions',3)}종목"
     write_trade_state(state)
     return jsonify({"ok": True, "recommend": rec, "state": state})
 
 
+
+@app.route('/api/kiwoom/cash')
+def api_kiwoom_cash():
+    return jsonify({'ok': True, 'cash': get_trade_cash_info(), 'time': now_kst().strftime('%Y-%m-%d %H:%M:%S')})
+
 @app.route('/api/auto_trade/status')
 def api_auto_trade_status():
     state = read_trade_state()
+    cash_info = get_trade_cash_info()
     return jsonify({
         'ok': True,
         'state': state,
@@ -1674,12 +1873,15 @@ def api_auto_trade_status():
         'order_cash_safety_rate': ORDER_CASH_SAFETY_RATE,
         'kiwoom_debug': state.get('last_kiwoom_debug', {}),
         'storage': get_storage_status(),
+        'account_cash': cash_info,
         'target_rate_percent': round(normalize_rate_input(state.get('target_rate', 0.027), 0.027)*100, 3),
         'profit_guard_percent': round(normalize_rate_input(state.get('profit_guard_rate', 0.012), 0.012)*100, 3),
         'trailing_stop_percent': round(normalize_rate_input(state.get('trailing_stop_rate', 0.011), 0.011)*100, 3),
         'max_trades_per_day': int(state.get('max_trades_per_day', 10)),
         'trade_count_today': int(state.get('trade_count_today', 0)),
         'force_exit_time': state.get('force_exit_time', '15:15'),
+        'max_positions': int(state.get('max_positions', 3)),
+        'min_order_cash': safe_float(state.get('min_order_cash', 50000)),
         'stop_rate_percent': round(normalize_rate_input(state.get('stop_rate', -0.018), -0.018)*100, 3)
     })
 
@@ -1690,7 +1892,7 @@ def api_auto_trade_set():
     for key in ['auto_trade_enabled', 'panic_stop']:
         if key in data:
             state[key] = bool(data[key])
-    for key in ['max_total_cash', 'max_order_cash', 'cash_buffer', 'daily_max_loss', 'cooldown_minutes', 'max_trades_per_day']:
+    for key in ['max_total_cash', 'max_order_cash', 'cash_buffer', 'daily_max_loss', 'cooldown_minutes', 'max_trades_per_day', 'max_positions', 'min_order_cash']:
         if key in data:
             state[key] = safe_float(data[key], state.get(key, TRADE_DEFAULTS.get(key, 0)))
     if 'force_exit_time' in data:
@@ -1781,7 +1983,7 @@ def api_v88_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v88 FETCH FIX",
+            "version": "KIWOOM REAL AUTO SCALPING v88 CASH MULTI FIX",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -1848,10 +2050,10 @@ HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name
 </div></div><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="green" onclick="loadHoldings()">보유종목 강제 새로고침</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
 <section id="autotrade" class="card">
   <h2>🤖 키움 실전 자동매매</h2>
-  <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 처음에는 반드시 소액으로 체결 여부를 확인하세요.<br><b>AI 추천 설정</b>은 총 투자금 기준으로 1회 진입금·하루손실·목표/손절을 자동 계산합니다. 수동 설정도 가능합니다.<br>목표/손절 수익률은 <b>2.5 = +2.5%</b>, <b>-1.8 = -1.8%</b>처럼 입력하면 됩니다.</p>
+  <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 실제 매수금은 화면의 총투자금이 아니라 <b>키움 예수금/주문가능금액</b>을 기준으로 자동 계산합니다.<br><b>AI 추천 설정</b>은 예수금 기준 1회 진입 상한·하루손실·목표/손절을 자동 계산합니다. 수동 설정도 가능합니다.<br>목표/손절 수익률은 <b>2.5 = +2.5%</b>, <b>-1.8 = -1.8%</b>처럼 입력하면 됩니다.</p>
   <div class="grid">
-    <div><label>총 투자금</label><input id="atTotal" value="500000"></div>
-    <div><label>1회 최대 진입금</label><input id="atOrder" value="450000"></div><div id="atOrderQuickMoney"><div class="quick-money">
+    <div><label>키움 예수금 기준금액</label><input id="atTotal" value="500000"></div>
+    <div><label>1회 진입 상한금액</label><input id="atOrder" value="450000"></div><div id="atOrderQuickMoney"><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -1870,7 +2072,7 @@ HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name
     <button class="green" onclick="applyAiSettings()">AI 추천 설정 적용</button>
     <button class="light" onclick="manualSettingsGuide()">수동 설정</button>
   </div>
-  <div id="aiSettingBox" class="empty" style="margin-top:10px">총 투자금 입력 후 AI 추천 설정 적용을 누르면 최적 조건이 자동 입력됩니다.</div>
+  <div id="aiSettingBox" class="empty" style="margin-top:10px">키움 예수금 기준금액 입력 후 AI 추천 설정 적용을 누르면 최적 조건이 자동 입력됩니다. 실제 주문은 키움 주문가능금액 기준으로 계산됩니다.</div>
   <div class="empty" style="margin-top:12px">
     <b>⚡ 스캘핑 AI 엔진</b><br>
     목표는 한 번에 크게 먹는 방식이 아니라 <b>2~5% 수익을 여러 번 안정적으로 누적</b>하는 구조입니다.<br>
@@ -2079,12 +2281,14 @@ async function applyAiSettings(){
   $("atCool").value=r.cooldown_minutes||30;
   $("atTarget").value=r.target_rate_percent||2.5;
   $("atStop").value=r.stop_rate_percent||-1.8;
+  if($("atMaxPositions")) $("atMaxPositions").value=r.max_positions||3;
+  if($("atMinOrder")) $("atMinOrder").value=r.min_order_cash||50000;
   if($("atMaxTrades")) $("atMaxTrades").value=r.max_trades_per_day||10;
   if($("atProfitGuard")) $("atProfitGuard").value=r.profit_guard_rate_percent||1.2;
   if($("atTrailing")) $("atTrailing").value=r.trailing_stop_rate_percent||1.1;
   if($("atExitTime")) $("atExitTime").value=r.force_exit_time||"15:15";
   $("aiSettingBox").innerHTML=`✅ <b>${r.mode}</b> 적용 완료<br>
-  총 투자금 ${Number(r.max_total_cash).toLocaleString()}원 · 1회 최대 진입금 ${Number(r.max_order_cash).toLocaleString()}원 · 현금 여유 ${Number(r.cash_buffer).toLocaleString()}원<br>
+  키움 예수금 기준 ${Number(r.max_total_cash).toLocaleString()}원 · 1회 진입 상한 ${Number(r.max_order_cash).toLocaleString()}원 · 현금 여유 ${Number(r.cash_buffer).toLocaleString()}원 · 동시 ${Number(r.max_positions||3).toLocaleString()}종목<br>
   목표 +${r.target_rate_percent}% · 손절 ${r.stop_rate_percent}% · 하루 최대손실 ${Number(r.daily_max_loss).toLocaleString()}원 · 재진입금지 ${r.cooldown_minutes}분<br>
   <span class="muted">${r.note}</span>`;
   await autoTradeStatus();
@@ -2093,14 +2297,16 @@ async function applyAiSettings(){
 function manualSettingsGuide(){
   $("aiSettingBox").innerHTML=`✍️ <b>수동 설정 모드</b><br>
   성일님이 직접 값을 입력한 뒤 <b>실전 자동매매 ON</b>을 누르면 해당 값이 적용됩니다.<br>
-  추천 예시: 목표 2.5 / 손절 -1.8 / 1회 진입금은 총 투자금의 80~85%`;
+  추천 예시: 목표 2.5 / 손절 -1.8 / 실제 매수금은 키움 예수금과 동시 보유 종목수 기준으로 자동 분배`;
 }
 
 
 async function autoTradeStatus(){
   const d=await fetchJson("/api/auto_trade/status");
   const s=d.state||{};
+  const ac=d.account_cash||{};
   $("autoTradeBox").innerHTML=`상태: <b>${s.auto_trade_enabled?"ON":"OFF"}</b> · 키움설정 ${d.kiwoom_ready?"완료":"필요"} · 실전ENV ${d.real_trading_env?"true":"false"} · DRY_RUN ${d.dry_run?"true":"false"} · 장중 ${d.market_open?"예":"아니오"}<br>
+  키움 주문가능금액 ${Number(ac.cash||0).toLocaleString()}원 (${ac.source||"-"}) · 동시보유 ${d.max_positions||3}종목 · 최소진입 ${Number(d.min_order_cash||0).toLocaleString()}원<br>
   금일손익 ${Number(s.daily_realized_pnl||0).toLocaleString()}원 · 하루손실제한 ${Number(s.daily_max_loss||-30000).toLocaleString()}원<br>
   적용 목표/손절: +${d.target_rate_percent||0}% / ${d.stop_rate_percent||0}%<br>스캘핑: 거래 ${d.trade_count_today||0}/${d.max_trades_per_day||10}회 · 수익보호 ${d.profit_guard_percent||1.2}% · 트레일링 ${d.trailing_stop_percent||1.1}% · 청산 ${d.force_exit_time||"15:15"}<br>
   <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span><br><span class="muted">가격정책: 키움현재가 필수 ${d.kiwoom_price_required?"ON":"OFF"} · 허용오차 ${d.price_diff_limit_pct}% · 백그라운드 자동매수 ${d.auto_buy_in_watch_loop?"ON":"OFF"} · 매도 후 신규매수 ${d.auto_rebuy_after_sell?"ON":"OFF"} · 주문안전비율 ${d.order_cash_safety_rate||0.96}</span>`;
@@ -2126,6 +2332,8 @@ async function setAutoTrade(on){
     cooldown_minutes:num($("atCool").value),
     target_rate:Number($("atTarget").value||2.5),
     stop_rate:Number($("atStop").value||-1.8),
+    max_positions:num($("atMaxPositions")?.value||3),
+    min_order_cash:num($("atMinOrder")?.value||50000),
     max_trades_per_day:num($("atMaxTrades")?.value||10),
     profit_guard_rate:Number($("atProfitGuard")?.value||1.2),
     trailing_stop_rate:Number($("atTrailing")?.value||1.1),
