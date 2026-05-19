@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v88 UPGRADE
-파일명: app_kiwoom_real_auto_scalping_v88_upgrade.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v88 STORAGE FIX
+파일명: app_kiwoom_real_auto_scalping_v88_storage_fix.py
 
 이 파일은 사용자가 업로드한 v88 계열 전체 텍스트를 기반으로 v88 목표 기능을 반영한 업그레이드본입니다.
 
@@ -13,6 +13,7 @@ v88 반영 핵심:
 - 매도 후 자동 신규 후보 탐색/재매수 구조 유지 및 상태 표시 강화
 - 실시간 상태 API /api/v88_dashboard 추가
 - 기존 /api/version을 v88로 갱신
+- 저장소 확인 중 멈춤 문제 수정: BASE_DIR 정의, Persistent Disk 경로, loadHoldings 중복 함수 제거
 
 주의:
 - 실전 주문 전 KIWOOM_DRY_RUN=true 상태에서 충분히 검증하세요.
@@ -21,6 +22,7 @@ v88 반영 핵심:
 """
 
 import os, re, json, time, math, threading
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 import requests
 import pandas as pd
@@ -30,6 +32,16 @@ from flask import Flask, jsonify, request, render_template_string, Response
 
 app = Flask(__name__)
 KST = timezone(timedelta(hours=9))
+
+# v88 FIX: Render 저장소 경로 통합
+# - Render Persistent Disk를 쓰면 APP_DATA_DIR=/var/data 로 설정하세요.
+# - Persistent Disk가 없으면 /tmp를 사용하므로 재배포 시 서버 파일은 사라질 수 있습니다.
+BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
+try:
+    BASE_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    BASE_DIR = Path("/tmp")
+
 
 def now_kst(): return datetime.now(KST)
 def safe_float(v, default=0.0):
@@ -1768,7 +1780,7 @@ def api_v88_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v88 UPGRADE",
+            "version": "KIWOOM REAL AUTO SCALPING v88 STORAGE FIX",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -1797,7 +1809,7 @@ def api_v88_dashboard():
         return jsonify({"ok": False, "message": str(e)}), 500
 
 @app.route('/api/version')
-def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v88-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v88_upgrade.py','v88_dashboard':'/api/v88_dashboard'})
+def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v88-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v88_storage_fix.py','v88_dashboard':'/api/v88_dashboard'})
 
 HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v88</title><style>
 :root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}}
@@ -2005,15 +2017,18 @@ async function restoreHoldingsFromBrowser(){
   alert(`브라우저 백업 복구 완료: ${d.restored||0}개`);
 }
 async function loadStorageStatus(){
+  const el=$("storageStatus");
   try{
     const d=await fetchJson("/api/storage_status");
     const s=d.storage||{};
-    const el=$("storageStatus");
     if(el) el.innerHTML=`저장소: ${s.persistent?"✅ 영구저장":"⚠️ 임시저장"} · ${s.path||"-"}<br><span class="muted">${s.message||""}</span>`;
-  }catch(e){}
+  }catch(e){
+    if(el) el.innerHTML=`⚠️ 저장소 확인 실패: ${e.message}<br><span class="muted">보유종목 API는 계속 시도합니다.</span>`;
+  }
 }
 
-async function loadHoldings(){const d=await fetchJson("/api/server_holdings?sync=1&refresh=1");renderHoldings(d.holdings||[])}
+// v88 FIX: 아래 중복 loadHoldings 함수가 기존 복구/백업 로직을 덮어써서
+// '저장소 확인 중...'이 계속 남고 브라우저 백업 복구가 실행되지 않던 문제를 제거했습니다.
 
 async function applyAiSettings(){
   const cash=num($("atTotal").value)||100000;
