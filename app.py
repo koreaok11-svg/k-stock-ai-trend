@@ -1,55 +1,28 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v107 AI PROFIT MAX
-파일명: app_kiwoom_real_auto_scalping_v107_ai_profit_max.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v107 LITE OPTIMIZED
+파일명: app_kiwoom_real_auto_scalping_v107_lite_optimized.py
 
-이 파일은 사용자가 업로드한 v107 계열 전체 텍스트를 기반으로 v107 목표 기능을 반영한 업그레이드본입니다.
+실전 운영용 경량화 버전입니다.
 
-v107 반영 핵심:
-- 기존 키움 REST 토큰/현재가/주문/잔고동기화 구조 유지
-- 기존 보유종목 자동등록/Render 재배포 후 복구/localStorage 백업 구조 유지
-- AI 단타 후보에 v107 스캘핑 점수 추가
-- 거래량 급증/거래대금/등락률/테마가중/체결강도 추정/호가잔량 추정 점수화
-- 매도 후 자동 신규 후보 탐색/재매수 구조 유지 및 상태 표시 강화
-- 실시간 상태 API /api/v107_dashboard 추가
-- 기존 /api/version을 v107로 갱신
-- 저장소 확인 중 멈춤 문제 수정: BASE_DIR 정의, Persistent Disk 경로, loadHoldings 중복 함수 제거
-- Fetch is aborted 문제 수정: 프론트 요청 제한시간 확대, 초기 로딩에서 키움 동기화/현재가 refresh 분리
+유지 기능:
+- 키움 REST 실전 자동매매
+- 키움 현재가/예수금/잔고 동기화
+- AI 단타 후보 선정
+- 장상태 AI
+- 중복매수 방지
+- API 실패 시 주문금지
+- 체결강도/거래대금 급증 필터
+- 손실복구 모드
+- 시간대별 전략
+- 목표가/손절가/트레일링 감시
+- 텔레그램 알림
 
-
-v107 추가 수정:
-- Flask endpoint 함수명 중복 오류 수정
-- /api/kiwoom_cash 와 /api/kiwoom/cash 가 서로 다른 함수명을 사용하도록 변경
-- Render 배포 시 AssertionError: View function mapping is overwriting... 방지
-
-
-v107 최종 수정:
-- 보유종목 강제 새로고침 버튼이 로컬 현재가 refresh가 아니라 키움 실제잔고 full sync를 실행하도록 수정
-- 키움 실제잔고에 없는 종목은 앱 보유목록에서 제거
-- 키움 실제잔고에 있는 종목은 앱에서 삭제했어도 다시 등록
-- 같은 종목은 앱 로컬 수량이 아니라 키움 실제 수량/매입가/현재가로 완전 덮어쓰기
-- 하나마이크론 1주처럼 남은 로컬값이 키움 실제 3주를 덮지 못하는 문제 수정
-- 대한광통신처럼 키움에 없는 종목이 앱에 계속 남는 문제 수정
-- 키움 잔고 응답 파싱 필드명/리스트 구조를 더 넓게 탐색
-
-
-v107 추가 기능:
-- 1순위: 장상태 AI, 중복매수 방지, API 실패 시 주문금지, 체결강도 필터
-- 2순위: 거래대금 급증 AI, 손실복구 모드, 시간대별 전략
-- 3순위: AI 자동 전략 최적화, 승률 학습, 시장별 전략 자동변경
-
-주의:
-- 실전 주문 전 KIWOOM_DRY_RUN=true 상태에서 충분히 검증하세요.
-- 호가/체결강도는 키움 실시간/호가 API 연결 상태에 따라 실제값 또는 추정값으로 표시됩니다.
-- 투자 판단과 주문 책임은 사용자에게 있습니다.
+경량화:
+- 긴 설명 주석 축소
+- 개발용 테스트 API 일부 제거
+- 빈 줄 정리
 """
-
-# ============================================================
-# v107 수정 내용
-# - Render Flask 중복 endpoint 오류(api_kiwoom_cash) 수정
-# - 키움 예수금/주문가능금액 자동 조회 기능 유지
-# - 여러 종목 동시 단타 운용 기능 유지
-# ============================================================
 
 import os, re, json, time, math, threading
 from pathlib import Path
@@ -63,15 +36,11 @@ from flask import Flask, jsonify, request, render_template_string, Response
 app = Flask(__name__)
 KST = timezone(timedelta(hours=9))
 
-# v107 FIX: Render 저장소 경로 통합
-# - Render Persistent Disk를 쓰면 APP_DATA_DIR=/var/data 로 설정하세요.
-# - Persistent Disk가 없으면 /tmp를 사용하므로 재배포 시 서버 파일은 사라질 수 있습니다.
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
 try:
     BASE_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
     BASE_DIR = Path("/tmp")
-
 
 def now_kst(): return datetime.now(KST)
 def safe_float(v, default=0.0):
@@ -100,7 +69,6 @@ def normalize_rate_input(v, default=0.0):
 def rate_to_percent_text(v):
     r = safe_float(v, 0)
     return f"{r*100:.2f}%"
-
 
 def safe_json(obj):
     if isinstance(obj, dict): return {str(k): safe_json(v) for k,v in obj.items()}
@@ -225,12 +193,6 @@ def send_holding_alert(kind,h,cur):
     WATCH_STATE['last_alerts'][key]=True
     ok,_=send_telegram_message(msg); return ok
 
-
-
-
-# ============================================================
-# v107 Render 서버 공인 IP 확인 모듈
-# ============================================================
 _LAST_RENDER_IP_INFO = {
     "ip": "",
     "checked_at": "",
@@ -301,7 +263,6 @@ def get_render_public_ip(force=False):
         }
         return _LAST_RENDER_IP_INFO
 
-
 def print_render_public_ip_on_startup():
     """
     Render Logs에 공인 IP를 출력합니다.
@@ -324,7 +285,6 @@ def print_render_public_ip_on_startup():
     except Exception as e:
         print("RENDER_PUBLIC_IP_CHECK_EXCEPTION =", e, flush=True)
 
-
 try:
     @app.route("/api/render_ip")
     def api_render_ip():
@@ -333,11 +293,6 @@ try:
 except Exception:
     pass
 
-
-
-# =========================================================
-# v107 스캘핑 AI 확장 엔진
-# =========================================================
 def v107_clamp(v, lo=0, hi=100):
     try:
         return max(lo, min(hi, safe_float(v, 0)))
@@ -519,7 +474,6 @@ def v107_calculate_scalping_score(row, price, orderbook=None):
         "orderPriority": final_score
     }
 
-
 def score_candidates(limit=700,cash=500000,min_qty=5,max_change=7,min_amount=1000000000,min_score=70):
     df=get_market_df(limit=limit)
     if df is None or df.empty: return []
@@ -605,16 +559,6 @@ def ensure_watch_running():
             t=threading.Thread(target=watch_loop,daemon=True); WATCH_STATE['thread']=t; t.start()
     return True
 
-
-# ===============================
-# Kiwoom REST 실전 자동매매 모듈
-# ===============================
-# Render 환경변수 등록명:
-# KIWOOM_APP_KEY      = 키움 App Key
-# KIWOOM_SECRET_KEY   = 키움 App Secret  (보조 호환: KIWOOM_APP_SECRET)
-# KIWOOM_REAL_TRADING = true  -> 실전 주문 허용
-# KIWOOM_DRY_RUN      = true  -> 실제 주문 전송 안 함 / false -> 실제 주문 전송
-
 TRADE_STATE_FILE = os.getenv("TRADE_STATE_FILE", "/tmp/sungil_trade_state_v107.json")
 KIWOOM_BASE_URL = os.getenv("KIWOOM_BASE_URL", "https://api.kiwoom.com").rstrip("/")
 KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "").strip()
@@ -625,11 +569,8 @@ AUTO_BUY_IN_WATCH_LOOP = os.getenv("AUTO_BUY_IN_WATCH_LOOP", "false").lower() ==
 AUTO_REBUY_AFTER_SELL = os.getenv("AUTO_REBUY_AFTER_SELL", "true").lower() == "true"
 ORDER_CASH_SAFETY_RATE = safe_float(os.getenv("ORDER_CASH_SAFETY_RATE", "0.96"), 0.96)
 
-
-
 PRICE_DIFF_LIMIT = safe_float(os.getenv("PRICE_DIFF_LIMIT", "0.01"), 0.01)
 KIWOOM_PRICE_REQUIRED = os.getenv("KIWOOM_PRICE_REQUIRED", "true").lower() == "true"
-
 
 TRADE_DEFAULTS = {
     "auto_trade_enabled": False,
@@ -667,9 +608,6 @@ TRADE_DEFAULTS = {
 }
 _TOKEN_CACHE = {"token": "", "expires": 0}
 
-
-
-
 def kiwoom_auth_help_message(msg):
     """
     키움 인증 실패 메시지를 사용자가 조치하기 쉬운 문장으로 변환합니다.
@@ -686,7 +624,6 @@ def kiwoom_auth_help_message(msg):
     if "8001" in s or "8002" in s or "App Key" in s or "Secret" in s:
         return "App Key 또는 Secret Key 검증 실패입니다. Render 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 또는 KIWOOM_APP_SECRET 값을 다시 확인하세요."
     return s
-
 
 def update_kiwoom_debug(stage, code="", status=0, message="", data=None):
     """
@@ -712,7 +649,6 @@ def update_kiwoom_debug(stage, code="", status=0, message="", data=None):
     except Exception as e:
         print("update_kiwoom_debug error:", e)
 
-
 def update_trade_status(status, message="", candidate=None, order=None, telegram=None):
     """
     실전 자동매매 진행상태를 저장합니다.
@@ -735,7 +671,6 @@ def update_trade_status(status, message="", candidate=None, order=None, telegram
         print("update trade status error:", e)
         return None
 
-
 def send_trade_telegram(text, status_label=""):
     """
     텔레그램 발송 결과를 상태창에도 기록합니다.
@@ -747,7 +682,6 @@ def send_trade_telegram(text, status_label=""):
         telegram={"ok": ok, "message": msg, "status": status_label}
     )
     return ok, msg
-
 
 def read_trade_state():
     try:
@@ -770,8 +704,6 @@ def write_trade_state(state):
     except Exception:
         return False
 
-
-
 def extract_available_qty(obj):
     """
     키움 주문 실패 메시지에서 '13주 매수가능' 같은 문구를 찾아 수량을 추출합니다.
@@ -785,7 +717,6 @@ def extract_available_qty(obj):
         return int(m.group(1))
     return 0
 
-
 def calc_safe_order_qty(max_order_cash, live_price):
     """
     실전 주문 수량 계산.
@@ -796,7 +727,6 @@ def calc_safe_order_qty(max_order_cash, live_price):
     if cash <= 0 or price <= 0:
         return 0
     return int(cash // price)
-
 
 def recommend_auto_trade_settings(total_cash):
     """
@@ -863,7 +793,6 @@ def recommend_auto_trade_settings(total_cash):
         "force_exit_time": "15:15"
     }
 
-
 def market_is_open():
     n = now_kst()
     if n.weekday() >= 5:
@@ -908,7 +837,6 @@ def kiwoom_get_token():
         update_kiwoom_debug("token_exception", "", 0, str(e))
         raise
 
-
 def parse_kiwoom_price(data):
     """
     키움 REST 현재가 응답에서 현재가를 안전하게 추출합니다.
@@ -941,7 +869,6 @@ def parse_kiwoom_price(data):
                     if p >= 10:
                         return p
     return 0
-
 
 def get_kiwoom_live_price(code):
     """
@@ -989,7 +916,6 @@ def get_kiwoom_live_price(code):
         print("kiwoom live price error:", code, e)
         return 0
 
-
 def get_trade_live_price(code, fallback=True):
     """
     실전 매매 기준 현재가.
@@ -1007,7 +933,6 @@ def get_trade_live_price(code, fallback=True):
 
     return 0, "NONE"
 
-
 def validate_price_gap(ai_price, live_price):
     """
     AI 후보가격과 주문 직전 키움 현재가 차이를 확인합니다.
@@ -1019,7 +944,6 @@ def validate_price_gap(ai_price, live_price):
         return False, 999
     gap = abs(ai_price - live_price) / live_price
     return gap <= PRICE_DIFF_LIMIT, gap
-
 
 def kiwoom_order(side, code, qty, price=0, order_type="market"):
     code = str(code).zfill(6)
@@ -1044,16 +968,6 @@ def kiwoom_order(side, code, qty, price=0, order_type="market"):
         data = {"raw": r.text}
     return {"ok": r.status_code == 200 and str(data.get("return_code", "0")) in ["0", ""], "status": r.status_code, "api_id": api_id, "request": body, "response": data}
 
-
-# ===============================
-# v107 AI PROFIT MAX: 키움 예수금/주문가능금액 기반 매수금 계산
-# ===============================
-
-
-
-# ============================================================
-# v107 키움 예수금 qry_tp 필수 파라미터 보정
-# ============================================================
 def make_kiwoom_cash_body(base=None):
     """
     키움 예수금/주문가능금액 조회 API에서 필수로 요구하는 qry_tp를 자동 포함합니다.
@@ -1066,7 +980,6 @@ def make_kiwoom_cash_body(base=None):
         # 일부 계정/API 버전에 따라 2/3 모두 허용될 수 있으므로 3을 우선 사용합니다.
         body["qry_tp"] = os.getenv("KIWOOM_CASH_QRY_TP", "3")
     return body
-
 
 def normalize_kiwoom_cash_result(data):
     """
@@ -1119,8 +1032,6 @@ def normalize_kiwoom_cash_result(data):
     except Exception:
         return {"orderable_cash": 0, "deposit": 0, "withdrawable": 0}
 
-
-
 def _recursive_find_number_by_keys(obj, keywords):
     """
     키움 계좌/예수금 응답 필드명이 환경마다 다를 수 있어
@@ -1144,7 +1055,6 @@ def _recursive_find_number_by_keys(obj, keywords):
                 best = nested
     return best
 
-
 def parse_kiwoom_cash(data):
     """
     키움 REST 응답에서 실제 매수에 사용할 수 있는 예수금/주문가능금액을 추출합니다.
@@ -1167,7 +1077,6 @@ def parse_kiwoom_cash(data):
 
     deposit_cash = _recursive_find_number_by_keys(data, deposit_keys)
     return deposit_cash
-
 
 def get_kiwoom_account_cash():
     """
@@ -1216,7 +1125,6 @@ def get_kiwoom_account_cash():
 
     return {"ok": False, "cash": 0, "source": "NONE", "message": last_error or "키움 예수금 조회 실패"}
 
-
 def get_trade_cash_info():
     """
     실전 매매용 현금 정보.
@@ -1233,7 +1141,6 @@ def get_trade_cash_info():
         return {"ok": True, "cash": fallback, "source": "DRY_RUN_SETTING", "message": "DRY_RUN 설정금액 사용"}
 
     return res
-
 
 def calc_dynamic_order_cash(live_price=0):
     """
@@ -1319,8 +1226,6 @@ def trade_can_buy(code, price):
         return False, "현재가 확인 실패"
     return True, "OK"
 
-
-
 def reset_daily_trade_count_if_needed(state=None):
     state = state or read_trade_state()
     today = now_kst().strftime("%Y-%m-%d")
@@ -1329,7 +1234,6 @@ def reset_daily_trade_count_if_needed(state=None):
         state["trade_count_today"] = 0
         write_trade_state(state)
     return state
-
 
 def should_force_exit_now(state=None):
     state = state or read_trade_state()
@@ -1340,7 +1244,6 @@ def should_force_exit_now(state=None):
         return (now.hour, now.minute) >= (hh, mm)
     except Exception:
         return False
-
 
 def can_open_new_scalp_trade(state=None):
     state = reset_daily_trade_count_if_needed(state or read_trade_state())
@@ -1354,15 +1257,11 @@ def can_open_new_scalp_trade(state=None):
         return False, f"하루 최대 거래횟수 {state.get('max_trades_per_day', 10)}회에 도달했습니다."
     return True, "신규 진입 가능"
 
-
 def mark_scalp_trade_opened():
     state = reset_daily_trade_count_if_needed(read_trade_state())
     state["trade_count_today"] = int(state.get("trade_count_today", 0)) + 1
     write_trade_state(state)
     return state
-
-
-
 
 def get_storage_status():
     try:
@@ -1375,7 +1274,6 @@ def get_storage_status():
         }
     except Exception as e:
         return {"path": "", "persistent": False, "message": str(e)}
-
 
 def upsert_holding(new_holding):
     """
@@ -1404,13 +1302,11 @@ def upsert_holding(new_holding):
         print("upsert_holding error:", e)
         return False
 
-
 def remove_holding_by_code(code):
     code = str(code).zfill(6)
     holdings = [h for h in read_holdings() if str(h.get("code", "")).zfill(6) != code]
     write_holdings(holdings)
     return holdings
-
 
 def parse_kiwoom_holdings(data):
     """
@@ -1486,7 +1382,6 @@ def parse_kiwoom_holdings(data):
             })
     return result
 
-
 def kiwoom_get_account_holdings():
     """
     키움 REST 실보유 잔고 동기화.
@@ -1528,7 +1423,6 @@ def kiwoom_get_account_holdings():
 
     return {"ok": False, "message": last_error or "키움 실보유 조회 실패", "holdings": []}
 
-
 def sync_kiwoom_holdings_to_local():
     """
     키움 계좌의 실제 보유종목을 로컬 보유종목에 병합합니다.
@@ -1556,7 +1450,6 @@ def sync_kiwoom_holdings_to_local():
     except Exception as e:
         print("sync_kiwoom_holdings_to_local error:", e)
         return read_holdings()
-
 
 def register_auto_holding(pick, code, live, qty, order, price_src="KIWOOM"):
     """
@@ -1607,12 +1500,6 @@ def register_auto_holding(pick, code, live, qty, order, price_src="KIWOOM"):
         update_trade_status("보유종목 자동등록 오류", str(e), candidate=pick, order=order)
         return None
 
-
-
-
-# ============================================================
-# v107 AI 추천 진입금액 / 보유종목 상세 표시 모듈
-# ============================================================
 def v107_ai_position_rate(ai_score=80, price=0, orderable_cash=0, current_positions=0, max_positions=3):
     """
     AI 단타 최적화용 진입 비율.
@@ -1658,7 +1545,6 @@ def v107_ai_position_rate(ai_score=80, price=0, orderable_cash=0, current_positi
             rate = min(rate, 0.30)
 
     return max(0.05, min(rate, 0.45))
-
 
 def v107_calc_ai_recommended_budget(pick=None, live_price=0):
     """
@@ -1730,7 +1616,6 @@ def v107_calc_ai_recommended_budget(pick=None, live_price=0):
         "source": cash_info.get("source")
     }
 
-
 def v107_calc_order_qty_from_ai_budget(pick=None, live_price=0):
     budget, info = v107_calc_ai_recommended_budget(pick, live_price)
     price = safe_float(live_price, 0)
@@ -1738,7 +1623,6 @@ def v107_calc_order_qty_from_ai_budget(pick=None, live_price=0):
         return 0, info
     qty = int(budget // price)
     return max(0, qty), info
-
 
 def v107_holding_status(rate, cur=0, target=0, stop=0):
     rate = safe_float(rate, 0)
@@ -1755,7 +1639,6 @@ def v107_holding_status(rate, cur=0, target=0, stop=0):
     if rate <= -1.5:
         return "손절 위험"
     return "관찰 중"
-
 
 def v107_enrich_holding(h):
     h = normalize_holding(dict(h))
@@ -1795,7 +1678,6 @@ def v107_enrich_holding(h):
     h["updatedBy"] = "v107"
     return h
 
-
 def v107_get_enriched_holdings():
     items = read_holdings()
     enriched = []
@@ -1808,7 +1690,6 @@ def v107_get_enriched_holdings():
             enriched.append(hh)
     write_holdings(enriched)
     return enriched
-
 
 try:
     # [v107 duplicate route disabled] @app.route("/api/v107_holdings")
@@ -1851,13 +1732,6 @@ try:
 except Exception:
     pass
 
-
-
-
-
-# ============================================================
-# v107 주문 가능 수량 0 오류 수정 모듈
-# ============================================================
 def v107_extract_orderable_cash(info=None):
     info = info or {}
     vals = []
@@ -1869,7 +1743,6 @@ def v107_extract_orderable_cash(info=None):
             for k in ["orderable_cash", "cash", "deposit", "withdrawable"]:
                 vals.append(safe_float(cash_info.get(k, 0), 0))
     return max(vals) if vals else 0
-
 
 def v107_get_orderable_cash():
     try:
@@ -1897,7 +1770,6 @@ def v107_get_orderable_cash():
     except Exception as e:
         last_err = str(e)
     return 0, {"ok": False, "message": locals().get("last_err", "키움 주문가능금액 조회 실패")}
-
 
 def v107_calc_final_order_qty(pick=None, live_price=0):
     state = read_trade_state()
@@ -1956,14 +1828,11 @@ def v107_calc_final_order_qty(pick=None, live_price=0):
         "ai_info": ai_info
     }
 
-
 def v107_calc_order_qty_from_ai_budget(pick=None, live_price=0):
     return v107_calc_final_order_qty(pick, live_price)
 
-
 def calc_auto_cash_order_qty(live_price, pick=None):
     return v107_calc_final_order_qty(pick, live_price)
-
 
 try:
     # [v107 duplicate route disabled] @app.route("/api/v107_order_qty_test")
@@ -1977,13 +1846,6 @@ try:
 except Exception:
     pass
 
-
-
-
-
-# ============================================================
-# v107 주문가능금액 적극 활용 / 키움 실제잔고 강제동기화 보강
-# ============================================================
 def v107_calc_aggressive_ai_budget(pick=None, live_price=0):
     """
     v107 핵심:
@@ -2083,7 +1945,6 @@ def v107_calc_aggressive_ai_budget(pick=None, live_price=0):
         "cash_raw": cash_raw
     }
 
-
 def v107_calc_final_order_qty(pick=None, live_price=0):
     budget, info = v107_calc_aggressive_ai_budget(pick, live_price)
     price = safe_float(live_price or (pick.get("price", 0) if isinstance(pick, dict) else 0), 0)
@@ -2095,8 +1956,6 @@ def v107_calc_final_order_qty(pick=None, live_price=0):
     info["qty"] = qty
     return qty, info
 
-
-# 기존 함수명 완전 덮어쓰기: 이후 코드가 어떤 버전 함수를 호출해도 v107 계산 사용
 def v96_calc_final_order_qty(pick=None, live_price=0):
     return v107_calc_final_order_qty(pick, live_price)
 
@@ -2108,7 +1967,6 @@ def v94_calc_order_qty_from_ai_budget(pick=None, live_price=0):
 
 def calc_auto_cash_order_qty(live_price, pick=None):
     return v107_calc_final_order_qty(pick, live_price)
-
 
 def v107_force_sync_holdings_old_disabled(full_sync=True):
     """
@@ -2141,12 +1999,9 @@ def v107_force_sync_holdings_old_disabled(full_sync=True):
     except Exception as e:
         return {"ok": False, "version": "v107", "message": str(e), "holdings": read_holdings()}
 
-
-# 기존 이름도 v107로 덮어쓰기
 def sync_kiwoom_holdings_to_local():
     res = v107_force_sync_holdings(full_sync=True)
     return res.get("holdings", read_holdings())
-
 
 try:
     # [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
@@ -2155,7 +2010,6 @@ try:
         return jsonify(v107_force_sync_holdings(full_sync=full))
 except Exception:
     pass
-
 
 try:
     @app.route("/api/v107_order_qty_test")
@@ -2168,8 +2022,6 @@ try:
         return jsonify({"ok": qty > 0, "version": "v107", "qty": qty, "info": info})
 except Exception:
     pass
-
-
 
 def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
     """
@@ -2385,7 +2237,6 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
     return {"ok": bool(order.get("ok")), "pick": pick, "order": order}
 
-
 def try_rebuy_after_sell(sold_code=""):
     """
     자동매도 성공 후 새로운 AI 후보를 자동으로 탐색/매수합니다.
@@ -2432,7 +2283,6 @@ def try_rebuy_after_sell(sold_code=""):
         send_trade_telegram(f"⚠️ <b>재매수 처리 오류</b>\n사유: {e}", "rebuy_error")
         return {"ok": False, "message": str(e)}
 
-
 def auto_sell_holding(kind, h, cur):
     state = read_trade_state()
     if not state.get("auto_trade_enabled") or not h.get("autoTrade"):
@@ -2474,23 +2324,11 @@ def auto_sell_holding(kind, h, cur):
     send_holding_alert(kind, h, cur)
     return False
 
-
 @app.before_request
 def auto_resume():
     try:
         if not request.path.startswith('/static') and read_holdings() and not WATCH_STATE.get('running'): ensure_watch_running()
     except Exception: pass
-
-
-
-# ============================================================
-# v107 키움 예수금 / 주문가능금액 자동 조회 모듈
-# ============================================================
-# 목적:
-# - 사용자가 앱에 총투자금을 직접 입력하지 않아도 키움 REST API에서
-#   예수금/주문가능금액을 자동 조회하여 자동매수 기준금액으로 사용합니다.
-# - 실제 매수 가능 기준은 "키움 주문가능금액"입니다.
-# - 조회 실패 시에는 무리하게 주문하지 않고 자동매수를 보류합니다.
 
 _ACCOUNT_CASH_CACHE = {
     "time": 0,
@@ -2502,7 +2340,6 @@ USE_KIWOOM_CASH_AUTO = os.getenv("USE_KIWOOM_CASH_AUTO", "true").lower() == "tru
 MAX_POSITION_COUNT = int(os.getenv("MAX_POSITION_COUNT", "3"))
 POSITION_CASH_RATE = safe_float(os.getenv("POSITION_CASH_RATE", "0.33"), 0.33)
 MIN_ORDER_CASH = safe_float(os.getenv("MIN_ORDER_CASH", "30000"), 30000)
-
 
 def parse_money_from_any(data, keys):
     """
@@ -2531,7 +2368,6 @@ def parse_money_from_any(data, keys):
                 return found
 
     return 0
-
 
 def parse_kiwoom_cash_response(data):
     """
@@ -2564,7 +2400,6 @@ def parse_kiwoom_cash_response(data):
         "withdrawable": int(withdrawable),
         "raw_checked_at": now_kst().strftime("%Y-%m-%d %H:%M:%S")
     }
-
 
 def kiwoom_get_account_cash(force=False):
     """
@@ -2657,20 +2492,17 @@ def kiwoom_get_account_cash(force=False):
     _ACCOUNT_CASH_CACHE.update({"time": time.time(), "data": res})
     return res
 
-
 def get_current_position_count():
     try:
         return len([h for h in read_holdings() if safe_float(h.get("qty", 0)) > 0])
     except Exception:
         return 0
 
-
 def get_open_holding_codes():
     try:
         return set(str(h.get("code", "")).zfill(6) for h in read_holdings())
     except Exception:
         return set()
-
 
 def get_auto_order_budget():
     """
@@ -2732,7 +2564,6 @@ def get_auto_order_budget():
         "cash_info": {"ok": True, "source": "MANUAL"}
     }
 
-
 def trade_can_buy_v107(code, price):
     """
     v107 매수 가능 조건:
@@ -2776,7 +2607,6 @@ def trade_can_buy_v107(code, price):
 
     return True, "OK"
 
-
 def calc_auto_cash_order_qty(live_price):
     """
     v107 수량 계산:
@@ -2793,8 +2623,6 @@ def calc_auto_cash_order_qty(live_price):
     qty = int(safe_float(budget.get("final_order_budget", budget.get("ai_recommended_budget", budget.get("budget", 0))), 0) // price)
     return max(0, qty), budget
 
-
-# v107 API: 키움 예수금/주문가능금액 확인
 try:
     @app.route("/api/kiwoom_cash")
     def api_kiwoom_cash():
@@ -2817,11 +2645,6 @@ try:
         })
 except Exception:
     pass
-
-# ============================================================
-# v107 자동매수 함수 보강
-# 기존 auto_buy_best_pick이 있으면 아래 함수가 이름을 덮어써서 v107 로직을 사용합니다.
-# ============================================================
 
 def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
     """
@@ -3019,8 +2842,6 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
     return {"ok": bool(order.get("ok")), "pick": pick, "order": order, "budget": budget}
 
-
-
 @app.route('/')
 def index(): return render_template_string(HTML)
 @app.route('/api/login_check',methods=['POST'])
@@ -3049,13 +2870,10 @@ def api_best_pick_test_alert():
     if not pick: return jsonify({'ok':False,'message':'현재 조건에 맞는 후보가 없습니다.'})
     return jsonify({'ok':send_better_pick_alert(pick,0),'pick':pick})
 
-
 @app.route('/api/storage_status')
 def api_storage_status():
     return jsonify({"ok": True, "storage": get_storage_status(), "holdings_count": len(read_holdings())})
 
-
-# [v107 duplicate route disabled] @app.route('/api/restore_holdings', methods=['POST'])
 def api_restore_holdings():
     data = request.get_json(force=True, silent=True) or {}
     items = data.get("holdings", [])
@@ -3080,14 +2898,11 @@ def api_restore_holdings():
     write_trade_state(state)
     return jsonify({"ok": True, "restored": restored, "holdings": read_holdings()})
 
-
 @app.route('/api/sync_kiwoom_holdings', methods=['POST','GET'])
 def api_sync_kiwoom_holdings():
     holdings = sync_kiwoom_holdings_to_local()
     return jsonify({'ok': True, 'holdings': holdings, 'count': len(holdings)})
 
-
-# [v107 duplicate route disabled] @app.route('/api/server_holdings_v107',methods=['GET','POST'])
 def api_server_holdings():
     if request.method=='GET':
         holdings = read_holdings()
@@ -3136,7 +2951,6 @@ def api_telegram_test_page():
     title='✅ 텔레그램 테스트 발송 완료' if ok else '⚠️ 텔레그램 테스트 실패'; body='텔레그램 앱에서 메시지를 확인해 주세요.' if ok else str(msg)
     return Response(f"<!doctype html><html lang='ko'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f8ed;padding:30px;color:#263629'><div style='background:white;border-radius:24px;padding:24px;box-shadow:0 10px 30px #0001'><h2>{title}</h2><p>{body}</p><a href='/' style='display:block;background:#5f8d65;color:white;padding:16px;border-radius:16px;text-align:center;text-decoration:none;font-weight:800'>앱으로 돌아가기</a></div></body></html>",mimetype='text/html; charset=utf-8')
 
-
 @app.route('/api/auto_trade/recommend_settings')
 def api_auto_trade_recommend_settings():
     cash = request.args.get("cash", 100000)
@@ -3166,8 +2980,6 @@ def api_auto_trade_apply_recommend_settings():
     state["last_order_message"] = f"{rec['mode']} 적용: 목표 {rec['target_rate_percent']}%, 손절 {rec['stop_rate_percent']}%, 키움 예수금 기준 1회 진입 상한 {rec['max_order_cash']:,}원, 동시 {rec.get('max_positions',3)}종목"
     write_trade_state(state)
     return jsonify({"ok": True, "recommend": rec, "state": state})
-
-
 
 @app.route('/api/kiwoom/cash')
 def api_kiwoom_cash_legacy():
@@ -3250,8 +3062,6 @@ def api_auto_trade_panic_stop():
     send_telegram_message('🛑 <b>긴급정지 실행</b>\n실전 자동매매를 OFF 했습니다.')
     return jsonify({'ok': True, 'state': state})
 
-
-
 @app.route('/api/kiwoom_price_test/<code>')
 def api_kiwoom_price_test(code):
     p = get_kiwoom_live_price(code)
@@ -3264,8 +3074,6 @@ def api_kiwoom_price_test(code):
         'kiwoom_ready': kiwoom_ready(),
         'base_url': KIWOOM_BASE_URL
     })
-
-
 
 @app.route('/api/v107_dashboard')
 def api_v107_dashboard():
@@ -3303,7 +3111,7 @@ def api_v107_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v107 AI PROFIT MAX",
+            "version": "KIWOOM REAL AUTO SCALPING v107 LITE OPTIMIZED",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -3612,7 +3420,6 @@ function manualSettingsGuide(){
   추천 예시: 목표 2.5 / 손절 -1.8 / 실제 매수금은 키움 예수금과 동시 보유 종목수 기준으로 자동 분배`;
 }
 
-
 async function autoTradeStatus(){
   const d=await fetchJson("/api/auto_trade/status");
   const s=d.state||{};
@@ -3679,16 +3486,11 @@ async function kiwoomPriceTest(){
 async function telegramStatus(){const d=await fetchJson("/api/telegram_status");$("telegramBox").innerHTML=d.ok?"✅ 텔레그램 설정 완료":"⚠️ Render 환경변수 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 확인 필요"}async function telegramTest(){const d=await fetchJson("/api/telegram_test");$("telegramBox").innerHTML=d.ok?"✅ 테스트 발송 완료":"⚠️ 테스트 실패: "+d.message}async function startWatch(){const d=await fetchJson("/api/server_watch/start",{method:"POST"});$("telegramBox").innerHTML=`🟢 실전 감시 시작 · ${d.holdings}개 · ${d.interval}초 간격`}async function login(){const d=await fetchJson("/api/login_check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("passwordInput").value})});if(d.ok){localStorage.setItem("sungil_ai_login_role",d.role);$("passwordLock").classList.add("hidden")}else $("loginMessage").innerText=d.message||"로그인 실패"}function checkLock(){if(!localStorage.getItem("sungil_ai_login_role"))$("passwordLock").classList.remove("hidden")}$("hName").addEventListener("blur",findCode);["hBuy","hAmount"].forEach(id=>$(id).addEventListener("input",calcHolding));window.addEventListener("load",()=>{setTimeout(()=>{$("loading").classList.add("hide");setTimeout(()=>$("loading").remove(),700)},3500);checkLock();bindMoneyInputs();loadBest();loadHoldings();telegramStatus();autoTradeStatus();setInterval(loadHoldings,20000);setInterval(autoTradeStatus,10000)});
 </script></body></html>'''
 
-# [v107] __main__ app.run moved to the very end so all overrides load first.
-# v107: Render 배포/재시작 시 Logs에 서버 공인 IP 출력
 try:
     print_render_public_ip_on_startup()
 except Exception as _ip_startup_error:
     print("RENDER_PUBLIC_IP_STARTUP_ERROR =", _ip_startup_error, flush=True)
 
-
-
-# v107: 화면에서 키움 예수금 실제 조회 상태 확인용
 try:
     @app.route("/api/v107_cash_check")
     def api_v107_cash_check():
@@ -3710,12 +3512,6 @@ try:
 except Exception:
     pass
 
-
-
-
-# ============================================================
-# v107 키움 인증/현재가/예수금 통합 진단 모듈
-# ============================================================
 def v107_env_status():
     app_key_ok = bool(os.getenv("KIWOOM_APP_KEY", "").strip())
     secret_ok = bool((os.getenv("KIWOOM_SECRET_KEY", "") or os.getenv("KIWOOM_APP_SECRET", "") or os.getenv("KIWOOM_SECRET", "")).strip())
@@ -3728,7 +3524,6 @@ def v107_env_status():
         "TELEGRAM_CHAT_ID": bool(os.getenv("TELEGRAM_CHAT_ID", "").strip()),
         "KIWOOM_BASE_URL": KIWOOM_BASE_URL
     }
-
 
 def v107_token_test():
     try:
@@ -3749,7 +3544,6 @@ def v107_token_test():
             "message": str(e),
             "help": "토큰 실패 시 Render IP 등록, App Key/Secret, 영웅문S# 추가인증 상태를 확인하세요."
         }
-
 
 def v107_price_test(code="005930"):
     code = str(code or "005930").zfill(6)
@@ -3772,7 +3566,6 @@ def v107_price_test(code="005930"):
             "debug": dbg,
             "message": str(e)
         }
-
 
 def v107_cash_test():
     results = {}
@@ -3806,7 +3599,6 @@ def v107_cash_test():
         "results": results,
         "message": "키움 예수금/주문가능금액 조회 성공" if ok else "키움 예수금/주문가능금액 조회 실패"
     }
-
 
 def v107_kiwoom_diagnosis(code="005930"):
     try:
@@ -3844,7 +3636,6 @@ def v107_kiwoom_diagnosis(code="005930"):
         "checked_at": now_kst().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-
 try:
     @app.route("/api/v107_kiwoom_diag")
     def api_v107_kiwoom_diag():
@@ -3852,7 +3643,6 @@ try:
         return jsonify(v107_kiwoom_diagnosis(code))
 except Exception:
     pass
-
 
 try:
     @app.route("/api/v107_price_test")
@@ -3862,7 +3652,6 @@ try:
 except Exception:
     pass
 
-
 try:
     @app.route("/api/v107_cash_test")
     def api_v107_cash_test():
@@ -3870,13 +3659,6 @@ try:
 except Exception:
     pass
 
-
-
-
-
-# ============================================================
-# v107 키움 실제잔고 강제 동기화 모듈
-# ============================================================
 def v107_normalize_real_holding(h):
     """
     키움 잔고 응답을 앱 보유종목 표준 구조로 정규화합니다.
@@ -3950,7 +3732,6 @@ def v107_normalize_real_holding(h):
         "updatedBy": "v107"
     }
 
-
 def v107_get_kiwoom_real_holdings_safe():
     """
     키움 실제잔고 조회를 안전하게 수행합니다.
@@ -3963,7 +3744,6 @@ def v107_get_kiwoom_real_holdings_safe():
         return {"ok": False, "holdings": [], "raw": res, "message": res.get("message", "키움 실잔고 조회 실패")}
     except Exception as e:
         return {"ok": False, "holdings": [], "message": str(e)}
-
 
 def v107_force_sync_holdings(full_sync=True):
     """
@@ -4039,11 +3819,8 @@ def v107_force_sync_holdings(full_sync=True):
         "message": "키움 실제잔고 기준으로 앱 보유종목을 강제 동기화했습니다."
     }
 
-
-# 기존 동기화 함수명을 v107 방식으로 덮어쓰기
 def sync_kiwoom_holdings_to_local():
     return v107_force_sync_holdings(full_sync=False).get("holdings", read_holdings())
-
 
 try:
     # [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
@@ -4052,7 +3829,6 @@ try:
         return jsonify(v107_force_sync_holdings(full_sync=full))
 except Exception:
     pass
-
 
 try:
     # [v107 duplicate route disabled] @app.route("/api/v107_holdings")
@@ -4065,16 +3841,10 @@ try:
 except Exception:
     pass
 
-
-
-# ============================================================
-# v107 최종 보유종목 키움 실제잔고 강제동기화 모듈
-# ============================================================
 def v107_clean_code(raw):
     s = str(raw or "").strip().replace("A", "")
     s = re.sub(r"[^0-9]", "", s)
     return s.zfill(6) if s else ""
-
 
 def v107_num(v, default=0):
     try:
@@ -4085,7 +3855,6 @@ def v107_num(v, default=0):
         return abs(safe_float(v, default))
     except Exception:
         return default
-
 
 def v107_find_holding_lists(obj):
     """
@@ -4106,7 +3875,6 @@ def v107_find_holding_lists(obj):
 
     walk(obj)
     return lists
-
 
 def parse_kiwoom_holdings(data):
     """
@@ -4205,7 +3973,6 @@ def parse_kiwoom_holdings(data):
 
     return list(by_code.values())
 
-
 def kiwoom_get_account_holdings():
     """
     v107 override:
@@ -4257,7 +4024,6 @@ def kiwoom_get_account_holdings():
             update_kiwoom_debug("holdings_exception", "", 0, last_error)
 
     return {"ok": False, "message": last_error or "키움 실제잔고 조회 실패 또는 보유종목 없음", "holdings": [], "raw": last_raw}
-
 
 def v107_force_sync_holdings(full_sync=True):
     """
@@ -4323,11 +4089,8 @@ def v107_force_sync_holdings(full_sync=True):
         "message": "키움 실제잔고 기준으로 앱 보유종목을 완전 동기화했습니다."
     }
 
-
-# 기존 함수명도 v107 full sync로 덮어쓰기
 def sync_kiwoom_holdings_to_local():
     return v107_force_sync_holdings(full_sync=True).get("holdings", read_holdings())
-
 
 try:
     # [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
@@ -4336,7 +4099,6 @@ try:
         return jsonify(v107_force_sync_holdings(full_sync=full))
 except Exception:
     pass
-
 
 try:
     # [v107 duplicate route disabled] @app.route("/api/v107_holdings")
@@ -4349,18 +4111,10 @@ try:
 except Exception:
     pass
 
-
-
-
-
-# ============================================================
-# v107 최종 키움 실제잔고 보유종목 동기화 모듈
-# ============================================================
 def v107_code(raw):
     s = str(raw or "").strip().replace("A", "")
     s = re.sub(r"[^0-9]", "", s)
     return s.zfill(6) if s else ""
-
 
 def v107_num(v, default=0):
     try:
@@ -4371,7 +4125,6 @@ def v107_num(v, default=0):
         return abs(safe_float(v, default))
     except Exception:
         return default
-
 
 def v107_deep_lists(obj):
     found = []
@@ -4386,7 +4139,6 @@ def v107_deep_lists(obj):
                 walk(v)
     walk(obj)
     return found
-
 
 def parse_kiwoom_holdings(data):
     if not isinstance(data, dict):
@@ -4475,7 +4227,6 @@ def parse_kiwoom_holdings(data):
 
     return list(by_code.values())
 
-
 def kiwoom_get_account_holdings():
     if not kiwoom_ready():
         return {"ok": False, "message": "키움 환경변수 미설정", "holdings": []}
@@ -4523,7 +4274,6 @@ def kiwoom_get_account_holdings():
 
     return {"ok": False, "message": last_error or "키움 실제잔고 조회 실패", "holdings": [], "raw": last_raw}
 
-
 def v107_force_sync_holdings(full_sync=True):
     res = kiwoom_get_account_holdings()
     if not res.get("ok"):
@@ -4545,25 +4295,18 @@ def v107_force_sync_holdings(full_sync=True):
 
     return {"ok": True, "version": "v107", "api_id": res.get("api_id"), "full_sync": True, "count": len(real_items), "holdings": real_items, "message": "키움 실제잔고 기준으로 앱 보유종목을 완전 동기화했습니다."}
 
-
 def sync_kiwoom_holdings_to_local():
     return v107_force_sync_holdings(full_sync=True).get("holdings", read_holdings())
 
-
-# [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
 def api_v107_force_sync_holdings_dup2():
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-
-# [v107 duplicate route disabled] @app.route("/api/v107_holdings")
 def api_v107_holdings_dup2():
     refresh = str(request.args.get("refresh", "0")).lower() in ["1", "true", "yes"]
     if refresh:
         return jsonify(v107_force_sync_holdings(full_sync=True))
     return jsonify({"ok": True, "version": "v107", "holdings": read_holdings()})
 
-
-# [v107 duplicate route disabled] @app.route("/api/server_holdings_v107", methods=["GET", "POST"])
 def api_server_holdings_v107():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -4584,11 +4327,6 @@ def api_server_holdings_v107():
         return jsonify(v107_force_sync_holdings(full_sync=True))
     return jsonify({"ok": True, "holdings": read_holdings(), "storage": get_storage_status() if "get_storage_status" in globals() else {}})
 
-
-# ============================================================
-# v107 최종 라우트: 보유종목 강제동기화 단일 진입점
-# ============================================================
-# [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
 def api_v107_force_sync_holdings_final():
     fn = globals().get("v107_force_sync_holdings") or globals().get("v100_force_sync_holdings") or globals().get("v99_force_sync_holdings") or globals().get("v98_force_sync_holdings")
     if fn:
@@ -4600,16 +4338,12 @@ def api_v107_force_sync_holdings_final():
             return jsonify({"ok": True, "version": "v107", "holdings": res.get("holdings", []), "message": "키움 실제잔고 기준 동기화 완료"})
     return jsonify({"ok": False, "version": "v107", "message": "force sync function not found", "holdings": read_holdings()})
 
-
-# [v107 duplicate route disabled] @app.route("/api/v107_holdings")
 def api_v107_holdings_final():
     refresh = str(request.args.get("refresh", "0")).lower() in ["1", "true", "yes"]
     if refresh:
         return api_v107_force_sync_holdings_final()
     return jsonify({"ok": True, "version": "v107", "holdings": read_holdings()})
 
-
-# [v107 duplicate route disabled] @app.route("/api/server_holdings_v107", methods=["GET", "POST"])
 def api_server_holdings_v107_final():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -4628,12 +4362,6 @@ def api_server_holdings_v107_final():
         return api_v107_force_sync_holdings_final()
     return jsonify({"ok": True, "holdings": read_holdings(), "storage": get_storage_status() if "get_storage_status" in globals() else {}})
 
-
-
-
-# ============================================================
-# v107 실제 키움잔고 표시 우선 / 오래된 보유목록 차단
-# ============================================================
 def v107_force_sync_holdings(full_sync=True):
     """
     키움 실제잔고를 서버 보유목록의 유일한 기준으로 사용합니다.
@@ -4685,13 +4413,9 @@ def v107_force_sync_holdings(full_sync=True):
             "holdings": read_holdings()
         }
 
-
-# [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
 def api_v107_force_sync_holdings_final():
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-
-# [v107 duplicate route disabled] @app.route("/api/v107_holdings")
 def api_v107_holdings_final():
     # 기본값 refresh=1: 화면 진입 시 항상 키움 실제잔고를 우선합니다.
     refresh = str(request.args.get("refresh", "1")).lower() not in ["0", "false", "no"]
@@ -4699,8 +4423,6 @@ def api_v107_holdings_final():
         return jsonify(v107_force_sync_holdings(full_sync=True))
     return jsonify({"ok": True, "version": "v107", "holdings": read_holdings()})
 
-
-# [v107 duplicate route disabled] @app.route("/api/server_holdings_v107", methods=["GET", "POST"])
 def api_server_holdings_v107_final():
     """
     보유 탭 전용 API.
@@ -4722,19 +4444,12 @@ def api_server_holdings_v107_final():
 
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-
-
-
-# ============================================================
-# v107 실제잔고 기반 자동매도 감시 보호 모듈
-# ============================================================
 _SELL_GUARD_SKIP = {}
 
 def v107_code(raw):
     s = str(raw or "").strip().replace("A", "")
     s = re.sub(r"[^0-9]", "", s)
     return s.zfill(6) if s else ""
-
 
 def v107_get_real_holding_codes():
     """
@@ -4762,7 +4477,6 @@ def v107_get_real_holding_codes():
         return set(), read_holdings(), {"ok": False, "message": str(e)}
 
     return set(), read_holdings(), {"ok": False, "message": "키움 실제잔고 조회 실패"}
-
 
 def v107_purge_not_real_holdings(reason="키움 실제잔고에 없음"):
     """
@@ -4809,7 +4523,6 @@ def v107_purge_not_real_holdings(reason="키움 실제잔고에 없음"):
         "message": "키움 실제잔고 기준으로 보유목록을 정리했습니다."
     }
 
-
 def v107_mark_sell_skip(code, name="", reason="매도가능수량 0"):
     code = v107_code(code)
     if not code:
@@ -4821,7 +4534,6 @@ def v107_mark_sell_skip(code, name="", reason="매도가능수량 0"):
         "time_text": now_kst().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-
 def v107_should_skip_sell(code):
     code = v107_code(code)
     info = _SELL_GUARD_SKIP.get(code)
@@ -4829,7 +4541,6 @@ def v107_should_skip_sell(code):
         return False
     # 30분 동안 동일 오류 반복 방지
     return time.time() - safe_float(info.get("time", 0), 0) < 1800
-
 
 def v107_remove_holding_if_not_real_or_sellable_zero(code, name="", reason="매도가능수량 0"):
     """
@@ -4862,7 +4573,6 @@ def v107_remove_holding_if_not_real_or_sellable_zero(code, name="", reason="매�
         "message": f"{name or code}는 매도가능수량 0으로 앱 보유목록에서 제거했습니다."
     }
 
-
 def v107_is_sellable_holding(h):
     """
     자동매도 대상인지 확인.
@@ -4893,26 +4603,18 @@ def v107_is_sellable_holding(h):
 
     return True, "OK"
 
-
-# 기존 write/read API용 강제동기화
 def v107_force_sync_holdings(full_sync=True):
     return v107_purge_not_real_holdings("v107 force sync")
 
-
-# [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
 def api_v107_force_sync_holdings_final():
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-
-# [v107 duplicate route disabled] @app.route("/api/v107_holdings")
 def api_v107_holdings_final():
     refresh = str(request.args.get("refresh", "1")).lower() not in ["0", "false", "no"]
     if refresh:
         return jsonify(v107_force_sync_holdings(full_sync=True))
     return jsonify({"ok": True, "version": "v107", "holdings": read_holdings()})
 
-
-# [v107 duplicate route disabled] @app.route("/api/server_holdings_v107", methods=["GET", "POST"])
 def api_server_holdings_v107_final():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -4931,20 +4633,10 @@ def api_server_holdings_v107_final():
 
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-
 @app.route("/api/v107_purge_fake_holdings", methods=["GET", "POST"])
 def api_v107_purge_fake_holdings():
     return jsonify(v107_purge_not_real_holdings("수동 정리 요청"))
 
-
-
-# ============================================================
-# v107 AI PROFIT MAX
-# 반드시 app.run 이전에 배치되어야 하는 최종 보유/감시/매도 보호 로직
-# ============================================================
-
-# v107는 과거 v103/v104 보유목록 파일을 사용하지 않습니다.
-# 녹십자홀딩스 같은 과거 캐시 종목이 다시 살아나는 것을 막기 위함입니다.
 HOLDINGS_FILE = str(BASE_DIR / "sungil_holdings_v107_real_balance.json")
 SELL_GUARD_FILE = str(BASE_DIR / "sungil_sell_guard_v107.json")
 
@@ -5377,15 +5069,12 @@ def ensure_watch_running():
             t.start()
     return True
 
-# [v107 duplicate route disabled] @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
 def api_v107_force_sync_holdings():
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-# [v107 duplicate route disabled] @app.route("/api/v107_holdings")
 def api_v107_holdings():
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-# [v107 duplicate route disabled] @app.route("/api/server_holdings_v107", methods=["GET", "POST"])
 def api_server_holdings_v107():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -5430,23 +5119,16 @@ def api_v107_reset_fake_holdings():
     sync["message"] = "v107 초기화 완료: 과거 보유목록 파일 제거 후 키움 실제잔고로 재동기화했습니다."
     return jsonify(sync)
 
-
-# ============================================================
-# v107 AI PROFIT MAX
-# 반드시 app.run 이전에 실행되는 최종 덮어쓰기 로직
-# ============================================================
 HOLDINGS_FILE = str(BASE_DIR / "sungil_holdings_v107_real_only.json")
 SELL_GUARD_FILE = str(BASE_DIR / "sungil_sell_guard_v107.json")
 
 _REAL_HOLDINGS_CACHE_V107 = {"time": 0, "res": None}
 REAL_HOLDINGS_CACHE_SEC_V107 = int(os.getenv("REAL_HOLDINGS_CACHE_SEC", "5"))
 
-
 def v107_code(raw):
     s = str(raw or "").strip().replace("A", "")
     s = re.sub(r"[^0-9]", "", s)
     return s.zfill(6) if s else ""
-
 
 def v107_num(v, default=0):
     try:
@@ -5457,7 +5139,6 @@ def v107_num(v, default=0):
         return abs(safe_float(v, default))
     except Exception:
         return default
-
 
 def v107_deep_dicts(obj):
     out = []
@@ -5471,7 +5152,6 @@ def v107_deep_dicts(obj):
                 walk(i)
     walk(obj)
     return out
-
 
 def parse_kiwoom_holdings(data):
     """v107: 키움 실제잔고 파싱 최종 강화."""
@@ -5561,7 +5241,6 @@ def parse_kiwoom_holdings(data):
             by_code[code] = h
     return list(by_code.values())
 
-
 def kiwoom_get_account_holdings():
     """v107: 실제잔고 조회 전용. 실패하면 과거 로컬을 반환하지 않습니다."""
     if not kiwoom_ready():
@@ -5611,7 +5290,6 @@ def kiwoom_get_account_holdings():
     update_kiwoom_debug("holdings_fail", "", 0, res["message"], last_raw)
     return res
 
-
 def v107_make_holding(code, name, qty, buy):
     code = v107_code(code)
     cur = 0
@@ -5640,14 +5318,12 @@ def v107_make_holding(code, name, qty, buy):
         "profitRate": round(((cur - buy) / buy * 100) if buy else 0, 2), "holdingStatus": "스크린샷 보정", "updatedBy": "v107_screen"
     }
 
-
 def v107_screen_holdings():
     """사용자 제공 2026-05-20 16:10 키움 잔고 화면 기준 비상 보정값."""
     return [
         v107_make_holding("010170", "대한광통신", 11, 23136),
         v107_make_holding("067310", "하나마이크론", 4, 46863),
     ]
-
 
 def v107_force_sync_holdings(full_sync=True, allow_screen_fallback=False):
     res = kiwoom_get_account_holdings()
@@ -5675,17 +5351,14 @@ def v107_force_sync_holdings(full_sync=True, allow_screen_fallback=False):
     write_trade_state(state)
     return {"ok": False, "version": "v107", "holdings": [], "count": 0, "source": "NONE", "message": "키움 실제잔고 조회 실패. 과거 로컬 보유목록은 표시하지 않습니다.", "kiwoom_error": res}
 
-
 def read_holdings_real_only():
     res = v107_force_sync_holdings(full_sync=True)
     return res.get("holdings", []) if isinstance(res, dict) else []
-
 
 def v107_real_map():
     res = v107_force_sync_holdings(full_sync=True)
     items = res.get("holdings", []) if isinstance(res, dict) else []
     return {v107_code(h.get("code")): h for h in items if v107_code(h.get("code")) and safe_float(h.get("qty", 0), 0) > 0}, res
-
 
 def v107_remove_local_holding(code, name="", reason="실제잔고에 없음"):
     code = v107_code(code)
@@ -5693,7 +5366,6 @@ def v107_remove_local_holding(code, name="", reason="실제잔고에 없음"):
     write_holdings(items)
     update_trade_status("v107 실제 미보유 종목 제거", f"{name or code}: {reason}")
     return items
-
 
 def auto_sell_holding(kind, h, cur):
     """v107: 자동매도는 장중 + 키움 실제잔고 확인 성공 + 실제 보유 종목일 때만 실행."""
@@ -5748,7 +5420,6 @@ def auto_sell_holding(kind, h, cur):
         pass
     return True
 
-
 def check_one_holding(h):
     h = normalize_holding(dict(h or {}))
     code = v107_code(h.get("code"))
@@ -5776,7 +5447,6 @@ def check_one_holding(h):
         auto_sell_holding("stop", h, cur)
     return h
 
-
 def watch_loop():
     last_best = 0
     while WATCH_STATE.get("running"):
@@ -5799,16 +5469,13 @@ def watch_loop():
             print("v107 watch loop error:", e)
         time.sleep(WATCH_INTERVAL)
 
-
 @app.route("/api/v107_force_sync_holdings", methods=["GET", "POST"])
 def api_v107_force_sync_holdings():
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-
 @app.route("/api/v107_holdings")
 def api_v107_holdings():
     return jsonify(v107_force_sync_holdings(full_sync=True))
-
 
 @app.route("/api/server_holdings_v107", methods=["GET", "POST"])
 def api_server_holdings_v107():
@@ -5826,12 +5493,10 @@ def api_server_holdings_v107():
             return jsonify({"ok": True, "version": "v107", "holdings": items, "message": "화면에서 임시 제거했습니다. 키움에 실제 보유 중이면 다시 동기화됩니다."})
     return jsonify(v107_force_sync_holdings(full_sync=True))
 
-
 @app.route("/api/restore_holdings", methods=["POST"])
 def api_restore_holdings_v107_disabled():
     # 브라우저 백업이 과거 종목을 되살리는 원인을 차단합니다.
     return jsonify(v107_force_sync_holdings(full_sync=True))
-
 
 @app.route("/api/v107_apply_screen_holdings", methods=["GET", "POST"])
 def api_v107_apply_screen_holdings():
@@ -5843,7 +5508,6 @@ def api_v107_apply_screen_holdings():
     state["last_order_message"] = "대한광통신 11주, 하나마이크론 4주 임시 반영. 키움 실제잔고 API 정상화 시 자동 대체됩니다."
     write_trade_state(state)
     return jsonify({"ok": True, "version": "v107", "holdings": items, "message": "스크린샷 기준 실제 보유종목을 임시 반영했습니다."})
-
 
 @app.route("/api/v107_reset_all_holdings", methods=["GET", "POST"])
 def api_v107_reset_all_holdings():
@@ -5863,7 +5527,6 @@ def api_v107_reset_all_holdings():
     res = v107_force_sync_holdings(full_sync=True)
     res["removed_files"] = removed_files
     return jsonify(res)
-
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '10000'))
