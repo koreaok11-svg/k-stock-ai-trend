@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v92 RENDER IP CHECK
-파일명: app_kiwoom_real_auto_scalping_v92_render_ip_check.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v93 CASH QRY FIX
+파일명: app_kiwoom_real_auto_scalping_v93_cash_qry_fix.py
 
-이 파일은 사용자가 업로드한 v92 계열 전체 텍스트를 기반으로 v92 목표 기능을 반영한 업그레이드본입니다.
+이 파일은 사용자가 업로드한 v93 계열 전체 텍스트를 기반으로 v93 목표 기능을 반영한 업그레이드본입니다.
 
-v92 반영 핵심:
+v93 반영 핵심:
 - 기존 키움 REST 토큰/현재가/주문/잔고동기화 구조 유지
 - 기존 보유종목 자동등록/Render 재배포 후 복구/localStorage 백업 구조 유지
-- AI 단타 후보에 v92 스캘핑 점수 추가
+- AI 단타 후보에 v93 스캘핑 점수 추가
 - 거래량 급증/거래대금/등락률/테마가중/체결강도 추정/호가잔량 추정 점수화
 - 매도 후 자동 신규 후보 탐색/재매수 구조 유지 및 상태 표시 강화
-- 실시간 상태 API /api/v92_dashboard 추가
-- 기존 /api/version을 v92로 갱신
+- 실시간 상태 API /api/v93_dashboard 추가
+- 기존 /api/version을 v93로 갱신
 - 저장소 확인 중 멈춤 문제 수정: BASE_DIR 정의, Persistent Disk 경로, loadHoldings 중복 함수 제거
 - Fetch is aborted 문제 수정: 프론트 요청 제한시간 확대, 초기 로딩에서 키움 동기화/현재가 refresh 분리
 
 
-v92 추가 수정:
+v93 추가 수정:
 - Flask endpoint 함수명 중복 오류 수정
 - /api/kiwoom_cash 와 /api/kiwoom/cash 가 서로 다른 함수명을 사용하도록 변경
 - Render 배포 시 AssertionError: View function mapping is overwriting... 방지
@@ -29,7 +29,7 @@ v92 추가 수정:
 """
 
 # ============================================================
-# v92 수정 내용
+# v93 수정 내용
 # - Render Flask 중복 endpoint 오류(api_kiwoom_cash) 수정
 # - 키움 예수금/주문가능금액 자동 조회 기능 유지
 # - 여러 종목 동시 단타 운용 기능 유지
@@ -47,7 +47,7 @@ from flask import Flask, jsonify, request, render_template_string, Response
 app = Flask(__name__)
 KST = timezone(timedelta(hours=9))
 
-# v92 FIX: Render 저장소 경로 통합
+# v93 FIX: Render 저장소 경로 통합
 # - Render Persistent Disk를 쓰면 APP_DATA_DIR=/var/data 로 설정하세요.
 # - Persistent Disk가 없으면 /tmp를 사용하므로 재배포 시 서버 파일은 사라질 수 있습니다.
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
@@ -183,7 +183,7 @@ def send_telegram_message(text):
         return (True,'sent') if r.status_code==200 else (False,r.text[:500])
     except Exception as e: return False,str(e)
 
-HOLDINGS_FILE=os.getenv('SERVER_HOLDINGS_FILE','/tmp/sungil_holdings_v92.json')
+HOLDINGS_FILE=os.getenv('SERVER_HOLDINGS_FILE','/tmp/sungil_holdings_v93.json')
 WATCH_STATE={'running':False,'thread':None,'last_alerts':{},'last_check':'','last_prices':{},'best_code':'','best_score':0}
 WATCH_LOCK=threading.Lock(); WATCH_INTERVAL=int(os.getenv('SERVER_WATCH_INTERVAL','20')); BEST_PICK_GAP=float(os.getenv('BEST_PICK_MIN_SCORE_GAP','3.0'))
 def read_holdings():
@@ -213,7 +213,7 @@ def send_holding_alert(kind,h,cur):
 
 
 # ============================================================
-# v92 Render 서버 공인 IP 확인 모듈
+# v93 Render 서버 공인 IP 확인 모듈
 # ============================================================
 _LAST_RENDER_IP_INFO = {
     "ip": "",
@@ -320,15 +320,15 @@ except Exception:
 
 
 # =========================================================
-# v92 스캘핑 AI 확장 엔진
+# v93 스캘핑 AI 확장 엔진
 # =========================================================
-def v92_clamp(v, lo=0, hi=100):
+def v93_clamp(v, lo=0, hi=100):
     try:
         return max(lo, min(hi, safe_float(v, 0)))
     except Exception:
         return lo
 
-def v92_get_orderbook_metrics(code):
+def v93_get_orderbook_metrics(code):
     """
     호가잔량/매수압력 조회.
     실제 키움 호가 API 필드명이 계정/문서 버전에 따라 다를 수 있어 여러 키를 방어적으로 탐색합니다.
@@ -388,7 +388,7 @@ def v92_get_orderbook_metrics(code):
             pass
         return result
 
-def v92_estimate_execution_strength(row):
+def v93_estimate_execution_strength(row):
     """
     체결강도 실제 API가 없을 때 쓰는 추정값.
     거래량순위/거래대금순위/당일등락률이 높을수록 강한 체결로 추정합니다.
@@ -397,11 +397,11 @@ def v92_estimate_execution_strength(row):
     volume_rank = safe_float(row.get("volumeRank", 0))
     day_change = safe_float(row.get("dayChange", 0))
     base = 80 + amount_rank * 0.35 + volume_rank * 0.35 + max(0, day_change) * 3.0
-    return round(v92_clamp(base, 50, 200), 2)
+    return round(v93_clamp(base, 50, 200), 2)
 
-def v92_calculate_scalping_score(row, price, orderbook=None):
+def v93_calculate_scalping_score(row, price, orderbook=None):
     """
-    v92 최종 스캘핑 점수.
+    v93 최종 스캘핑 점수.
     - 기존 후보 점수
     - 거래량 급증
     - 거래대금
@@ -432,10 +432,10 @@ def v92_calculate_scalping_score(row, price, orderbook=None):
         change_score = 40
 
     # 거래량/거래대금 급증 점수
-    volume_spike_score = v92_clamp(volume_rank * 0.6 + amount_rank * 0.4, 0, 100)
+    volume_spike_score = v93_clamp(volume_rank * 0.6 + amount_rank * 0.4, 0, 100)
 
     # 체결강도
-    execution_strength = v92_estimate_execution_strength(row)
+    execution_strength = v93_estimate_execution_strength(row)
     if execution_strength >= 150:
         execution_score = 100
     elif execution_strength >= 130:
@@ -457,7 +457,7 @@ def v92_calculate_scalping_score(row, price, orderbook=None):
         orderbook_score = 45
     else:
         # 실제 호가 API가 없으면 거래량/거래대금 기반으로 보수 추정
-        orderbook_score = v92_clamp((volume_rank + amount_rank) / 2 * 0.75, 20, 75)
+        orderbook_score = v93_clamp((volume_rank + amount_rank) / 2 * 0.75, 20, 75)
 
     raw = (
         base_score * 0.30 +
@@ -467,7 +467,7 @@ def v92_calculate_scalping_score(row, price, orderbook=None):
         change_score * 0.15
     ) * min(theme_weight, 1.25)
 
-    final_score = round(v92_clamp(raw, 0, 100), 2)
+    final_score = round(v93_clamp(raw, 0, 100), 2)
 
     reasons = []
     if volume_spike_score >= 80: reasons.append("거래량/거래대금 급증")
@@ -488,7 +488,7 @@ def v92_calculate_scalping_score(row, price, orderbook=None):
         status = "대기"
 
     return {
-        "aiScoreV92": final_score,
+        "aiScoreV93": final_score,
         "legacyScore": round(base_score, 2),
         "volumeSpikeScore": round(volume_spike_score, 2),
         "executionStrength": execution_strength,
@@ -528,10 +528,10 @@ def score_candidates(limit=700,cash=500000,min_qty=5,max_change=7,min_amount=100
             qty = int(cash // p) if p else 0
         if qty < min_qty:
             continue
-        orderbook = v92_get_orderbook_metrics(code)
-        v92_ai = v92_calculate_scalping_score(row, p, orderbook)
-        base_pick = {'code':code,'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'priceSource':src,'score':v92_ai['aiScoreV92'],'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':f"v92 스캘핑 AI: {v92_ai['scalpingStatus']} · {', '.join(v92_ai['scalpingReasons'])}. 현재가는 {src} 기준입니다. 추격보다 호가·거래량 유지 확인 후 접근이 좋습니다."}
-        base_pick.update(v92_ai)
+        orderbook = v93_get_orderbook_metrics(code)
+        v93_ai = v93_calculate_scalping_score(row, p, orderbook)
+        base_pick = {'code':code,'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'priceSource':src,'score':v93_ai['aiScoreV93'],'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':f"v93 스캘핑 AI: {v93_ai['scalpingStatus']} · {', '.join(v93_ai['scalpingReasons'])}. 현재가는 {src} 기준입니다. 추격보다 호가·거래량 유지 확인 후 접근이 좋습니다."}
+        base_pick.update(v93_ai)
         out.append(base_pick)
     return out
 
@@ -544,7 +544,7 @@ def best_pick_from_params(args=None):
             a,b=part.split('-'); ranges.append((safe_float(a),safe_float(b)))
         except Exception: pass
     if ranges: picks=[p for p in picks if any(lo<=p['price']<=hi for lo,hi in ranges)]
-    picks=sorted(picks, key=lambda x: safe_float(x.get('orderPriority', x.get('aiScoreV92', x.get('score', 0)))), reverse=True)
+    picks=sorted(picks, key=lambda x: safe_float(x.get('orderPriority', x.get('aiScoreV93', x.get('score', 0)))), reverse=True)
     return (picks[0] if picks else None), picks
 
 def send_better_pick_alert(pick,old_score=0):
@@ -599,7 +599,7 @@ def ensure_watch_running():
 # KIWOOM_REAL_TRADING = true  -> 실전 주문 허용
 # KIWOOM_DRY_RUN      = true  -> 실제 주문 전송 안 함 / false -> 실제 주문 전송
 
-TRADE_STATE_FILE = os.getenv("TRADE_STATE_FILE", "/tmp/sungil_trade_state_v92.json")
+TRADE_STATE_FILE = os.getenv("TRADE_STATE_FILE", "/tmp/sungil_trade_state_v93.json")
 KIWOOM_BASE_URL = os.getenv("KIWOOM_BASE_URL", "https://api.kiwoom.com").rstrip("/")
 KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "").strip()
 KIWOOM_SECRET_KEY = (os.getenv("KIWOOM_SECRET_KEY", "") or os.getenv("KIWOOM_APP_SECRET", "")).strip()
@@ -617,7 +617,7 @@ KIWOOM_PRICE_REQUIRED = os.getenv("KIWOOM_PRICE_REQUIRED", "true").lower() == "t
 
 TRADE_DEFAULTS = {
     "auto_trade_enabled": False,
-    # v92 cash multi fix: 화면 입력 총투자금이 아니라 키움 예수금/주문가능금액을 우선 사용합니다.
+    # v93 cash multi fix: 화면 입력 총투자금이 아니라 키움 예수금/주문가능금액을 우선 사용합니다.
     "max_total_cash": 500000,
     "max_order_cash": 450000,
     "cash_buffer": 50000,
@@ -1030,8 +1030,80 @@ def kiwoom_order(side, code, qty, price=0, order_type="market"):
 
 
 # ===============================
-# v92 RENDER IP CHECK: 키움 예수금/주문가능금액 기반 매수금 계산
+# v93 CASH QRY FIX: 키움 예수금/주문가능금액 기반 매수금 계산
 # ===============================
+
+
+
+# ============================================================
+# v93 키움 예수금 qry_tp 필수 파라미터 보정
+# ============================================================
+def make_kiwoom_cash_body(base=None):
+    """
+    키움 예수금/주문가능금액 조회 API에서 필수로 요구하는 qry_tp를 자동 포함합니다.
+    화면 오류:
+    return_msg: 입력 값 오류입니다[1511:필수 입력 값에 값이 존재하지 않습니다. 필수입력 파라미터=qry_tp]
+    """
+    body = dict(base or {})
+    if not body.get("qry_tp"):
+        # 키움 계좌 예수금/주문가능금액 조회용 기본 조회구분
+        # 일부 계정/API 버전에 따라 2/3 모두 허용될 수 있으므로 3을 우선 사용합니다.
+        body["qry_tp"] = os.getenv("KIWOOM_CASH_QRY_TP", "3")
+    return body
+
+
+def normalize_kiwoom_cash_result(data):
+    """
+    v93 보강: 여러 응답 필드명에서 예수금/주문가능금액을 더 넓게 탐색합니다.
+    """
+    try:
+        orderable_keys = [
+            "ord_psbl_cash", "ord_psbl_amt", "buy_psbl_amt", "buy_available_cash",
+            "nxtdy_buy_psbl_amt", "현금주문가능금액", "주문가능금액", "매수가능금액",
+            "ord_alow_amt", "max_buy_amt", "available", "avail_cash"
+        ]
+        deposit_keys = [
+            "dnca_tot_amt", "deposit", "예수금", "dps", "dpst", "entr",
+            "d1_entra", "d2_entra", "cash", "현금", "예수금총액"
+        ]
+        withdraw_keys = [
+            "wdrl_psbl_amt", "출금가능금액", "추정인출가능금액", "prsm_dpst"
+        ]
+
+        def deep_find(obj, keys):
+            best = 0
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if any(str(key) == str(k) or str(key) in str(k) for key in keys):
+                        val = abs(safe_float(str(v).replace(",", "").replace("+", "").replace("-", "").strip(), 0))
+                        if val > best:
+                            best = val
+                    nested = deep_find(v, keys)
+                    if nested > best:
+                        best = nested
+            elif isinstance(obj, list):
+                for item in obj:
+                    nested = deep_find(item, keys)
+                    if nested > best:
+                        best = nested
+            return best
+
+        orderable = deep_find(data, orderable_keys)
+        deposit = deep_find(data, deposit_keys)
+        withdrawable = deep_find(data, withdraw_keys)
+
+        if orderable <= 0 and deposit > 0:
+            orderable = deposit
+
+        return {
+            "orderable_cash": int(orderable),
+            "deposit": int(deposit),
+            "withdrawable": int(withdrawable),
+        }
+    except Exception:
+        return {"orderable_cash": 0, "deposit": 0, "withdrawable": 0}
+
+
 
 def _recursive_find_number_by_keys(obj, keywords):
     """
@@ -1091,9 +1163,9 @@ def get_kiwoom_account_cash():
         return {"ok": False, "cash": 0, "source": "NONE", "message": "키움 환경변수 미설정"}
 
     endpoints = [
-        ("/api/dostk/acnt", "kt00001", {}),
-        ("/api/dostk/acnt", "kt00004", {}),
-        ("/api/dostk/acnt", "kt00018", {}),
+        ("/api/dostk/acnt", "kt00001", make_kiwoom_cash_body()),
+        ("/api/dostk/acnt", "kt00004", make_kiwoom_cash_body()),
+        ("/api/dostk/acnt", "kt00018", make_kiwoom_cash_body()),
     ]
     last_error = ""
     for path, api_id, body in endpoints:
@@ -1106,13 +1178,16 @@ def get_kiwoom_account_cash():
                 "next-key": "",
                 "api-id": api_id
             }
-            r = requests.post(KIWOOM_BASE_URL + path, json=body, headers=headers, timeout=8)
+            r = requests.post(KIWOOM_BASE_URL + path, json=make_kiwoom_cash_body(body), headers=headers, timeout=8)
             try:
                 data = r.json() if r.text else {}
             except Exception:
                 data = {"raw": r.text[:1000]}
 
             cash = parse_kiwoom_cash(data)
+            norm_cash = normalize_kiwoom_cash_result(data)
+            if cash <= 0:
+                cash = safe_float(norm_cash.get("orderable_cash", 0), 0)
             if r.status_code == 200 and cash > 0:
                 update_kiwoom_debug("cash_ok", "", r.status_code, f"키움 주문가능금액 {cash:,.0f}원 조회 성공", {"cash": cash, "api_id": api_id})
                 return {"ok": True, "cash": cash, "source": "KIWOOM", "api_id": api_id, "message": "키움 예수금 조회 성공"}
@@ -1422,7 +1497,7 @@ def kiwoom_get_account_holdings():
                 "next-key": "",
                 "api-id": api_id
             }
-            r = requests.post(KIWOOM_BASE_URL + path, json=body, headers=headers, timeout=8)
+            r = requests.post(KIWOOM_BASE_URL + path, json=make_kiwoom_cash_body(body), headers=headers, timeout=8)
             try:
                 data = r.json() if r.text else {}
             except Exception:
@@ -1757,7 +1832,7 @@ def try_rebuy_after_sell(sold_code=""):
             update_trade_status("재매수 대기", "장중이 아니므로 신규 매수를 진행하지 않습니다.")
             return {"ok": False, "message": "market closed"}
 
-        # v92 RENDER IP CHECK: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
+        # v93 CASH QRY FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
 
         if safe_float(state.get("daily_realized_pnl", 0)) <= safe_float(state.get("daily_max_loss", -30000)):
             update_trade_status("재매수 중지", "하루 최대 손실 제한에 도달하여 신규 매수를 중지합니다.")
@@ -1830,7 +1905,7 @@ def auto_resume():
 
 
 # ============================================================
-# v92 키움 예수금 / 주문가능금액 자동 조회 모듈
+# v93 키움 예수금 / 주문가능금액 자동 조회 모듈
 # ============================================================
 # 목적:
 # - 사용자가 앱에 총투자금을 직접 입력하지 않아도 키움 REST API에서
@@ -1935,10 +2010,10 @@ def kiwoom_get_account_cash(force=False):
 
     # 키움 예수금/계좌 관련 TR은 환경에 따라 다를 수 있어 여러 api-id를 순차 시도
     endpoints = [
-        ("/api/dostk/acnt", "kt00001", {}),
-        ("/api/dostk/acnt", "kt00004", {}),
-        ("/api/dostk/acnt", "kt00005", {}),
-        ("/api/dostk/acnt", "kt00018", {}),
+        ("/api/dostk/acnt", "kt00001", make_kiwoom_cash_body()),
+        ("/api/dostk/acnt", "kt00004", make_kiwoom_cash_body()),
+        ("/api/dostk/acnt", "kt00005", make_kiwoom_cash_body()),
+        ("/api/dostk/acnt", "kt00018", make_kiwoom_cash_body()),
     ]
 
     last_error = ""
@@ -1952,13 +2027,16 @@ def kiwoom_get_account_cash(force=False):
                 "next-key": "",
                 "api-id": api_id
             }
-            r = requests.post(KIWOOM_BASE_URL + path, json=body, headers=headers, timeout=8)
+            r = requests.post(KIWOOM_BASE_URL + path, json=make_kiwoom_cash_body(body), headers=headers, timeout=8)
             try:
                 data = r.json() if r.text else {}
             except Exception:
                 data = {"raw": r.text[:1000]}
 
             parsed = parse_kiwoom_cash_response(data)
+            norm_cash = normalize_kiwoom_cash_result(data)
+            if parsed.get("orderable_cash", 0) <= 0 and norm_cash.get("orderable_cash", 0) > 0:
+                parsed.update(norm_cash)
             if r.status_code == 200 and parsed.get("orderable_cash", 0) > 0:
                 res = {
                     "ok": True,
@@ -2017,7 +2095,7 @@ def get_open_holding_codes():
 
 def get_auto_order_budget():
     """
-    v92 핵심:
+    v93 핵심:
     앱 입력 총투자금이 아니라 키움 주문가능금액을 기준으로 1회 진입금 계산.
     여러 종목 동시 운용을 위해 주문가능금액의 POSITION_CASH_RATE만 사용.
     """
@@ -2076,9 +2154,9 @@ def get_auto_order_budget():
     }
 
 
-def trade_can_buy_v92(code, price):
+def trade_can_buy_v93(code, price):
     """
-    v92 매수 가능 조건:
+    v93 매수 가능 조건:
     - 1종목 제한 제거
     - 최대 동시 보유 종목수까지만 허용
     - 동일 종목 중복매수 방지
@@ -2122,7 +2200,7 @@ def trade_can_buy_v92(code, price):
 
 def calc_auto_cash_order_qty(live_price):
     """
-    v92 수량 계산:
+    v93 수량 계산:
     키움 주문가능금액 자동조회 → 종목당 예산 계산 → 주문수량 산출
     """
     budget = get_auto_order_budget()
@@ -2137,38 +2215,38 @@ def calc_auto_cash_order_qty(live_price):
     return max(0, qty), budget
 
 
-# v92 API: 키움 예수금/주문가능금액 확인
+# v93 API: 키움 예수금/주문가능금액 확인
 try:
     @app.route("/api/kiwoom_cash")
     def api_kiwoom_cash():
         force = str(request.args.get("force", "0")).lower() in ["1", "true", "yes"]
         return jsonify(kiwoom_get_account_cash(force=force))
 
-    @app.route("/api/v92_cash")
-    def api_v92_cash():
+    @app.route("/api/v93_cash")
+    def api_v93_cash():
         cash = kiwoom_get_account_cash(force=True)
         budget = get_auto_order_budget()
         return jsonify({
             "ok": bool(cash.get("ok")),
-            "version": "v92",
+            "version": "v93",
             "cash": cash,
             "budget": budget,
             "max_position_count": MAX_POSITION_COUNT,
             "position_cash_rate": POSITION_CASH_RATE,
             "min_order_cash": MIN_ORDER_CASH,
-            "message": "v92는 앱 입력금액이 아니라 키움 주문가능금액을 자동 조회하여 매수 기준으로 사용합니다."
+            "message": "v93는 앱 입력금액이 아니라 키움 주문가능금액을 자동 조회하여 매수 기준으로 사용합니다."
         })
 except Exception:
     pass
 
 # ============================================================
-# v92 자동매수 함수 보강
-# 기존 auto_buy_best_pick이 있으면 아래 함수가 이름을 덮어써서 v92 로직을 사용합니다.
+# v93 자동매수 함수 보강
+# 기존 auto_buy_best_pick이 있으면 아래 함수가 이름을 덮어써서 v93 로직을 사용합니다.
 # ============================================================
 
 def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
     """
-    v92:
+    v93:
     - 키움 예수금/주문가능금액 자동 조회
     - 1종목 제한 제거
     - 여러 종목 동시 단타 가능
@@ -2181,7 +2259,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
         update_trade_status("AI 대기중", open_reason)
         return {"ok": False, "message": open_reason}
 
-    update_trade_status("종목 탐색중", "v92 키움 주문가능금액 기준으로 AI 단타 후보를 찾는 중입니다.")
+    update_trade_status("종목 탐색중", "v93 키움 주문가능금액 기준으로 AI 단타 후보를 찾는 중입니다.")
 
     if args is not None:
         pick, picks = best_pick_from_params(args)
@@ -2245,7 +2323,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
         update_trade_status("매수 보류", reason, candidate=pick)
         return {"ok": False, "message": reason, "pick": pick}
 
-    allowed, reason = trade_can_buy_v92(code, live)
+    allowed, reason = trade_can_buy_v93(code, live)
 
     if not allowed:
         update_trade_status("매수 보류", reason, candidate=pick)
@@ -2260,7 +2338,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
     update_trade_status(
         "주문 전송중",
-        f"v92 키움 주문가능금액 기준 매수 주문: {pick.get('name')} {qty}주 / 주문가능금액 {budget.get('orderable_cash', 0):,.0f}원 / 1회예산 {budget.get('budget', 0):,.0f}원",
+        f"v93 키움 주문가능금액 기준 매수 주문: {pick.get('name')} {qty}주 / 주문가능금액 {budget.get('orderable_cash', 0):,.0f}원 / 1회예산 {budget.get('budget', 0):,.0f}원",
         candidate=pick
     )
 
@@ -2286,13 +2364,13 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
         update_trade_status(
             "매수 성공" if not order.get("dry_run") else "DRY-RUN 매수 성공",
-            f"v92 {pick['name']} {qty}주 매수 처리 완료",
+            f"v93 {pick['name']} {qty}주 매수 처리 완료",
             candidate=pick,
             order=order
         )
 
         send_trade_telegram(
-            f"🚀 <b>v92 AI 자동매수 {'DRY-RUN ' if order.get('dry_run') else ''}진행</b>\n"
+            f"🚀 <b>v93 AI 자동매수 {'DRY-RUN ' if order.get('dry_run') else ''}진행</b>\n"
             f"종목: <b>{pick['name']}</b> ({code})\n"
             f"매수가 기준: {live:,.0f}원 ({price_src})\n"
             f"수량: {qty:,}주\n"
@@ -2304,8 +2382,8 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
             f"AI 점수: {safe_float(pick.get('score', 0)):.2f}\n"
             f"테마: {pick.get('theme', '')}\n"
             f"시간: {now_kst().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            "※ v92는 앱 입력금액이 아니라 키움 주문가능금액을 자동 기준으로 사용합니다.",
-            "buy_success_v92"
+            "※ v93는 앱 입력금액이 아니라 키움 주문가능금액을 자동 기준으로 사용합니다.",
+            "buy_success_v93"
         )
 
     else:
@@ -2335,14 +2413,14 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
                 update_trade_status("수량 조정 매수 성공", f"{pick['name']} {retry_qty}주 매수 처리 완료", candidate=pick, order=retry_order)
                 send_trade_telegram(
-                    f"🚀 <b>v92 AI 자동매수 수량조정 진행</b>\n"
+                    f"🚀 <b>v93 AI 자동매수 수량조정 진행</b>\n"
                     f"종목: <b>{pick['name']}</b> ({code})\n"
                     f"매수가 기준: {live:,.0f}원 ({price_src})\n"
                     f"최초 수량: {qty:,}주 → 조정 수량: {retry_qty:,}주\n"
                     f"매수금액: {retry_amount:,.0f}원\n"
                     f"키움 주문가능금액: {budget.get('orderable_cash', 0):,.0f}원\n"
                     f"시간: {now_kst().strftime('%Y-%m-%d %H:%M:%S')}",
-                    "buy_retry_success_v92"
+                    "buy_retry_success_v93"
                 )
                 return {"ok": True, "pick": pick, "order": retry_order, "adjusted_qty": retry_qty, "budget": budget}
 
@@ -2351,13 +2429,13 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
         update_trade_status("매수 실패", reason, candidate=pick, order=order)
         send_trade_telegram(
-            f"⚠️ <b>v92 AI 자동매수 실패</b>\n"
+            f"⚠️ <b>v93 AI 자동매수 실패</b>\n"
             f"종목: {pick.get('name')} ({code})\n"
             f"현재가: {live:,.0f}원\n"
             f"수량: {qty:,}주\n"
             f"사유: {reason}\n\n"
             "키움 예수금/주문가능금액 또는 주문 가능 수량을 확인하세요.",
-            "buy_fail_v92"
+            "buy_fail_v93"
         )
 
     return {"ok": bool(order.get("ok")), "pick": pick, "order": order, "budget": budget}
@@ -2606,10 +2684,10 @@ def api_kiwoom_price_test(code):
 
 
 
-@app.route('/api/v92_dashboard')
-def api_v92_dashboard():
+@app.route('/api/v93_dashboard')
+def api_v93_dashboard():
     """
-    v92 실시간 수익률/후보/상태 통합 대시보드 API.
+    v93 실시간 수익률/후보/상태 통합 대시보드 API.
     기존 화면을 크게 깨지 않고 새 HTS형 UI를 붙일 때 사용할 수 있습니다.
     """
     try:
@@ -2642,7 +2720,7 @@ def api_v92_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v92 RENDER IP CHECK",
+            "version": "KIWOOM REAL AUTO SCALPING v93 CASH QRY FIX",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -2671,9 +2749,9 @@ def api_v92_dashboard():
         return jsonify({"ok": False, "message": str(e)}), 500
 
 @app.route('/api/version')
-def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v92-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v92_fetch_fix.py','v92_dashboard':'/api/v92_dashboard'})
+def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v93-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v93_fetch_fix.py','v93_dashboard':'/api/v93_dashboard'})
 
-HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v92</title><style>
+HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v93</title><style>
 :root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}}
 
 .quick-money{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 18px}
@@ -2681,7 +2759,7 @@ HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name
 .quick-money button.darkmini{background:#32475a;color:white}
 .quick-money .hint{width:100%;font-size:.82em;color:#6d7782;margin-top:2px}
 
-</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v92</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v93</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -2781,7 +2859,7 @@ function clearMoneyFast(){
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
 function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("요청 시간이 길어져 중단되었습니다. 잠시 후 다시 시도하거나 후보 조건을 낮춰주세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString(),{timeoutMs:120000});$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString(),{timeoutMs:120000});$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"refresh"})});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
-  // v92 FETCH FIX
+  // v93 FETCH FIX
   // 초기 화면에서 키움 실보유 동기화(sync=1)와 현재가 갱신(refresh=1)을 동시에 호출하면
   // 모바일/Render 환경에서 20초 이상 걸려 Fetch is aborted가 발생할 수 있습니다.
   // 따라서 1단계는 서버 저장 보유종목만 빠르게 표시하고, 2단계로 백그라운드 갱신을 분리합니다.
@@ -2926,7 +3004,7 @@ async function loadStorageStatus(){
   }
 }
 
-// v92 FIX: 아래 중복 loadHoldings 함수가 기존 복구/백업 로직을 덮어써서
+// v93 FIX: 아래 중복 loadHoldings 함수가 기존 복구/백업 로직을 덮어써서
 // '저장소 확인 중...'이 계속 남고 브라우저 백업 복구가 실행되지 않던 문제를 제거했습니다.
 
 async function applyAiSettings(){
@@ -3032,9 +3110,32 @@ if __name__=='__main__':
 
 
 
-# v92: Render 배포/재시작 시 Logs에 서버 공인 IP 출력
+# v93: Render 배포/재시작 시 Logs에 서버 공인 IP 출력
 try:
     print_render_public_ip_on_startup()
 except Exception as _ip_startup_error:
     print("RENDER_PUBLIC_IP_STARTUP_ERROR =", _ip_startup_error, flush=True)
 
+
+
+# v93: 화면에서 키움 예수금 실제 조회 상태 확인용
+try:
+    @app.route("/api/v93_cash_check")
+    def api_v93_cash_check():
+        try:
+            cash1 = get_kiwoom_account_cash() if "get_kiwoom_account_cash" in globals() else {}
+        except Exception as e:
+            cash1 = {"ok": False, "message": str(e)}
+        try:
+            cash2 = kiwoom_get_account_cash(force=True) if "kiwoom_get_account_cash" in globals() else {}
+        except Exception as e:
+            cash2 = {"ok": False, "message": str(e)}
+        return jsonify({
+            "ok": bool(cash1.get("ok") or cash2.get("ok")),
+            "version": "v93",
+            "primary_cash": cash1,
+            "secondary_cash": cash2,
+            "message": "v93: qry_tp 필수 파라미터 포함 후 키움 예수금/주문가능금액 조회 결과입니다."
+        })
+except Exception:
+    pass
