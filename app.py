@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v94 AI BUDGET HOLDING VIEW
-파일명: app_kiwoom_real_auto_scalping_v94_ai_budget_holding_view.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v95 KIWOOM DIAG FIX
+파일명: app_kiwoom_real_auto_scalping_v95_kiwoom_diag_fix.py
 
-이 파일은 사용자가 업로드한 v94 계열 전체 텍스트를 기반으로 v94 목표 기능을 반영한 업그레이드본입니다.
+이 파일은 사용자가 업로드한 v95 계열 전체 텍스트를 기반으로 v95 목표 기능을 반영한 업그레이드본입니다.
 
-v94 반영 핵심:
+v95 반영 핵심:
 - 기존 키움 REST 토큰/현재가/주문/잔고동기화 구조 유지
 - 기존 보유종목 자동등록/Render 재배포 후 복구/localStorage 백업 구조 유지
-- AI 단타 후보에 v94 스캘핑 점수 추가
+- AI 단타 후보에 v95 스캘핑 점수 추가
 - 거래량 급증/거래대금/등락률/테마가중/체결강도 추정/호가잔량 추정 점수화
 - 매도 후 자동 신규 후보 탐색/재매수 구조 유지 및 상태 표시 강화
-- 실시간 상태 API /api/v94_dashboard 추가
-- 기존 /api/version을 v94로 갱신
+- 실시간 상태 API /api/v95_dashboard 추가
+- 기존 /api/version을 v95로 갱신
 - 저장소 확인 중 멈춤 문제 수정: BASE_DIR 정의, Persistent Disk 경로, loadHoldings 중복 함수 제거
 - Fetch is aborted 문제 수정: 프론트 요청 제한시간 확대, 초기 로딩에서 키움 동기화/현재가 refresh 분리
 
 
-v94 추가 수정:
+v95 추가 수정:
 - Flask endpoint 함수명 중복 오류 수정
 - /api/kiwoom_cash 와 /api/kiwoom/cash 가 서로 다른 함수명을 사용하도록 변경
 - Render 배포 시 AssertionError: View function mapping is overwriting... 방지
@@ -29,7 +29,7 @@ v94 추가 수정:
 """
 
 # ============================================================
-# v94 수정 내용
+# v95 수정 내용
 # - Render Flask 중복 endpoint 오류(api_kiwoom_cash) 수정
 # - 키움 예수금/주문가능금액 자동 조회 기능 유지
 # - 여러 종목 동시 단타 운용 기능 유지
@@ -47,7 +47,7 @@ from flask import Flask, jsonify, request, render_template_string, Response
 app = Flask(__name__)
 KST = timezone(timedelta(hours=9))
 
-# v94 FIX: Render 저장소 경로 통합
+# v95 FIX: Render 저장소 경로 통합
 # - Render Persistent Disk를 쓰면 APP_DATA_DIR=/var/data 로 설정하세요.
 # - Persistent Disk가 없으면 /tmp를 사용하므로 재배포 시 서버 파일은 사라질 수 있습니다.
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
@@ -183,7 +183,7 @@ def send_telegram_message(text):
         return (True,'sent') if r.status_code==200 else (False,r.text[:500])
     except Exception as e: return False,str(e)
 
-HOLDINGS_FILE=os.getenv('SERVER_HOLDINGS_FILE','/tmp/sungil_holdings_v94.json')
+HOLDINGS_FILE=os.getenv('SERVER_HOLDINGS_FILE','/tmp/sungil_holdings_v95.json')
 WATCH_STATE={'running':False,'thread':None,'last_alerts':{},'last_check':'','last_prices':{},'best_code':'','best_score':0}
 WATCH_LOCK=threading.Lock(); WATCH_INTERVAL=int(os.getenv('SERVER_WATCH_INTERVAL','20')); BEST_PICK_GAP=float(os.getenv('BEST_PICK_MIN_SCORE_GAP','3.0'))
 def read_holdings():
@@ -213,7 +213,7 @@ def send_holding_alert(kind,h,cur):
 
 
 # ============================================================
-# v94 Render 서버 공인 IP 확인 모듈
+# v95 Render 서버 공인 IP 확인 모듈
 # ============================================================
 _LAST_RENDER_IP_INFO = {
     "ip": "",
@@ -320,15 +320,15 @@ except Exception:
 
 
 # =========================================================
-# v94 스캘핑 AI 확장 엔진
+# v95 스캘핑 AI 확장 엔진
 # =========================================================
-def v94_clamp(v, lo=0, hi=100):
+def v95_clamp(v, lo=0, hi=100):
     try:
         return max(lo, min(hi, safe_float(v, 0)))
     except Exception:
         return lo
 
-def v94_get_orderbook_metrics(code):
+def v95_get_orderbook_metrics(code):
     """
     호가잔량/매수압력 조회.
     실제 키움 호가 API 필드명이 계정/문서 버전에 따라 다를 수 있어 여러 키를 방어적으로 탐색합니다.
@@ -388,7 +388,7 @@ def v94_get_orderbook_metrics(code):
             pass
         return result
 
-def v94_estimate_execution_strength(row):
+def v95_estimate_execution_strength(row):
     """
     체결강도 실제 API가 없을 때 쓰는 추정값.
     거래량순위/거래대금순위/당일등락률이 높을수록 강한 체결로 추정합니다.
@@ -397,11 +397,11 @@ def v94_estimate_execution_strength(row):
     volume_rank = safe_float(row.get("volumeRank", 0))
     day_change = safe_float(row.get("dayChange", 0))
     base = 80 + amount_rank * 0.35 + volume_rank * 0.35 + max(0, day_change) * 3.0
-    return round(v94_clamp(base, 50, 200), 2)
+    return round(v95_clamp(base, 50, 200), 2)
 
-def v94_calculate_scalping_score(row, price, orderbook=None):
+def v95_calculate_scalping_score(row, price, orderbook=None):
     """
-    v94 최종 스캘핑 점수.
+    v95 최종 스캘핑 점수.
     - 기존 후보 점수
     - 거래량 급증
     - 거래대금
@@ -432,10 +432,10 @@ def v94_calculate_scalping_score(row, price, orderbook=None):
         change_score = 40
 
     # 거래량/거래대금 급증 점수
-    volume_spike_score = v94_clamp(volume_rank * 0.6 + amount_rank * 0.4, 0, 100)
+    volume_spike_score = v95_clamp(volume_rank * 0.6 + amount_rank * 0.4, 0, 100)
 
     # 체결강도
-    execution_strength = v94_estimate_execution_strength(row)
+    execution_strength = v95_estimate_execution_strength(row)
     if execution_strength >= 150:
         execution_score = 100
     elif execution_strength >= 130:
@@ -457,7 +457,7 @@ def v94_calculate_scalping_score(row, price, orderbook=None):
         orderbook_score = 45
     else:
         # 실제 호가 API가 없으면 거래량/거래대금 기반으로 보수 추정
-        orderbook_score = v94_clamp((volume_rank + amount_rank) / 2 * 0.75, 20, 75)
+        orderbook_score = v95_clamp((volume_rank + amount_rank) / 2 * 0.75, 20, 75)
 
     raw = (
         base_score * 0.30 +
@@ -467,7 +467,7 @@ def v94_calculate_scalping_score(row, price, orderbook=None):
         change_score * 0.15
     ) * min(theme_weight, 1.25)
 
-    final_score = round(v94_clamp(raw, 0, 100), 2)
+    final_score = round(v95_clamp(raw, 0, 100), 2)
 
     reasons = []
     if volume_spike_score >= 80: reasons.append("거래량/거래대금 급증")
@@ -488,7 +488,7 @@ def v94_calculate_scalping_score(row, price, orderbook=None):
         status = "대기"
 
     return {
-        "aiScoreV94": final_score,
+        "aiScoreV95": final_score,
         "legacyScore": round(base_score, 2),
         "volumeSpikeScore": round(volume_spike_score, 2),
         "executionStrength": execution_strength,
@@ -528,10 +528,10 @@ def score_candidates(limit=700,cash=500000,min_qty=5,max_change=7,min_amount=100
             qty = int(cash // p) if p else 0
         if qty < min_qty:
             continue
-        orderbook = v94_get_orderbook_metrics(code)
-        v94_ai = v94_calculate_scalping_score(row, p, orderbook)
-        base_pick = {'code':code,'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'priceSource':src,'score':v94_ai['aiScoreV94'],'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':f"v94 스캘핑 AI: {v94_ai['scalpingStatus']} · {', '.join(v94_ai['scalpingReasons'])}. 현재가는 {src} 기준입니다. 추격보다 호가·거래량 유지 확인 후 접근이 좋습니다."}
-        base_pick.update(v94_ai)
+        orderbook = v95_get_orderbook_metrics(code)
+        v95_ai = v95_calculate_scalping_score(row, p, orderbook)
+        base_pick = {'code':code,'name':str(row['Name']),'market':str(row.get('Market','')),'theme':normalize_theme(row['theme']),'price':round(p),'priceSource':src,'score':v95_ai['aiScoreV95'],'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),'comment':f"v95 스캘핑 AI: {v95_ai['scalpingStatus']} · {', '.join(v95_ai['scalpingReasons'])}. 현재가는 {src} 기준입니다. 추격보다 호가·거래량 유지 확인 후 접근이 좋습니다."}
+        base_pick.update(v95_ai)
         out.append(base_pick)
     return out
 
@@ -544,7 +544,7 @@ def best_pick_from_params(args=None):
             a,b=part.split('-'); ranges.append((safe_float(a),safe_float(b)))
         except Exception: pass
     if ranges: picks=[p for p in picks if any(lo<=p['price']<=hi for lo,hi in ranges)]
-    picks=sorted(picks, key=lambda x: safe_float(x.get('orderPriority', x.get('aiScoreV94', x.get('score', 0)))), reverse=True)
+    picks=sorted(picks, key=lambda x: safe_float(x.get('orderPriority', x.get('aiScoreV95', x.get('score', 0)))), reverse=True)
     return (picks[0] if picks else None), picks
 
 def send_better_pick_alert(pick,old_score=0):
@@ -599,10 +599,10 @@ def ensure_watch_running():
 # KIWOOM_REAL_TRADING = true  -> 실전 주문 허용
 # KIWOOM_DRY_RUN      = true  -> 실제 주문 전송 안 함 / false -> 실제 주문 전송
 
-TRADE_STATE_FILE = os.getenv("TRADE_STATE_FILE", "/tmp/sungil_trade_state_v94.json")
+TRADE_STATE_FILE = os.getenv("TRADE_STATE_FILE", "/tmp/sungil_trade_state_v95.json")
 KIWOOM_BASE_URL = os.getenv("KIWOOM_BASE_URL", "https://api.kiwoom.com").rstrip("/")
 KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "").strip()
-KIWOOM_SECRET_KEY = (os.getenv("KIWOOM_SECRET_KEY", "") or os.getenv("KIWOOM_APP_SECRET", "")).strip()
+KIWOOM_SECRET_KEY = (os.getenv("KIWOOM_SECRET_KEY", "") or os.getenv("KIWOOM_APP_SECRET", "") or os.getenv("KIWOOM_SECRET", "")).strip()
 KIWOOM_REAL_TRADING = os.getenv("KIWOOM_REAL_TRADING", "false").lower() == "true"
 KIWOOM_DRY_RUN = os.getenv("KIWOOM_DRY_RUN", "true").lower() == "true"
 AUTO_BUY_IN_WATCH_LOOP = os.getenv("AUTO_BUY_IN_WATCH_LOOP", "false").lower() == "true"
@@ -617,7 +617,7 @@ KIWOOM_PRICE_REQUIRED = os.getenv("KIWOOM_PRICE_REQUIRED", "true").lower() == "t
 
 TRADE_DEFAULTS = {
     "auto_trade_enabled": False,
-    # v94 cash multi fix: 화면 입력 총투자금이 아니라 키움 예수금/주문가능금액을 우선 사용합니다.
+    # v95 cash multi fix: 화면 입력 총투자금이 아니라 키움 예수금/주문가능금액을 우선 사용합니다.
     "max_total_cash": 500000,
     "max_order_cash": 450000,
     "cash_buffer": 50000,
@@ -668,7 +668,7 @@ def kiwoom_auth_help_message(msg):
             "4) 저장 후 Render 재배포가 필요합니다."
         )
     if "8001" in s or "8002" in s or "App Key" in s or "Secret" in s:
-        return "App Key 또는 Secret Key 검증 실패입니다. Render 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 값을 다시 확인하세요."
+        return "App Key 또는 Secret Key 검증 실패입니다. Render 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 또는 KIWOOM_APP_SECRET 값을 다시 확인하세요."
     return s
 
 
@@ -863,8 +863,8 @@ def kiwoom_get_token():
         return _TOKEN_CACHE["token"]
 
     if not kiwoom_ready():
-        update_kiwoom_debug("token", "", 0, "KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 환경변수가 비어 있습니다.")
-        raise RuntimeError("KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 환경변수가 필요합니다.")
+        update_kiwoom_debug("token", "", 0, "KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 또는 KIWOOM_APP_SECRET 환경변수가 비어 있습니다.")
+        raise RuntimeError("KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 또는 KIWOOM_APP_SECRET 환경변수가 필요합니다.")
 
     try:
         r = requests.post(
@@ -1030,13 +1030,13 @@ def kiwoom_order(side, code, qty, price=0, order_type="market"):
 
 
 # ===============================
-# v94 AI BUDGET HOLDING VIEW: 키움 예수금/주문가능금액 기반 매수금 계산
+# v95 KIWOOM DIAG FIX: 키움 예수금/주문가능금액 기반 매수금 계산
 # ===============================
 
 
 
 # ============================================================
-# v94 키움 예수금 qry_tp 필수 파라미터 보정
+# v95 키움 예수금 qry_tp 필수 파라미터 보정
 # ============================================================
 def make_kiwoom_cash_body(base=None):
     """
@@ -1054,7 +1054,7 @@ def make_kiwoom_cash_body(base=None):
 
 def normalize_kiwoom_cash_result(data):
     """
-    v94 보강: 여러 응답 필드명에서 예수금/주문가능금액을 더 넓게 탐색합니다.
+    v95 보강: 여러 응답 필드명에서 예수금/주문가능금액을 더 넓게 탐색합니다.
     """
     try:
         orderable_keys = [
@@ -1595,9 +1595,9 @@ def register_auto_holding(pick, code, live, qty, order, price_src="KIWOOM"):
 
 
 # ============================================================
-# v94 AI 추천 진입금액 / 보유종목 상세 표시 모듈
+# v95 AI 추천 진입금액 / 보유종목 상세 표시 모듈
 # ============================================================
-def v94_ai_position_rate(ai_score=80, price=0, orderable_cash=0, current_positions=0, max_positions=3):
+def v95_ai_position_rate(ai_score=80, price=0, orderable_cash=0, current_positions=0, max_positions=3):
     """
     AI 단타 최적화용 진입 비율.
     단순 균등분할이 아니라 AI 점수와 리스크를 반영합니다.
@@ -1644,9 +1644,9 @@ def v94_ai_position_rate(ai_score=80, price=0, orderable_cash=0, current_positio
     return max(0.05, min(rate, 0.45))
 
 
-def v94_calc_ai_recommended_budget(pick=None, live_price=0):
+def v95_calc_ai_recommended_budget(pick=None, live_price=0):
     """
-    v94 핵심:
+    v95 핵심:
     기존 'AI 추천 진입금액'을 'AI 추천 진입금액'으로 변경합니다.
     키움 주문가능금액을 자동 조회하고, AI 점수/종목가격/보유종목수 기준으로 추천 진입금액을 계산합니다.
     """
@@ -1664,12 +1664,12 @@ def v94_calc_ai_recommended_budget(pick=None, live_price=0):
     ai_score = 80
     if isinstance(pick, dict):
         ai_score = safe_float(
-            pick.get("aiScoreV94", pick.get("aiScoreV90", pick.get("score", pick.get("orderPriority", 80)))),
+            pick.get("aiScoreV95", pick.get("aiScoreV90", pick.get("score", pick.get("orderPriority", 80)))),
             80
         )
 
     price = safe_float(live_price or (pick.get("price", 0) if isinstance(pick, dict) else 0), 0)
-    rate = v94_ai_position_rate(ai_score, price, usable_cash, current_positions, max_positions)
+    rate = v95_ai_position_rate(ai_score, price, usable_cash, current_positions, max_positions)
     recommended = usable_cash * rate * ORDER_CASH_SAFETY_RATE
 
     # 최소 진입금보다 작으면 매수 보류
@@ -1715,8 +1715,8 @@ def v94_calc_ai_recommended_budget(pick=None, live_price=0):
     }
 
 
-def v94_calc_order_qty_from_ai_budget(pick=None, live_price=0):
-    budget, info = v94_calc_ai_recommended_budget(pick, live_price)
+def v95_calc_order_qty_from_ai_budget(pick=None, live_price=0):
+    budget, info = v95_calc_ai_recommended_budget(pick, live_price)
     price = safe_float(live_price, 0)
     if not info.get("ok") or price <= 0:
         return 0, info
@@ -1724,7 +1724,7 @@ def v94_calc_order_qty_from_ai_budget(pick=None, live_price=0):
     return max(0, qty), info
 
 
-def v94_holding_status(rate, cur=0, target=0, stop=0):
+def v95_holding_status(rate, cur=0, target=0, stop=0):
     rate = safe_float(rate, 0)
     cur = safe_float(cur, 0)
     target = safe_float(target, 0)
@@ -1741,7 +1741,7 @@ def v94_holding_status(rate, cur=0, target=0, stop=0):
     return "관찰 중"
 
 
-def v94_enrich_holding(h):
+def v95_enrich_holding(h):
     h = normalize_holding(dict(h))
     code = str(h.get("code", "")).zfill(6)
     buy = safe_float(h.get("buyPrice", h.get("buy_price", 0)), 0)
@@ -1774,37 +1774,37 @@ def v94_enrich_holding(h):
     h["profitRate"] = round(rate, 2)
     h["target"] = round(target) if target else 0
     h["stop"] = round(stop) if stop else 0
-    h["holdingStatus"] = v94_holding_status(rate, cur, target, stop)
+    h["holdingStatus"] = v95_holding_status(rate, cur, target, stop)
     h["aiComment"] = ai_comment(cur, buy, target, stop, qty)
-    h["updatedBy"] = "v94"
+    h["updatedBy"] = "v95"
     return h
 
 
-def v94_get_enriched_holdings():
+def v95_get_enriched_holdings():
     items = read_holdings()
     enriched = []
     for h in items:
         try:
-            enriched.append(v94_enrich_holding(h))
+            enriched.append(v95_enrich_holding(h))
         except Exception as e:
             hh = dict(h)
-            hh["v94Error"] = str(e)
+            hh["v95Error"] = str(e)
             enriched.append(hh)
     write_holdings(enriched)
     return enriched
 
 
 try:
-    @app.route("/api/v94_holdings")
-    def api_v94_holdings():
-        holdings = v94_get_enriched_holdings()
+    @app.route("/api/v95_holdings")
+    def api_v95_holdings():
+        holdings = v95_get_enriched_holdings()
         total_buy = sum(safe_float(h.get("buyAmount", 0)) for h in holdings)
         total_eval = sum(safe_float(h.get("evalAmount", 0)) for h in holdings)
         total_pnl = total_eval - total_buy
         total_rate = (total_pnl / total_buy * 100) if total_buy else 0
         return jsonify({
             "ok": True,
-            "version": "v94",
+            "version": "v95",
             "holdings": holdings,
             "summary": {
                 "count": len(holdings),
@@ -1813,22 +1813,22 @@ try:
                 "totalProfitAmount": round(total_pnl),
                 "totalProfitRate": round(total_rate, 2)
             },
-            "message": "v94 보유종목 상세 조회: 매수가/현재가/수량/매수금액/평가금액/손익/목표가/손절가/상태/AI코멘트"
+            "message": "v95 보유종목 상세 조회: 매수가/현재가/수량/매수금액/평가금액/손익/목표가/손절가/상태/AI코멘트"
         })
 except Exception:
     pass
 
 try:
-    @app.route("/api/v94_ai_budget")
-    def api_v94_ai_budget():
+    @app.route("/api/v95_ai_budget")
+    def api_v95_ai_budget():
         code = request.args.get("code", "")
         price = safe_float(request.args.get("price", 0), 0)
         score = safe_float(request.args.get("score", 80), 80)
         pick = {"code": code, "score": score, "price": price}
-        budget, info = v94_calc_ai_recommended_budget(pick, price)
+        budget, info = v95_calc_ai_recommended_budget(pick, price)
         return jsonify({
             "ok": info.get("ok"),
-            "version": "v94",
+            "version": "v95",
             "budget": int(budget),
             "info": info
         })
@@ -2077,7 +2077,7 @@ def try_rebuy_after_sell(sold_code=""):
             update_trade_status("재매수 대기", "장중이 아니므로 신규 매수를 진행하지 않습니다.")
             return {"ok": False, "message": "market closed"}
 
-        # v94 AI BUDGET HOLDING VIEW: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
+        # v95 KIWOOM DIAG FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
 
         if safe_float(state.get("daily_realized_pnl", 0)) <= safe_float(state.get("daily_max_loss", -30000)):
             update_trade_status("재매수 중지", "하루 최대 손실 제한에 도달하여 신규 매수를 중지합니다.")
@@ -2150,7 +2150,7 @@ def auto_resume():
 
 
 # ============================================================
-# v94 키움 예수금 / 주문가능금액 자동 조회 모듈
+# v95 키움 예수금 / 주문가능금액 자동 조회 모듈
 # ============================================================
 # 목적:
 # - 사용자가 앱에 총투자금을 직접 입력하지 않아도 키움 REST API에서
@@ -2340,7 +2340,7 @@ def get_open_holding_codes():
 
 def get_auto_order_budget():
     """
-    v94 핵심:
+    v95 핵심:
     앱 입력 총투자금이 아니라 키움 주문가능금액을 기준으로 1회 진입금 계산.
     여러 종목 동시 운용을 위해 주문가능금액의 POSITION_CASH_RATE만 사용.
     """
@@ -2399,9 +2399,9 @@ def get_auto_order_budget():
     }
 
 
-def trade_can_buy_v94(code, price):
+def trade_can_buy_v95(code, price):
     """
-    v94 매수 가능 조건:
+    v95 매수 가능 조건:
     - 1종목 제한 제거
     - 최대 동시 보유 종목수까지만 허용
     - 동일 종목 중복매수 방지
@@ -2445,7 +2445,7 @@ def trade_can_buy_v94(code, price):
 
 def calc_auto_cash_order_qty(live_price):
     """
-    v94 수량 계산:
+    v95 수량 계산:
     키움 주문가능금액 자동조회 → 종목당 예산 계산 → 주문수량 산출
     """
     budget = get_auto_order_budget()
@@ -2460,38 +2460,38 @@ def calc_auto_cash_order_qty(live_price):
     return max(0, qty), budget
 
 
-# v94 API: 키움 예수금/주문가능금액 확인
+# v95 API: 키움 예수금/주문가능금액 확인
 try:
     @app.route("/api/kiwoom_cash")
     def api_kiwoom_cash():
         force = str(request.args.get("force", "0")).lower() in ["1", "true", "yes"]
         return jsonify(kiwoom_get_account_cash(force=force))
 
-    @app.route("/api/v94_cash")
-    def api_v94_cash():
+    @app.route("/api/v95_cash")
+    def api_v95_cash():
         cash = kiwoom_get_account_cash(force=True)
         budget = get_auto_order_budget()
         return jsonify({
             "ok": bool(cash.get("ok")),
-            "version": "v94",
+            "version": "v95",
             "cash": cash,
             "budget": budget,
             "max_position_count": MAX_POSITION_COUNT,
             "position_cash_rate": POSITION_CASH_RATE,
             "min_order_cash": MIN_ORDER_CASH,
-            "message": "v94는 앱 입력금액이 아니라 키움 주문가능금액을 자동 조회하여 매수 기준으로 사용합니다."
+            "message": "v95는 앱 입력금액이 아니라 키움 주문가능금액을 자동 조회하여 매수 기준으로 사용합니다."
         })
 except Exception:
     pass
 
 # ============================================================
-# v94 자동매수 함수 보강
-# 기존 auto_buy_best_pick이 있으면 아래 함수가 이름을 덮어써서 v94 로직을 사용합니다.
+# v95 자동매수 함수 보강
+# 기존 auto_buy_best_pick이 있으면 아래 함수가 이름을 덮어써서 v95 로직을 사용합니다.
 # ============================================================
 
 def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
     """
-    v94:
+    v95:
     - 키움 예수금/주문가능금액 자동 조회
     - 1종목 제한 제거
     - 여러 종목 동시 단타 가능
@@ -2504,7 +2504,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
         update_trade_status("AI 대기중", open_reason)
         return {"ok": False, "message": open_reason}
 
-    update_trade_status("종목 탐색중", "v94 키움 주문가능금액 기준으로 AI 단타 후보를 찾는 중입니다.")
+    update_trade_status("종목 탐색중", "v95 키움 주문가능금액 기준으로 AI 단타 후보를 찾는 중입니다.")
 
     if args is not None:
         pick, picks = best_pick_from_params(args)
@@ -2568,13 +2568,13 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
         update_trade_status("매수 보류", reason, candidate=pick)
         return {"ok": False, "message": reason, "pick": pick}
 
-    allowed, reason = trade_can_buy_v94(code, live)
+    allowed, reason = trade_can_buy_v95(code, live)
 
     if not allowed:
         update_trade_status("매수 보류", reason, candidate=pick)
         return {"ok": False, "message": reason, "pick": pick}
 
-    qty, budget = v94_calc_order_qty_from_ai_budget(pick, live)
+    qty, budget = v95_calc_order_qty_from_ai_budget(pick, live)
 
     if qty <= 0:
         reason = "키움 주문가능금액 기준 주문 가능 수량이 0입니다."
@@ -2583,7 +2583,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
     update_trade_status(
         "주문 전송중",
-        f"v94 키움 주문가능금액 기준 매수 주문: {pick.get('name')} {qty}주 / 주문가능금액 {budget.get('orderable_cash', 0):,.0f}원 / AI추천예산 {budget.get('budget', 0):,.0f}원",
+        f"v95 키움 주문가능금액 기준 매수 주문: {pick.get('name')} {qty}주 / 주문가능금액 {budget.get('orderable_cash', 0):,.0f}원 / AI추천예산 {budget.get('budget', 0):,.0f}원",
         candidate=pick
     )
 
@@ -2609,13 +2609,13 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
         update_trade_status(
             "매수 성공" if not order.get("dry_run") else "DRY-RUN 매수 성공",
-            f"v94 {pick['name']} {qty}주 매수 처리 완료",
+            f"v95 {pick['name']} {qty}주 매수 처리 완료",
             candidate=pick,
             order=order
         )
 
         send_trade_telegram(
-            f"🚀 <b>v94 AI 자동매수 {'DRY-RUN ' if order.get('dry_run') else ''}진행</b>\n"
+            f"🚀 <b>v95 AI 자동매수 {'DRY-RUN ' if order.get('dry_run') else ''}진행</b>\n"
             f"종목: <b>{pick['name']}</b> ({code})\n"
             f"매수가 기준: {live:,.0f}원 ({price_src})\n"
             f"수량: {qty:,}주\n"
@@ -2627,8 +2627,8 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
             f"AI 점수: {safe_float(pick.get('score', 0)):.2f}\n"
             f"테마: {pick.get('theme', '')}\n"
             f"시간: {now_kst().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            "※ v94는 앱 입력금액이 아니라 키움 주문가능금액을 자동 기준으로 사용합니다.",
-            "buy_success_v94"
+            "※ v95는 앱 입력금액이 아니라 키움 주문가능금액을 자동 기준으로 사용합니다.",
+            "buy_success_v95"
         )
 
     else:
@@ -2658,14 +2658,14 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
                 update_trade_status("수량 조정 매수 성공", f"{pick['name']} {retry_qty}주 매수 처리 완료", candidate=pick, order=retry_order)
                 send_trade_telegram(
-                    f"🚀 <b>v94 AI 자동매수 수량조정 진행</b>\n"
+                    f"🚀 <b>v95 AI 자동매수 수량조정 진행</b>\n"
                     f"종목: <b>{pick['name']}</b> ({code})\n"
                     f"매수가 기준: {live:,.0f}원 ({price_src})\n"
                     f"최초 수량: {qty:,}주 → 조정 수량: {retry_qty:,}주\n"
                     f"매수금액: {retry_amount:,.0f}원\n"
                     f"키움 주문가능금액: {budget.get('orderable_cash', 0):,.0f}원\n"
                     f"시간: {now_kst().strftime('%Y-%m-%d %H:%M:%S')}",
-                    "buy_retry_success_v94"
+                    "buy_retry_success_v95"
                 )
                 return {"ok": True, "pick": pick, "order": retry_order, "adjusted_qty": retry_qty, "budget": budget}
 
@@ -2674,13 +2674,13 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
         update_trade_status("매수 실패", reason, candidate=pick, order=order)
         send_trade_telegram(
-            f"⚠️ <b>v94 AI 자동매수 실패</b>\n"
+            f"⚠️ <b>v95 AI 자동매수 실패</b>\n"
             f"종목: {pick.get('name')} ({code})\n"
             f"현재가: {live:,.0f}원\n"
             f"수량: {qty:,}주\n"
             f"사유: {reason}\n\n"
             "키움 예수금/주문가능금액 또는 주문 가능 수량을 확인하세요.",
-            "buy_fail_v94"
+            "buy_fail_v95"
         )
 
     return {"ok": bool(order.get("ok")), "pick": pick, "order": order, "budget": budget}
@@ -2929,10 +2929,10 @@ def api_kiwoom_price_test(code):
 
 
 
-@app.route('/api/v94_dashboard')
-def api_v94_dashboard():
+@app.route('/api/v95_dashboard')
+def api_v95_dashboard():
     """
-    v94 실시간 수익률/후보/상태 통합 대시보드 API.
+    v95 실시간 수익률/후보/상태 통합 대시보드 API.
     기존 화면을 크게 깨지 않고 새 HTS형 UI를 붙일 때 사용할 수 있습니다.
     """
     try:
@@ -2965,7 +2965,7 @@ def api_v94_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v94 AI BUDGET HOLDING VIEW",
+            "version": "KIWOOM REAL AUTO SCALPING v95 KIWOOM DIAG FIX",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -2994,9 +2994,9 @@ def api_v94_dashboard():
         return jsonify({"ok": False, "message": str(e)}), 500
 
 @app.route('/api/version')
-def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v94-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v94_fetch_fix.py','v94_dashboard':'/api/v94_dashboard'})
+def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v95-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v95_fetch_fix.py','v95_dashboard':'/api/v95_dashboard'})
 
-HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v94</title><style>
+HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v95</title><style>
 :root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}}
 
 .quick-money{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 18px}
@@ -3004,7 +3004,7 @@ HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name
 .quick-money button.darkmini{background:#32475a;color:white}
 .quick-money .hint{width:100%;font-size:.82em;color:#6d7782;margin-top:2px}
 
-</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v94</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+</style></head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v95</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3104,7 +3104,7 @@ function clearMoneyFast(){
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
 function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("요청 시간이 길어져 중단되었습니다. 잠시 후 다시 시도하거나 후보 조건을 낮춰주세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString(),{timeoutMs:120000});$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString(),{timeoutMs:120000});$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"refresh"})});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
-  // v94 FETCH FIX
+  // v95 FETCH FIX
   // 초기 화면에서 키움 실보유 동기화(sync=1)와 현재가 갱신(refresh=1)을 동시에 호출하면
   // 모바일/Render 환경에서 20초 이상 걸려 Fetch is aborted가 발생할 수 있습니다.
   // 따라서 1단계는 서버 저장 보유종목만 빠르게 표시하고, 2단계로 백그라운드 갱신을 분리합니다.
@@ -3249,7 +3249,7 @@ async function loadStorageStatus(){
   }
 }
 
-// v94 FIX: 아래 중복 loadHoldings 함수가 기존 복구/백업 로직을 덮어써서
+// v95 FIX: 아래 중복 loadHoldings 함수가 기존 복구/백업 로직을 덮어써서
 // '저장소 확인 중...'이 계속 남고 브라우저 백업 복구가 실행되지 않던 문제를 제거했습니다.
 
 async function applyAiSettings(){
@@ -3291,7 +3291,7 @@ async function autoTradeStatus(){
   키움 주문가능금액 ${Number(ac.cash||0).toLocaleString()}원 (${ac.source||"-"}) · 동시보유 ${d.max_positions||3}종목 · 최소진입 ${Number(d.min_order_cash||0).toLocaleString()}원<br>
   금일손익 ${Number(s.daily_realized_pnl||0).toLocaleString()}원 · 하루손실제한 ${Number(s.daily_max_loss||-30000).toLocaleString()}원<br>
   적용 목표/손절: +${d.target_rate_percent||0}% / ${d.stop_rate_percent||0}%<br>스캘핑: 거래 ${d.trade_count_today||0}/${d.max_trades_per_day||10}회 · 수익보호 ${d.profit_guard_percent||1.2}% · 트레일링 ${d.trailing_stop_percent||1.1}% · 청산 ${d.force_exit_time||"15:15"}<br>
-  <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span><br><span class="muted">가격정책: 키움현재가 필수 ${d.kiwoom_price_required?"ON":"OFF"} · 허용오차 ${d.price_diff_limit_pct}% · 백그라운드 자동매수 ${d.auto_buy_in_watch_loop?"ON":"OFF"} · 매도 후 신규매수 ${d.auto_rebuy_after_sell?"ON":"OFF"} · 주문안전비율 ${d.order_cash_safety_rate||0.96}</span>`;
+  <span class="muted">필수 환경변수: KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 또는 KIWOOM_APP_SECRET / KIWOOM_REAL_TRADING / KIWOOM_DRY_RUN</span><br><span class="muted">가격정책: 키움현재가 필수 ${d.kiwoom_price_required?"ON":"OFF"} · 허용오차 ${d.price_diff_limit_pct}% · 백그라운드 자동매수 ${d.auto_buy_in_watch_loop?"ON":"OFF"} · 매도 후 신규매수 ${d.auto_rebuy_after_sell?"ON":"OFF"} · 주문안전비율 ${d.order_cash_safety_rate||0.96}</span>`;
 
   const cand=s.last_candidate||{};
   const tg=s.last_telegram_status||{};
@@ -3355,7 +3355,7 @@ if __name__=='__main__':
 
 
 
-# v94: Render 배포/재시작 시 Logs에 서버 공인 IP 출력
+# v95: Render 배포/재시작 시 Logs에 서버 공인 IP 출력
 try:
     print_render_public_ip_on_startup()
 except Exception as _ip_startup_error:
@@ -3363,10 +3363,10 @@ except Exception as _ip_startup_error:
 
 
 
-# v94: 화면에서 키움 예수금 실제 조회 상태 확인용
+# v95: 화면에서 키움 예수금 실제 조회 상태 확인용
 try:
-    @app.route("/api/v94_cash_check")
-    def api_v94_cash_check():
+    @app.route("/api/v95_cash_check")
+    def api_v95_cash_check():
         try:
             cash1 = get_kiwoom_account_cash() if "get_kiwoom_account_cash" in globals() else {}
         except Exception as e:
@@ -3377,10 +3377,171 @@ try:
             cash2 = {"ok": False, "message": str(e)}
         return jsonify({
             "ok": bool(cash1.get("ok") or cash2.get("ok")),
-            "version": "v94",
+            "version": "v95",
             "primary_cash": cash1,
             "secondary_cash": cash2,
-            "message": "v94: qry_tp 필수 파라미터 포함 후 키움 예수금/주문가능금액 조회 결과입니다."
+            "message": "v95: qry_tp 필수 파라미터 포함 후 키움 예수금/주문가능금액 조회 결과입니다."
         })
 except Exception:
     pass
+
+
+
+
+# ============================================================
+# v95 키움 인증/현재가/예수금 통합 진단 모듈
+# ============================================================
+def v95_env_status():
+    app_key_ok = bool(os.getenv("KIWOOM_APP_KEY", "").strip())
+    secret_ok = bool((os.getenv("KIWOOM_SECRET_KEY", "") or os.getenv("KIWOOM_APP_SECRET", "") or os.getenv("KIWOOM_SECRET", "")).strip())
+    return {
+        "KIWOOM_APP_KEY": app_key_ok,
+        "KIWOOM_SECRET_KEY_OR_APP_SECRET": secret_ok,
+        "KIWOOM_REAL_TRADING": os.getenv("KIWOOM_REAL_TRADING", "").lower() == "true",
+        "KIWOOM_DRY_RUN": os.getenv("KIWOOM_DRY_RUN", "true").lower() == "true",
+        "TELEGRAM_BOT_TOKEN": bool(os.getenv("TELEGRAM_BOT_TOKEN", "").strip()),
+        "TELEGRAM_CHAT_ID": bool(os.getenv("TELEGRAM_CHAT_ID", "").strip()),
+        "KIWOOM_BASE_URL": KIWOOM_BASE_URL
+    }
+
+
+def v95_token_test():
+    try:
+        try:
+            _TOKEN_CACHE["token"] = ""
+            _TOKEN_CACHE["expires"] = 0
+        except Exception:
+            pass
+        token = kiwoom_get_token()
+        return {
+            "ok": bool(token),
+            "message": "키움 토큰 발급 성공" if token else "키움 토큰 없음",
+            "token_prefix": (token[:8] + "...") if token else ""
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "message": str(e),
+            "help": "토큰 실패 시 Render IP 등록, App Key/Secret, 영웅문S# 추가인증 상태를 확인하세요."
+        }
+
+
+def v95_price_test(code="005930"):
+    code = str(code or "005930").zfill(6)
+    try:
+        p = get_kiwoom_live_price(code)
+        dbg = read_trade_state().get("last_kiwoom_debug", {})
+        return {
+            "ok": bool(p and p >= 10),
+            "code": code,
+            "price": p,
+            "debug": dbg,
+            "message": "키움 현재가 조회 성공" if p and p >= 10 else "키움 현재가 조회 실패"
+        }
+    except Exception as e:
+        dbg = read_trade_state().get("last_kiwoom_debug", {})
+        return {
+            "ok": False,
+            "code": code,
+            "price": 0,
+            "debug": dbg,
+            "message": str(e)
+        }
+
+
+def v95_cash_test():
+    results = {}
+    try:
+        if "get_kiwoom_account_cash" in globals():
+            results["get_kiwoom_account_cash"] = get_kiwoom_account_cash()
+    except Exception as e:
+        results["get_kiwoom_account_cash"] = {"ok": False, "message": str(e)}
+
+    try:
+        if "kiwoom_get_account_cash" in globals():
+            results["kiwoom_get_account_cash"] = kiwoom_get_account_cash(force=True)
+    except Exception as e:
+        results["kiwoom_get_account_cash"] = {"ok": False, "message": str(e)}
+
+    ok = False
+    orderable_cash = 0
+    for v in results.values():
+        if isinstance(v, dict):
+            ok = ok or bool(v.get("ok"))
+            orderable_cash = max(
+                orderable_cash,
+                safe_float(v.get("cash", 0), 0),
+                safe_float(v.get("orderable_cash", 0), 0),
+                safe_float(v.get("kiwoom_orderable_cash", 0), 0)
+            )
+
+    return {
+        "ok": ok,
+        "orderable_cash": int(orderable_cash),
+        "results": results,
+        "message": "키움 예수금/주문가능금액 조회 성공" if ok else "키움 예수금/주문가능금액 조회 실패"
+    }
+
+
+def v95_kiwoom_diagnosis(code="005930"):
+    try:
+        ip_info = get_render_public_ip(force=True) if "get_render_public_ip" in globals() else {"ok": False, "message": "render ip function missing"}
+    except Exception as e:
+        ip_info = {"ok": False, "message": str(e)}
+
+    env = v95_env_status()
+    token = v95_token_test()
+    price = v95_price_test(code)
+    cash = v95_cash_test()
+
+    final_ok = bool(env.get("KIWOOM_APP_KEY") and env.get("KIWOOM_SECRET_KEY_OR_APP_SECRET") and token.get("ok") and price.get("ok") and cash.get("ok"))
+
+    if not final_ok:
+        guide = [
+            "1) /api/render_ip 의 Render 공인 IP가 키움 APP KEY 관리 화면에 등록되어 있는지 확인",
+            "2) Render 환경변수 KIWOOM_APP_KEY 와 KIWOOM_APP_SECRET 또는 KIWOOM_SECRET_KEY 확인",
+            "3) 키움 OpenAPI에서 App Key/Secret을 재발급했다면 Render 환경변수도 새 값으로 교체",
+            "4) 영웅문S# 보안/인증에서 추가인증 또는 단말기 지정 상태 확인",
+            "5) Render 재배포 후 IP가 바뀌었으면 새 IP를 키움에 추가 등록"
+        ]
+    else:
+        guide = ["키움 인증/현재가/예수금 조회가 정상입니다."]
+
+    return {
+        "ok": final_ok,
+        "version": "v95",
+        "render_ip": ip_info,
+        "env": env,
+        "token": token,
+        "price": price,
+        "cash": cash,
+        "guide": guide,
+        "checked_at": now_kst().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+
+try:
+    @app.route("/api/v95_kiwoom_diag")
+    def api_v95_kiwoom_diag():
+        code = request.args.get("code", "005930")
+        return jsonify(v95_kiwoom_diagnosis(code))
+except Exception:
+    pass
+
+
+try:
+    @app.route("/api/v95_price_test")
+    def api_v95_price_test():
+        code = request.args.get("code", "005930")
+        return jsonify(v95_price_test(code))
+except Exception:
+    pass
+
+
+try:
+    @app.route("/api/v95_cash_test")
+    def api_v95_cash_test():
+        return jsonify(v95_cash_test())
+except Exception:
+    pass
+
