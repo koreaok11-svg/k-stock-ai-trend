@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v109 HARDENED SCALPING
-파일명: app_kiwoom_real_auto_scalping_v109_hardened_scalping.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v109.5 STABLE OPERATIONS
+파일명: app_kiwoom_real_auto_scalping_v109_5_stable_operations.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -2262,7 +2262,7 @@ def try_rebuy_after_sell(sold_code=""):
             update_trade_status("재매수 대기", "장중이 아니므로 신규 매수를 진행하지 않습니다.")
             return {"ok": False, "message": "market closed"}
 
-        # v109 HARDENED SCALPING: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
+        # v109.5 STABLE OPERATIONS: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
 
         if safe_float(state.get("daily_realized_pnl", 0)) <= safe_float(state.get("daily_max_loss", -30000)):
             update_trade_status("재매수 중지", "하루 최대 손실 제한에 도달하여 신규 매수를 중지합니다.")
@@ -3111,7 +3111,7 @@ def api_v109_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v109 HARDENED SCALPING",
+            "version": "KIWOOM REAL AUTO SCALPING v109.5 STABLE OPERATIONS",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -5536,7 +5536,7 @@ if __name__ == '__main__':
 
 
 # ============================================================
-# v109 HARDENED SCALPING ENGINE
+# v109.5 STABLE OPERATIONS ENGINE
 # ============================================================
 ORDER_LOCK = globals().get("ORDER_LOCK") or threading.Lock()
 STATE_LOCK = globals().get("STATE_LOCK") or threading.RLock()
@@ -5851,7 +5851,7 @@ def api_v109_trailing_test():
 
 
 # ============================================================
-# v109 HARDENED SCALPING PATCH
+# v109.5 STABLE OPERATIONS PATCH
 # 트레일링 스탑 실시간 감시 / 오타 방어 / REST 호출 제한 / 감시속도 최적화
 # ============================================================
 V109_WATCH_INTERVAL = safe_float(os.getenv("V109_WATCH_INTERVAL", "2"), 2)
