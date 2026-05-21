@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v124_REAL_DASHBOARD_ALERT_CENTER_FIX
-파일명: app_kiwoom_real_auto_scalping_v124_real_dashboard_alert_center_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v125_FAST_STATUS_COLLAPSE_AI_TARGET_RAISE_FIX
+파일명: app_kiwoom_real_auto_scalping_v125_fast_status_collapse_ai_target_raise_fix.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -3012,6 +3012,7 @@ def api_auto_trade_status():
         'target_rate_percent': round(normalize_rate_input(state.get('target_rate', 0.027), 0.027)*100, 3),
         'profit_guard_percent': round(normalize_rate_input(state.get('profit_guard_rate', 0.012), 0.012)*100, 3),
         'trailing_stop_percent': round(normalize_rate_input(state.get('trailing_stop_rate', 0.011), 0.011)*100, 3),
+        'ai_target_raise_enabled': AI_TARGET_RAISE_ENABLED if 'AI_TARGET_RAISE_ENABLED' in globals() else True,
         'max_trades_per_day': int(state.get('max_trades_per_day', 10)),
         'trade_count_today': int(state.get('trade_count_today', 0)),
         'force_exit_time': state.get('force_exit_time', '15:15'),
@@ -3082,7 +3083,7 @@ def api_auto_trade_quick_set():
             state['panic_stop'] = False
         state['last_status'] = '실전 자동매매 ON' if enabled else '실전 자동매매 OFF'
         state['last_status_time'] = now_kst().strftime('%Y-%m-%d %H:%M:%S')
-        state['last_order_message'] = 'v124 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
+        state['last_order_message'] = 'v125 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
         write_trade_state(state)
         if enabled:
             try:
@@ -3162,7 +3163,7 @@ def api_v109_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v124_REAL_DASHBOARD_ALERT_CENTER_FIX",
+            "version": "KIWOOM REAL AUTO SCALPING v125_FAST_STATUS_COLLAPSE_AI_TARGET_RAISE_FIX",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -3194,7 +3195,8 @@ def api_v109_dashboard():
 def api_version(): return jsonify({'ok':True,'version':'kiwoom-real-auto-scalping-v109-upgrade','watch_interval':WATCH_INTERVAL,'file':'app_kiwoom_real_auto_scalping_v109_fetch_fix.py','v109_dashboard':'/api/v109_dashboard'})
 
 HTML = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>성일의 AI 주식바람 v123</title><style>
-:root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}.statusDetails{margin-top:10px}.statusDetails summary{cursor:pointer;font-weight:950;background:#eef7e7;color:#426a49;border-radius:18px;padding:14px 16px;list-style:none}.statusDetails summary::-webkit-details-marker{display:none}.detailScroll{margin-top:10px;max-height:260px;overflow:auto;-webkit-overflow-scrolling:touch;background:#fffdf4;border-radius:18px;padding:14px 16px;line-height:1.6;border:1px solid #eadfbd}.miniStatus{line-height:1.55}.miniStatus b{font-size:1.05em}.infoGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}.infoItem{background:#fffaf0;border:1px solid #eadfbd;border-radius:14px;padding:10px 12px}.infoItem small{display:block;color:#667085;font-weight:800;margin-bottom:3px}.infoItem b{font-size:17px}.pillOk{display:inline-block;border-radius:999px;background:#eaf7df;color:#2f6b3a;padding:5px 10px;font-weight:950}.pillWarn{display:inline-block;border-radius:999px;background:#fff2c2;color:#7a5200;padding:5px 10px;font-weight:950}.pillBad{display:inline-block;border-radius:999px;background:#ffe1df;color:#aa2a20;padding:5px 10px;font-weight:950}.detailBtn{width:100%;margin:8px 0 10px;background:#eef7e7;color:#426a49}.alertHelp{background:#fff8df;border-radius:18px;padding:14px;line-height:1.6;color:#6b5b3f;margin:10px 0}.recentAlerts{background:#fffdf4;border:1px solid #eadfbd;border-radius:18px;padding:14px;line-height:1.6;margin-top:10px}@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}.detailScroll{max-height:220px}}
+:root{--green:#426a49;--deep:#253528;--cream:#fffdf0;--orange:#f3ad4e;--soft:#eef7e7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:linear-gradient(180deg,#f7faec,#e6f3e5,#fff7de);color:var(--deep)}.app{max-width:880px;margin:0 auto;padding:22px 18px 80px}.card{background:rgba(255,255,255,.86);border:1px solid rgba(90,120,80,.16);border-radius:28px;padding:24px;margin:18px 0;box-shadow:0 16px 38px rgba(69,94,63,.11)}.hero{padding:26px 4px 8px}.hero h1{font-size:36px;line-height:1.15;margin:0 0 8px;font-weight:950}.hero p{margin:0;color:#667085;font-size:16px;line-height:1.5}.badge{display:inline-flex;gap:6px;align-items:center;border-radius:999px;background:#eaf5df;color:#406044;font-weight:900;padding:8px 12px;margin-bottom:10px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}label{font-size:16px;font-weight:900;margin:12px 0 6px;display:block}input,select{width:100%;border:1px solid #d8e0cf;border-radius:18px;padding:14px 16px;font-size:18px;background:#fffffb}button{border:0;border-radius:20px;padding:16px 18px;font-size:17px;font-weight:900;background:linear-gradient(135deg,#f6af55,#aad889);color:#2b2b22;cursor:pointer}button.dark{background:#33495b;color:white}button.green{background:#5f9366;color:white}button.brown{background:#96622d;color:white}button.light{background:#eef7e7;color:#426a49}.row{display:flex;gap:10px;flex-wrap:wrap}.pick{border-radius:26px;background:#fffef8;border:1px solid #e4e9d7;padding:20px;box-shadow:0 10px 24px #0000000c}.pick h2{font-size:34px;margin:8px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{background:#edf4df;padding:8px 12px;border-radius:999px;font-weight:900}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.metric{background:#fbf8eb;border-radius:18px;padding:14px;text-align:center}.metric small{display:block;color:#667085;margin-bottom:6px}.metric b{font-size:20px}.comment{background:#eef8df;border-radius:18px;padding:14px;line-height:1.55;font-weight:800;color:#416246}.empty{padding:18px;border-radius:20px;background:#fff8df;color:#6b5b3f}.holding{background:white;border-radius:24px;padding:18px;margin:12px 0;border:1px solid #e0ead3}.red{color:#d32525}.blue{color:#2563eb}.muted{color:#667085}.tabs{position:sticky;top:0;z-index:10;background:rgba(250,252,239,.92);backdrop-filter:blur(14px);display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 0}.tab{padding:12px 6px;border:1px solid #d9e2ce;background:white;border-radius:999px;text-align:center;font-weight:900;font-size:14px}.tab.active{background:#5f8d65;color:white}.loading-screen{position:fixed;inset:0;background:linear-gradient(180deg,#fff8c8,#e7f6df,#d8ebff);z-index:9999;display:flex;align-items:center;justify-content:center;transition:.7s}.loading-screen.hide{opacity:0;pointer-events:none}.loading-card{width:min(86%,380px);border-radius:34px;background:rgba(255,255,255,.62);padding:34px 24px;text-align:center;box-shadow:0 20px 50px #0002}.loading-title{font-size:32px;font-weight:950;color:#34573a}.bar{height:12px;border-radius:99px;background:white;overflow:hidden;margin-top:18px}.bar span{display:block;height:100%;width:45%;background:linear-gradient(90deg,#f3c56f,#a5d987);animation:move 1.2s infinite}@keyframes move{from{margin-left:-50%}to{margin-left:110%}}.lock{position:fixed;inset:0;background:#f4faed;z-index:8888;display:flex;align-items:center;justify-content:center;padding:24px}.lock.hidden{display:none}.lockbox{max-width:460px;width:100%;background:white;border-radius:30px;padding:28px;box-shadow:0 20px 50px #0001}.statusDetails{margin-top:10px}.statusDetails summary{cursor:pointer;font-weight:950;background:#eef7e7;color:#426a49;border-radius:18px;padding:14px 16px;list-style:none}.statusDetails summary::-webkit-details-marker{display:none}.detailScroll{margin-top:10px;max-height:260px;overflow:auto;-webkit-overflow-scrolling:touch;background:#fffdf4;border-radius:18px;padding:14px 16px;line-height:1.6;border:1px solid #eadfbd}.miniStatus{line-height:1.55}.miniStatus b{font-size:1.05em}.infoGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}.infoItem{background:#fffaf0;border:1px solid #eadfbd;border-radius:14px;padding:10px 12px}.infoItem small{display:block;color:#667085;font-weight:800;margin-bottom:3px}.infoItem b{font-size:17px}.pillOk{display:inline-block;border-radius:999px;background:#eaf7df;color:#2f6b3a;padding:5px 10px;font-weight:950}.pillWarn{display:inline-block;border-radius:999px;background:#fff2c2;color:#7a5200;padding:5px 10px;font-weight:950}.pillBad{display:inline-block;border-radius:999px;background:#ffe1df;color:#aa2a20;padding:5px 10px;font-weight:950}.detailBtn{width:100%;margin:8px 0 10px;background:#eef7e7;color:#426a49}.alertHelp{background:#fff8df;border-radius:18px;padding:14px;line-height:1.6;color:#6b5b3f;margin:10px 0}.recentAlerts{background:#fffdf4;border:1px solid #eadfbd;border-radius:18px;padding:14px;line-height:1.6;margin-top:10px}.guideDetails{margin:8px 0 16px}.guideDetails summary{cursor:pointer;font-weight:950;background:#eef7e7;color:#426a49;border-radius:18px;padding:14px 16px;list-style:none}.guideDetails summary::-webkit-details-marker{display:none}.guideBody{margin-top:10px;background:#fff8df;border-radius:18px;padding:14px 16px;line-height:1.65;color:#6b5b3f}.fieldHint{font-size:.82em;color:#667085;margin-top:5px;line-height:1.45}.inputWrap{margin-bottom:4px}.aiTargetBox{background:#eef7e7;border:1px solid #d8e8cc;border-radius:18px;padding:12px 14px;line-height:1.55;margin-top:10px;color:#426a49;font-weight:800}
+@media(max-width:560px){.hero h1{font-size:31px}.grid,.metrics{grid-template-columns:1fr}.app{padding:18px 14px 70px}.tab{font-size:12px}.metrics{grid-template-columns:1fr 1fr}.detailScroll{max-height:220px}}
 
 .quick-money{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 18px}
 .quick-money button{padding:12px 16px;border-radius:18px;border:1px solid rgba(51,80,55,.18);background:#eef7e9;font-size:.9em;font-weight:800;color:#31543a}
@@ -3226,7 +3228,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v124</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v125</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3258,10 +3260,19 @@ input[placeholder*="손절가 자동"] { display:none !important; }
 </section>
 <section id="autotrade" class="card">
   <h2>🤖 키움 실전 자동매매</h2>
-  <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 실제 매수금은 화면의 총투자금이 아니라 <b>키움 예수금/주문가능금액</b>을 기준으로 자동 계산합니다.<br><b>AI 추천 설정</b>은 예수금 기준 1회 진입 상한·하루손실·목표/손절을 자동 계산합니다. 수동 설정도 가능합니다.<br>목표/손절 수익률은 <b>2.5 = +2.5%</b>, <b>-1.8 = -1.8%</b>처럼 입력하면 됩니다.</p>
+  <details class="guideDetails">
+    <summary>📘 실전 자동매매 설명 보기 / 접기</summary>
+    <div class="guideBody">
+      실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다.<br>
+      실제 매수금은 화면의 총투자금이 아니라 <b>키움 예수금/주문가능금액</b>을 기준으로 자동 계산합니다.<br>
+      <b>AI 추천 설정</b>은 예수금 기준 1회 진입 상한·하루손실·목표/손절을 자동 계산합니다.<br>
+      목표/손절 수익률은 <b>2.5 = +2.5%</b>, <b>-1.8 = -1.8%</b>처럼 입력하면 됩니다.
+      <div class="aiTargetBox">🚀 <b>AI 목표가 상향 기능</b><br>기본 목표가에 도달해도 현재가가 강하고 고점 유지 중이면 즉시 매도하지 않고 목표가를 위로 조정한 뒤 트레일링 스탑으로 수익을 보호합니다.</div>
+    </div>
+  </details>
   <div class="grid">
-    <div><label>키움 주문가능금액</label><input id="atTotal" value="500000"></div>
-    <div><label>AI 추천 진입금액</label><input id="atOrder" value="450000"></div><div id="atOrderQuickMoney"><div class="quick-money">
+    <div class="inputWrap"><label>키움 주문가능금액</label><input id="atTotal" value="500000" placeholder="예: 500000"><div class="fieldHint">키움에서 실제 주문 가능한 금액입니다. 상태 확인 시 자동 조회됩니다.</div></div>
+    <div class="inputWrap"><label>AI 추천 진입금액</label><input id="atOrder" value="450000" placeholder="예: 450000"><div class="fieldHint">1회 매수에 사용할 최대 금액입니다. 실제 주문은 예수금·보유종목 수를 다시 확인합니다.</div></div><div id="atOrderQuickMoney"><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3271,10 +3282,10 @@ input[placeholder*="손절가 자동"] { display:none !important; }
 <button type="button" class="warnmini" onclick="clearMoneyFast()">지우기</button>
 <div class="hint">먼저 금액 입력칸을 누른 뒤 버튼을 누르면 해당 칸에 금액이 들어갑니다.</div>
 </div></div>
-    <div><label>하루 최대 손실</label><input id="atLoss" value="-30000"></div>
-    <div><label>재진입 금지(분)</label><input id="atCool" value="30"></div>
-    <div><label>목표 수익률(%)</label><input id="atTarget" value="2.5"></div>
-    <div><label>손절 수익률(%)</label><input id="atStop" value="-1.8"></div>
+    <div class="inputWrap"><label>하루 최대 손실</label><input id="atLoss" value="-30000" placeholder="예: -30000"><div class="fieldHint">하루 손실이 이 금액 이하가 되면 자동매매를 멈춥니다.</div></div>
+    <div class="inputWrap"><label>재진입 금지(분)</label><input id="atCool" value="30" placeholder="예: 30"><div class="fieldHint">같은 종목을 다시 매수하기 전 대기 시간입니다.</div></div>
+    <div class="inputWrap"><label>기본 목표 수익률(%)</label><input id="atTarget" value="2.5" placeholder="예: 2.5"><div class="fieldHint">기본 익절 기준입니다. AI 강세 판단 시 목표가를 자동 상향할 수 있습니다.</div></div>
+    <div class="inputWrap"><label>손절 수익률(%)</label><input id="atStop" value="-1.8" placeholder="예: -1.8"><div class="fieldHint">손실 제한 기준입니다. 예: -1.8 입력 시 -1.8% 부근에서 방어합니다.</div></div>
   </div>
   <div class="row" style="margin-top:14px">
     <button class="green" onclick="applyAiSettings()">AI 추천 설정 적용</button>
@@ -3294,7 +3305,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
     <button class="green" onclick="setAutoTrade(true)">실전 자동매매 ON</button>
     <button class="light" onclick="setAutoTrade(false)">자동매매 OFF</button>
     <button class="brown" onclick="buyNow()">AI 최종 1종목 즉시매수</button>
-    <button class="dark" onclick="panicStop()">긴급정지</button><button class="light" onclick="kiwoomPriceTest()">키움 현재가 테스트</button>
+    <button class="dark" onclick="panicStop()">긴급정지</button><button class="light" onclick="autoTradeStatus()">상태 확인</button><button class="light" onclick="kiwoomPriceTest()">키움 현재가 테스트</button>
   </div>
   <div id="autoTradeBox" class="empty" style="margin-top:14px">자동매매 상태를 확인해 주세요.</div>
   <div id="autoTradeDetailBox" class="empty" style="margin-top:10px">상세 진행내용은 상태 확인 후 클릭해서 볼 수 있습니다.</div>
@@ -3329,7 +3340,7 @@ function clearMoneyFast(){
   const el=$(activeMoneyInputId||"atTotal");
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
-function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("요청 시간이 길어져 중단되었습니다. 잠시 후 다시 시도하거나 후보 조건을 낮춰주세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString(),{timeoutMs:120000});$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString(),{timeoutMs:120000});$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/v119_force_sync_holdings",{method:"POST",timeoutMs:120000});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
+function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString(),{timeoutMs:120000});$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString(),{timeoutMs:120000});$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/v119_force_sync_holdings",{method:"POST",timeoutMs:120000});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
   // v109 FETCH FIX
   // 초기 화면에서 키움 실보유 동기화(sync=1)와 현재가 갱신(refresh=1)을 동시에 호출하면
   // 모바일/Render 환경에서 20초 이상 걸려 Fetch is aborted가 발생할 수 있습니다.
@@ -3536,7 +3547,7 @@ function renderAutoTradeDashboard(d, openDetail=false){
 
         <b>자동매매 조건</b><br>
         상태 ${onText} · 키움설정 ${d.kiwoom_ready?"완료":"필요"} · 실전ENV ${d.real_trading_env?"true":"false"} · DRY_RUN ${d.dry_run?"true":"false"} · 장중 ${d.market_open?"예":"아니오"}<br>
-        목표/손절: +${d.target_rate_percent||0}% / ${d.stop_rate_percent||0}% · 수익보호 ${d.profit_guard_percent||1.2}% · 트레일링 ${d.trailing_stop_percent||1.1}% · 강제청산 ${d.force_exit_time||"15:15"}<br><br>
+        목표/손절: +${d.target_rate_percent||0}% / ${d.stop_rate_percent||0}% · 수익보호 ${d.profit_guard_percent||1.2}% · 트레일링 ${d.trailing_stop_percent||1.1}% · AI 목표상향 ON · 강제청산 ${d.force_exit_time||"15:15"}<br><span class="muted">목표가 도달 후 강세면 목표가를 위로 조정하고, 고점 대비 트레일링 하락 시 매도합니다.</span><br><br>
 
         <b>최근 진행상태</b><br>
         진행상태: ${s.last_status||"대기중"}<br>
@@ -3583,7 +3594,7 @@ async function setAutoTrade(on){
     box.innerHTML=`상태: <b>${on?"ON":"OFF"}</b> · 화면 즉시 반영<br><span class="muted">서버 저장 중입니다. 키움 잔고/가격 확인은 백그라운드에서 진행됩니다.</span>`;
   }
   if(detail){
-    detail.innerHTML=`<details class="statusDetails" open><summary>🔎 상세 진행내용 보기 / 숨기기</summary><div class="detailScroll"><b>최근 진행상태:</b> ${on?"실전 자동매매 ON 화면 반영":"자동매매 OFF 화면 반영"}<br><b>메시지:</b> v124 빠른 버튼 방식으로 요청 전송 중...<br><span class="muted">요청 완료 후 키움 실전 정보는 자동으로 상세창에 갱신됩니다.</span></div></details>`;
+    detail.innerHTML=`<details class="statusDetails" open><summary>🔎 상세 진행내용 보기 / 숨기기</summary><div class="detailScroll"><b>최근 진행상태:</b> ${on?"실전 자동매매 ON 화면 반영":"자동매매 OFF 화면 반영"}<br><b>메시지:</b> v125 빠른 버튼 방식으로 요청 전송 중...<br><span class="muted">요청 완료 후 키움 실전 정보는 자동으로 상세창에 갱신됩니다.</span></div></details>`;
   }
 
   const body={
@@ -3624,10 +3635,10 @@ async function setAutoTrade(on){
   }catch(e){
     // v123: 네트워크가 느려도 에러로 끝내지 않고, 상태확인 안내만 표시합니다.
     if(box){
-      box.innerHTML=`상태: <b>${on?"ON 화면 반영":"OFF 화면 반영"}</b><br><span class="muted">서버 응답이 늦습니다. 상태확인을 한번 눌러 저장 여부를 확인하세요.</span>`;
+      box.innerHTML=`상태: <b>${on?"ON 화면 반영":"OFF 화면 반영"}</b><br><span class="muted">서버 확인이 지연 중입니다. 5초 후 상태 확인을 누르면 저장 여부와 키움 정보를 다시 보여줍니다.</span>`;
     }
     if(detail){
-      detail.innerHTML=`<details class="statusDetails" open><summary>🔎 상세 진행내용 보기 / 숨기기</summary><div class="detailScroll"><b>최근 진행상태:</b> 버튼 화면 반영 완료 / 서버 확인 대기<br><b>메시지:</b> ${e.message}<br><span class="muted">Render 서버가 잠시 느릴 때 발생합니다. 같은 버튼을 여러 번 누르지 말고 5초 후 상태 확인을 눌러주세요.</span></div></details>`;
+      detail.innerHTML=`<details class="statusDetails" open><summary>🔎 상세 진행내용 보기 / 숨기기</summary><div class="detailScroll"><b>최근 진행상태:</b> 버튼 화면 반영 완료 / 서버 확인 대기<br><b>메시지:</b> 서버 확인이 지연 중입니다. 화면 상태는 유지됩니다.<br><button class="detailBtn" onclick="autoTradeStatus()">🔄 상태 확인</button><span class="muted">Render 서버가 잠시 느릴 때 발생합니다. 같은 버튼을 여러 번 누르지 말고 5초 후 상태 확인을 눌러주세요.</span></div></details>`;
     }
   }
 }
@@ -6060,6 +6071,9 @@ V109_CANDIDATE_KEY_PRICE_LIMIT = max(1, int(safe_float(os.getenv("V109_CANDIDATE
 V109_PRICE_CACHE_TTL = safe_float(os.getenv("V109_PRICE_CACHE_TTL", "2.0"), 2.0)
 V109_PROFIT_GUARD_RATE = normalize_rate_input(os.getenv("V109_PROFIT_GUARD_RATE", "1.2"), 0.012)
 V109_TRAILING_STOP_RATE = normalize_rate_input(os.getenv("V109_TRAILING_STOP_RATE", "1.1"), 0.011)
+AI_TARGET_RAISE_ENABLED = os.getenv("AI_TARGET_RAISE_ENABLED", "true").lower() == "true"
+AI_TARGET_RAISE_EXTRA_RATE = normalize_rate_input(os.getenv("AI_TARGET_RAISE_EXTRA_RATE", "0.8"), 0.008)
+AI_TARGET_RAISE_HOLD_NEAR_HIGH_RATE = normalize_rate_input(os.getenv("AI_TARGET_RAISE_HOLD_NEAR_HIGH_RATE", "0.5"), 0.005)
 
 
 def v109_code(raw):
@@ -6153,8 +6167,20 @@ def check_one_holding(h):
         with ORDER_LOCK:
             auto_sell_holding("trailing_stop", h, cur)
     elif target and cur >= target:
-        with ORDER_LOCK:
-            auto_sell_holding("target", h, cur)
+        # v125 AI 목표가 상향:
+        # 목표가에 닿았더라도 현재가가 당일/진입 후 최고가 부근이고 수익보호 구간이면
+        # 즉시 매도하지 않고 목표가를 위로 올린 뒤 트레일링 스탑으로 수익을 보호합니다.
+        near_high = current_high > 0 and cur >= current_high * (1.0 - AI_TARGET_RAISE_HOLD_NEAR_HIGH_RATE)
+        strong_profit = buy_price > 0 and current_rate >= profit_guard_rate
+        if AI_TARGET_RAISE_ENABLED and strong_profit and near_high:
+            new_target = round(max(target, cur * (1.0 + AI_TARGET_RAISE_EXTRA_RATE), current_high * (1.0 + AI_TARGET_RAISE_EXTRA_RATE)))
+            h["aiTargetRaised"] = True
+            h["aiTargetRaiseReason"] = f"목표가 도달 후 강세 유지: 기존 목표 {target:,.0f}원 → AI 상향 {new_target:,.0f}원"
+            h["target"] = new_target
+            h["targetRaiseAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            with ORDER_LOCK:
+                auto_sell_holding("target", h, cur)
 
     return h
 
@@ -6429,7 +6455,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v124",
+        "title": "KIWOOM REAL AUTO v125",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6786,7 +6812,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v124", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v125", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
 
 
 
@@ -7239,7 +7265,7 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v124", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v125", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
@@ -7499,7 +7525,7 @@ def api_v115_version():
     return jsonify({
         "ok": True,
         "version": "v115",
-        "title": "KIWOOM REAL AUTO v124",
+        "title": "KIWOOM REAL AUTO v125",
         "engine": "AUTO_SYNC_SMART_SIZE",
         "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
     })
@@ -7538,7 +7564,7 @@ def api_v116_version():
     return jsonify({
         "ok": True,
         "version": "v116",
-        "title": "KIWOOM REAL AUTO v124",
+        "title": "KIWOOM REAL AUTO v125",
         "engine": "LOADING_JS_FIX",
         "message": "v116 로딩 멈춤 JS 오류 수정 및 키움 실보유 동기화 유지"
     })
@@ -8001,7 +8027,7 @@ def api_v117_version():
     return jsonify({
         "ok": True,
         "version": "v117",
-        "title": "KIWOOM REAL AUTO v124",
+        "title": "KIWOOM REAL AUTO v125",
         "engine": "STRONG_SIZE_HOLDING_SYNC",
         "message": "v117 강한 매수수량 + 키움 실보유 자동동기화 강화 적용"
     })
@@ -8275,7 +8301,7 @@ def api_v118_version():
     return jsonify({
         "ok": True,
         "version": "v121",
-        "title": "KIWOOM REAL AUTO v124",
+        "title": "KIWOOM REAL AUTO v125",
         "engine": "REAL_HOLDINGS_AUTO_SYNC_FIX",
         "message": "v119 빠른 보유표시 + 백그라운드 동기화 + 주문락 문구 수정 적용"
     })
