@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v132_AFTER_MARKET_HOLDINGS_PROTECT
-파일명: app_kiwoom_real_auto_scalping_v132_after_market_holdings_protect.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v133_THREAD_CACHE_SECURITY_FIX
+파일명: app_kiwoom_real_auto_scalping_v133_thread_cache_security_fix.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -3246,7 +3246,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v132</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v133</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3346,7 +3346,7 @@ function clearMoneyFast(){
   const el=$(activeMoneyInputId||"atTotal");
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
-function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>현재 강한 단타 후보가 부족합니다. 조건 자동완화 캐시를 갱신 중이며, 실제 매수 전에는 키움 현재가로 재검증합니다.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v132_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>🟡 후보 캐시 준비중입니다. 화면은 유지됩니다. 5초 후 상태 확인을 눌러주세요.</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v132_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>현재 감시 후보가 부족합니다. 장중 변동성 또는 조건 자동완화 결과를 기다립니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>🟡 급등 후보 캐시 준비중입니다. 서버가 계산을 마치면 자동 표시됩니다.</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v132_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`🟡 키움 조회는 백그라운드 진행중입니다. 현재 화면은 마지막 정상 보유값을 유지합니다.`;}}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
+function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function v133StaleWarning(d){try{if(d&&d.is_stale_data){return `<div class='empty' style='border:2px solid #f59e0b;background:#fff3cd'>🔴 후보 데이터가 오래되었습니다. 최근 갱신 ${d.cache_age_sec||0}초 전 · 실제 매수 전에는 키움 현재가를 다시 확인합니다.</div>`} if(d&&d.cache_age_sec>60){return `<div class='empty'>🟡 후보 캐시 ${d.cache_age_sec}초 전 기준입니다.</div>`}}catch(e){}return ''}function renderPick(p){if(!p)return"<div class='empty'>현재 강한 단타 후보가 부족합니다. 조건 자동완화 캐시를 갱신 중이며, 실제 매수 전에는 키움 현재가로 재검증합니다.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v132_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>🟡 후보 캐시 준비중입니다. 화면은 유지됩니다. 5초 후 상태 확인을 눌러주세요.</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v132_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>현재 감시 후보가 부족합니다. 장중 변동성 또는 조건 자동완화 결과를 기다립니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>🟡 급등 후보 캐시 준비중입니다. 서버가 계산을 마치면 자동 표시됩니다.</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v132_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`🟡 키움 조회는 백그라운드 진행중입니다. 현재 화면은 마지막 정상 보유값을 유지합니다.`;}}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
   // v109 FETCH FIX
   // 초기 화면에서 키움 실보유 동기화(sync=1)와 현재가 갱신(refresh=1)을 동시에 호출하면
   // 모바일/Render 환경에서 20초 이상 걸려 Fetch is aborted가 발생할 수 있습니다.
@@ -9583,13 +9583,13 @@ def api_v131_status_light():
 
 
 # ============================================================
-# v132_AFTER_MARKET_HOLDINGS_PROTECT
+# v133_THREAD_CACHE_SECURITY_FIX
 # - 장마감/키움 빈응답/timeout 때 실제 보유 캐시를 절대 0개로 덮어쓰지 않음
 # - 마지막 정상 보유종목 별도 백업 유지
 # - 화면용 캐시는 즉시 표시, 키움 직접 조회는 백그라운드에서만 갱신
 # ============================================================
-V132_VERSION = "v132"
-V132_ENGINE = "AFTER_MARKET_HOLDINGS_PROTECT"
+V132_VERSION = "v133"
+V132_ENGINE = "THREAD_CACHE_SECURITY_FIX"
 V132_LAST_VALID_HOLDINGS_FILE = str(BASE_DIR / "sungil_last_valid_holdings_v132.json")
 
 try:
@@ -9848,6 +9848,220 @@ def api_v132_holdings_guard_status():
         "message": "v132: 키움 빈응답/장마감/timeout 시 기존 보유종목을 지우지 않는 보호모드가 적용되어 있습니다."
     }))
 
+
+
+# ============================================================
+# v133_THREAD_CACHE_SECURITY_FIX
+# 1) watch thread/파일 I/O lock 단일화
+# 2) 오래된 후보 캐시 경고 플래그 추가
+# 3) MASTER/USER 비밀번호 기본값 제거: 환경변수 없으면 로그인 차단
+# ============================================================
+V133_VERSION = "v133"
+V133_ENGINE = "THREAD_CACHE_SECURITY_FIX"
+V133_STALE_SEC = int(os.getenv("CANDIDATE_CACHE_STALE_SEC", "120"))
+
+# Lock alias: 코드 전역에서 오래된 WATCH_LOCK 이름을 쓰더라도 v129 단일락으로 연결합니다.
+try:
+    WATCH_LOCK = V129_THREAD_LOCK
+except Exception:
+    WATCH_LOCK = threading.RLock()
+
+# 파일 I/O 최종 오버라이드: 모든 holdings/trade_state 읽기 쓰기는 V129_FILE_LOCK + atomic write 사용
+try:
+    _V133_FILE_LOCK = V129_FILE_LOCK
+except Exception:
+    _V133_FILE_LOCK = threading.RLock()
+
+def read_holdings():
+    with _V133_FILE_LOCK:
+        try:
+            if os.path.exists(HOLDINGS_FILE):
+                with open(HOLDINGS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return data if isinstance(data, list) else []
+        except Exception as e:
+            print('v133 read_holdings warning:', e, flush=True)
+    return []
+
+def write_holdings(items):
+    with _V133_FILE_LOCK:
+        try:
+            return _v129_atomic_json_write(HOLDINGS_FILE, items or [])
+        except Exception:
+            try:
+                with open(HOLDINGS_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(items or [], f, ensure_ascii=False, indent=2)
+                return True
+            except Exception as e:
+                print('v133 write_holdings warning:', e, flush=True)
+                return False
+
+def read_trade_state():
+    with _V133_FILE_LOCK:
+        try:
+            if os.path.exists(TRADE_STATE_FILE):
+                with open(TRADE_STATE_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                st = dict(TRADE_DEFAULTS)
+                if isinstance(data, dict):
+                    st.update(data)
+                return st
+        except Exception as e:
+            print('v133 read_trade_state warning:', e, flush=True)
+    return dict(TRADE_DEFAULTS)
+
+def write_trade_state(state):
+    with _V133_FILE_LOCK:
+        try:
+            return _v129_atomic_json_write(TRADE_STATE_FILE, state or {})
+        except Exception:
+            try:
+                with open(TRADE_STATE_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(state or {}, f, ensure_ascii=False, indent=2)
+                return True
+            except Exception as e:
+                print('v133 write_trade_state warning:', e, flush=True)
+                return False
+
+# watch thread 최종 단일 진입점
+def ensure_watch_running():
+    with WATCH_LOCK:
+        WATCH_STATE['running'] = True
+        t = WATCH_STATE.get('thread')
+        if t is not None and t.is_alive():
+            return True
+        WATCH_STATE['thread'] = threading.Thread(target=watch_loop, daemon=True, name='watch_loop_v133_single')
+        WATCH_STATE['thread'].start()
+        return True
+
+# 캐시 stale 정보 부여
+def v133_add_stale_meta(payload):
+    try:
+        if not isinstance(payload, dict):
+            return payload
+        updated_ts = payload.get('ts') or payload.get('updatedTs') or 0
+        if not updated_ts:
+            # V128_CANDIDATE_CACHE 쪽 timestamp 추정
+            try:
+                cc = V128_CANDIDATE_CACHE if isinstance(V128_CANDIDATE_CACHE, dict) else {}
+                updated_ts = cc.get('ts') or cc.get('updatedTs') or 0
+            except Exception:
+                updated_ts = 0
+        age = int(max(0, time.time() - float(updated_ts))) if updated_ts else 999999
+        payload['cache_age_sec'] = age if age < 999999 else 0
+        payload['is_stale_data'] = bool(updated_ts and age > V133_STALE_SEC)
+        payload['stale_warning'] = '후보 캐시가 오래되었습니다. 실제 매수 전 키움 현재가로 재검증합니다.' if payload['is_stale_data'] else ''
+        payload['version'] = V133_VERSION
+        payload['engine'] = V133_ENGINE
+    except Exception:
+        pass
+    return payload
+
+def _v133_response_with_stale(prev_func):
+    try:
+        resp = prev_func()
+        data = resp.get_json(silent=True) if hasattr(resp, 'get_json') else None
+        if isinstance(data, dict):
+            return jsonify(safe_json(v133_add_stale_meta(data)))
+        return resp
+    except Exception as e:
+        return jsonify({'ok': False, 'version': V133_VERSION, 'engine': V133_ENGINE, 'is_stale_data': True, 'message': '후보 캐시 확인 중 오류. 마지막 정상 후보를 유지하세요.', 'error': str(e)[:300]})
+
+try:
+    _V133_PREV_BEST = app.view_functions.get('api_v131_best_pick_cached') or app.view_functions.get('api_v132_best_pick_cached') or api_v128_best_pick_cached
+    _V133_PREV_WATCH = app.view_functions.get('api_v131_watch_candidates_cached') or app.view_functions.get('api_v132_watch_candidates_cached') or api_v128_watch_candidates_cached
+    def v133_best_pick_cached_view():
+        return _v133_response_with_stale(_V133_PREV_BEST)
+    def v133_watch_candidates_cached_view():
+        return _v133_response_with_stale(_V133_PREV_WATCH)
+    # 같은 URL이 여러 endpoint로 등록된 상태를 모두 새 함수로 교체
+    for ep in ['api_v131_best_pick_cached','api_v132_best_pick_cached']:
+        if ep in app.view_functions:
+            app.view_functions[ep] = v133_best_pick_cached_view
+    for ep in ['api_v131_watch_candidates_cached','api_v132_watch_candidates_cached']:
+        if ep in app.view_functions:
+            app.view_functions[ep] = v133_watch_candidates_cached_view
+except Exception as e:
+    print('v133 candidate endpoint override warning:', e, flush=True)
+
+# 로그인 보안: MASTER_PASSWORD/USER_PASSWORD 기본값 0000/1234 제거
+_V133_BOOT_TEMP_PASSWORD = ''
+if not os.getenv('MASTER_PASSWORD') and not os.getenv('USER_PASSWORD'):
+    try:
+        import secrets as _v133_secrets
+        _V133_BOOT_TEMP_PASSWORD = _v133_secrets.token_urlsafe(18)
+        print('='*70, flush=True)
+        print('V133 SECURITY WARNING: MASTER_PASSWORD/USER_PASSWORD is not set.', flush=True)
+        print('Temporary password for this boot:', _V133_BOOT_TEMP_PASSWORD, flush=True)
+        print('Set MASTER_PASSWORD in Render Environment for stable secure login.', flush=True)
+        print('='*70, flush=True)
+    except Exception:
+        pass
+
+def api_login_check_v133_secure():
+    data = request.get_json(force=True, silent=True) or {}
+    pw = str(data.get('password','')).strip()
+    master = (os.getenv('MASTER_PASSWORD') or '').strip()
+    user = (os.getenv('USER_PASSWORD') or '').strip()
+    # 환경변수가 없으면 0000/1234는 절대 허용하지 않음. 부팅 로그 임시비번만 허용.
+    if not master and not user:
+        if _V133_BOOT_TEMP_PASSWORD and pw == _V133_BOOT_TEMP_PASSWORD:
+            return jsonify({'ok': True, 'role': 'temp_admin', 'version': V133_VERSION, 'message': '임시 로그인 성공. Render 환경변수 MASTER_PASSWORD 설정을 권장합니다.'})
+        return jsonify({'ok': False, 'version': V133_VERSION, 'message': '보안상 기본 비밀번호 로그인을 차단했습니다. Render 환경변수 MASTER_PASSWORD 또는 USER_PASSWORD를 설정하세요.'})
+    if master and pw == master:
+        return jsonify({'ok': True, 'role': 'master', 'version': V133_VERSION})
+    if user and pw == user:
+        return jsonify({'ok': True, 'role': 'user', 'version': V133_VERSION})
+    return jsonify({'ok': False, 'version': V133_VERSION, 'message': '비밀번호가 맞지 않습니다.'})
+
+try:
+    app.view_functions['api_login_check'] = api_login_check_v133_secure
+except Exception as e:
+    print('v133 login override warning:', e, flush=True)
+
+@app.route('/api/v133_security_status')
+def api_v133_security_status():
+    return jsonify({
+        'ok': True,
+        'version': V133_VERSION,
+        'master_password_set': bool(os.getenv('MASTER_PASSWORD')),
+        'user_password_set': bool(os.getenv('USER_PASSWORD')),
+        'default_password_blocked': True,
+        'message': 'v133: 기본 비밀번호 0000/1234는 제거되었습니다.'
+    })
+
+@app.route('/api/v133_status_light')
+def api_v133_status_light():
+    try:
+        keep, src = v132_get_best_cached_holdings()
+    except Exception:
+        keep, src = [], 'UNKNOWN'
+    try:
+        cc = V128_CANDIDATE_CACHE if isinstance(V128_CANDIDATE_CACHE, dict) else {}
+    except Exception:
+        cc = {}
+    payload = {
+        'ok': True,
+        'version': V133_VERSION,
+        'engine': V133_ENGINE,
+        'holding_count': len(keep),
+        'holdings_source': src,
+        'watch_thread_alive': bool(WATCH_STATE.get('thread') and WATCH_STATE.get('thread').is_alive()),
+        'telegram_queue_size': V129_TG_QUEUE.qsize() if 'V129_TG_QUEUE' in globals() else 0,
+        'candidate_cache_updated': cc.get('updated',''),
+        'candidate_cache_running': cc.get('running', False),
+        'security_default_password_blocked': True,
+    }
+    return jsonify(safe_json(v133_add_stale_meta(payload)))
+
+try:
+    V119_VERSION = V133_VERSION
+    V119_ENGINE = V133_ENGINE
+    V129_VERSION = V133_VERSION + ' ' + V133_ENGINE
+    V132_VERSION = V133_VERSION
+    V132_ENGINE = V133_ENGINE
+except Exception:
+    pass
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '10000'))
