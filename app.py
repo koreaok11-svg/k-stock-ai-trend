@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v114 BUY_QTY_HOLDINGS_FIX
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v115 AUTO_SYNC_SMART_SIZE
 파일명: app_kiwoom_real_auto_scalping_v113_real_holdings_ui_fix.py
 
 실전 운영용 경량화 버전입니다.
@@ -2004,7 +2004,7 @@ def sync_kiwoom_holdings_to_local():
     return res.get("holdings", read_holdings())
 
 try:
-    # [v109 duplicate route disabled] @app.route("/api/v114_force_sync_holdings", methods=["GET", "POST"])
+    # [v109 duplicate route disabled] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
     def api_v109_force_sync_holdings():
         full = str(request.args.get("full", "1")).lower() not in ["0", "false", "no"]
         return jsonify(v109_force_sync_holdings(full_sync=full))
@@ -2262,7 +2262,7 @@ def try_rebuy_after_sell(sold_code=""):
             update_trade_status("재매수 대기", "장중이 아니므로 신규 매수를 진행하지 않습니다.")
             return {"ok": False, "message": "market closed"}
 
-        # v114 BUY_QTY_HOLDINGS_FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
+        # v115 AUTO_SYNC_SMART_SIZE: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
 
         if safe_float(state.get("daily_realized_pnl", 0)) <= safe_float(state.get("daily_max_loss", -30000)):
             update_trade_status("재매수 중지", "하루 최대 손실 제한에 도달하여 신규 매수를 중지합니다.")
@@ -2772,7 +2772,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
         )
 
         send_trade_telegram(
-            f"🚀 <b>v113 AI 자동매수 {'DRY-RUN ' if order.get('dry_run') else ''}진행</b>\n"
+            f"🚀 <b>v115 AI 자동매수 {'DRY-RUN ' if order.get('dry_run') else ''}진행</b>\n"
             f"종목: <b>{pick['name']}</b> ({code})\n"
             f"매수가 기준: {live:,.0f}원 ({price_src})\n"
             f"수량: {qty:,}주\n"
@@ -2815,7 +2815,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
                 update_trade_status("수량 조정 매수 성공", f"{pick['name']} {retry_qty}주 매수 처리 완료", candidate=pick, order=retry_order)
                 send_trade_telegram(
-                    f"🚀 <b>v113 AI 자동매수 수량조정 진행</b>\n"
+                    f"🚀 <b>v115 AI 자동매수 수량조정 진행</b>\n"
                     f"종목: <b>{pick['name']}</b> ({code})\n"
                     f"매수가 기준: {live:,.0f}원 ({price_src})\n"
                     f"최초 수량: {qty:,}주 → 조정 수량: {retry_qty:,}주\n"
@@ -2831,7 +2831,7 @@ def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
 
         update_trade_status("매수 실패", reason, candidate=pick, order=order)
         send_trade_telegram(
-            f"⚠️ <b>v113 AI 자동매수 실패</b>\n"
+            f"⚠️ <b>v115 AI 자동매수 실패</b>\n"
             f"종목: {pick.get('name')} ({code})\n"
             f"현재가: {live:,.0f}원\n"
             f"수량: {qty:,}주\n"
@@ -3111,7 +3111,7 @@ def api_v109_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v114 BUY_QTY_HOLDINGS_FIX",
+            "version": "KIWOOM REAL AUTO SCALPING v115 AUTO_SYNC_SMART_SIZE",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -3162,7 +3162,7 @@ input[placeholder*="목표가 자동"],
 input[placeholder*="손절가 자동"] { display:none !important; }
 </style>
 
-</head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v114</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+</head><body><div id="loading" class="loading-screen"><div class="loading-card"><div style="font-size:58px">🍃</div><div class="loading-title">성일의 AI 주식바람</div><p class="muted">오늘 시장의 흐름을 읽는 중...</p><div class="bar"><span></span></div></div></div><div id="passwordLock" class="lock hidden"><div class="lockbox"><div class="badge">🔐 SECURE ACCESS</div><h1>성일의 AI 주식바람</h1><p class="muted">비밀번호를 입력하면 앱을 사용할 수 있습니다.</p><input id="passwordInput" type="password" placeholder="비밀번호 입력"><button class="green" onclick="login()" style="width:100%;margin-top:12px">로그인</button><p id="loginMessage" class="muted"></p></div></div><main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v115</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3178,16 +3178,20 @@ input[placeholder*="손절가 자동"] { display:none !important; }
 <button type="button" onclick="setMoneyFast(30000000000)">300억</button>
 <button type="button" class="darkmini" onclick="addMoneyFast(1000000000)">+10억</button>
 <button type="button" class="warnmini" onclick="clearMoneyFast()">지우기</button>
-</div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card"><h2>💼 보유종목 관리</h2><p class="muted">실제 자동매수/키움 실보유 종목은 이곳에 자동 등록됩니다. 키움 실제잔고 기준으로 표시됩니다. 브라우저 백업 보유목록은 사용하지 않습니다.</p><div id="storageStatus" class="empty">저장소 확인 중...</div><div class="grid"><input id="hName" placeholder="종목명 예: 휴림로봇"><input id="hCode" placeholder="종목코드 예: 090710"><input id="hBuy" placeholder="매수가 예: 13120"><input id="hAmount" placeholder="매수금액 예: 500000"><div id="hAmountQuickMoney"><div class="quick-money">
-<button type="button" onclick="setMoneyFast(1000)">1천원</button>
-<button type="button" onclick="setMoneyFast(10000)">1만원</button>
-<button type="button" onclick="setMoneyFast(100000)">10만원</button>
-<button type="button" onclick="setMoneyFast(1000000)">100만원</button>
-<button type="button" class="darkmini" onclick="addMoneyFast(10000)">+1만원</button>
-<button type="button" class="darkmini" onclick="addMoneyFast(100000)">+10만원</button>
-<button type="button" class="warnmini" onclick="clearMoneyFast()">지우기</button>
-<div class="hint">먼저 금액 입력칸을 누른 뒤 버튼을 누르면 해당 칸에 금액이 들어갑니다.</div>
-</div></div><input id="hQty" placeholder="수량 자동계산 또는 입력"><input id="hTarget" placeholder="목표가 자동 +3.5%"><input id="hStop" placeholder="손절가 자동 -2.5%"></div><div class="row" style="margin-top:14px"><button class="green" onclick="addHolding()">보유종목 등록</button><button class="dark" onclick="refreshHoldings()">현재가 즉시확인</button><button class="green" onclick="loadHoldings()">보유종목 강제 새로고침</button><button class="light" onclick="clearHoldings()">전체 삭제</button></div><div id="holdingStatus" class="empty" style="margin-top:14px">로딩 전입니다.</div><div id="holdingList"></div></section>
+</div><div><label>최소 AI 점수</label><input id="minScore" value="70"></div></div><div class="row" style="margin-top:16px"><button class="green" onclick="loadBest()">필터 적용/새로고침</button><button class="dark" onclick="loadWatch()">다음 단타 후보 보기</button><button class="brown" onclick="testBetterAlert()">텔레그램 테스트 알림</button></div></section><section id="best" class="card"><h2>⚡ AI 단타 최종 후보</h2><div id="bestBox" class="empty">아직 조회하지 않았습니다.</div></section><section id="watch" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="watchBox" class="empty">다음 단타 후보 보기를 누르면 표시됩니다.</div></section><section id="holdings" class="card">
+<h2>💼 키움 실보유 자동 동기화</h2>
+<p class="muted">
+수동 보유종목 등록 기능은 삭제했습니다. 이제 보유탭은 <b>키움증권 실제 잔고</b>만 기준으로 표시합니다.
+매수 체결 후 자동으로 새로고침되며, AI 감시·자동매도·텔레그램도 같은 보유목록을 사용합니다.
+</p>
+<div class="row" style="margin-top:14px">
+<button class="green" onclick="v115RefreshHoldings()">키움 실보유 새로고침</button>
+<button class="dark" onclick="v115OpenHoldingsApi()">API 직접 확인</button>
+<button class="light" onclick="v115ClearViewOnly()">화면만 초기화</button>
+</div>
+<div id="holdingStatus" class="empty" style="margin-top:14px">키움 실제잔고 확인 전입니다.</div>
+<div id="holdingList"></div>
+</section>
 <section id="autotrade" class="card">
   <h2>🤖 키움 실전 자동매매</h2>
   <p class="muted">실전 자동매매는 키움 REST API 환경변수가 설정되어야 동작합니다. 실제 매수금은 화면의 총투자금이 아니라 <b>키움 예수금/주문가능금액</b>을 기준으로 자동 계산합니다.<br><b>AI 추천 설정</b>은 예수금 기준 1회 진입 상한·하루손실·목표/손절을 자동 계산합니다. 수동 설정도 가능합니다.<br>목표/손절 수익률은 <b>2.5 = +2.5%</b>, <b>-1.8 = -1.8%</b>처럼 입력하면 됩니다.</p>
@@ -3261,7 +3265,7 @@ function clearMoneyFast(){
   const el=$(activeMoneyInputId||"atTotal");
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
-function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("요청 시간이 길어져 중단되었습니다. 잠시 후 다시 시도하거나 후보 조건을 낮춰주세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString(),{timeoutMs:120000});$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString(),{timeoutMs:120000});$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v114_server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/v114_force_sync_holdings",{method:"POST",timeoutMs:120000});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v114_server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
+function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value)})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("요청 시간이 길어져 중단되었습니다. 잠시 후 다시 시도하거나 후보 조건을 낮춰주세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/best_pick?"+getParams().toString(),{timeoutMs:120000});$("bestBox").innerHTML=renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/watch_candidates?"+getParams().toString(),{timeoutMs:120000});$("watchBox").innerHTML=(d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>"}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v115_server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){const d=await fetchJson("/api/v115_force_sync_holdings",{method:"POST",timeoutMs:120000});renderHoldings(d.holdings||[])}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v115_server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
   // v109 FETCH FIX
   // 초기 화면에서 키움 실보유 동기화(sync=1)와 현재가 갱신(refresh=1)을 동시에 호출하면
   // 모바일/Render 환경에서 20초 이상 걸려 Fetch is aborted가 발생할 수 있습니다.
@@ -3270,7 +3274,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
 
   let d={holdings:[]};
   try{
-    d=await fetchJson("/api/v114_server_holdings",{timeoutMs:60000});
+    d=await fetchJson("/api/v115_server_holdings",{timeoutMs:60000});
   }catch(e){
     $("holdingStatus").innerHTML=`⚠️ 보유종목 조회 실패: ${e.message}`;
     return;
@@ -3288,7 +3292,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
           body:JSON.stringify({holdings:backup}),
           timeoutMs:60000
         });
-        d=await fetchJson("/api/v114_server_holdings",{timeoutMs:60000});
+        d=await fetchJson("/api/v115_server_holdings",{timeoutMs:60000});
         list=d.holdings||[];
       }catch(e){
         $("holdingStatus").innerHTML=`⚠️ 브라우저 백업 복구 실패: ${e.message}`;
@@ -3303,7 +3307,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
   if(list.length){
     setTimeout(async()=>{
       try{
-        const rd=await fetchJson("/api/v114_server_holdings",{
+        const rd=await fetchJson("/api/v115_server_holdings",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({action:"refresh"}),
@@ -3372,7 +3376,7 @@ function aiCommentText(cur,buy,target,stop,qty){
   if(rate>0) return `초기 수익 구간입니다. 거래량 유지 시 목표가까지 감시합니다.`;
   return `대기/약손실 구간입니다. 손절가 접근 여부를 감시합니다.`;
 }
-async function removeHolding(id,code){const d=await fetchJson("/api/v114_server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"remove",id,code})});renderHoldings(d.holdings||[])}
+async function removeHolding(id,code){const d=await fetchJson("/api/v115_server_holdings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"remove",id,code})});renderHoldings(d.holdings||[])}
 function backupHoldingsToBrowser(list){/* v109 disabled */}
 function getBrowserHoldingBackup(){return []}
 async function restoreHoldingsFromBrowser(){alert("v109부터 브라우저 백업 복구는 사용하지 않습니다. 키움 실제잔고 동기화를 사용하세요."); await refreshHoldings();}
@@ -3823,7 +3827,7 @@ def sync_kiwoom_holdings_to_local():
     return v109_force_sync_holdings(full_sync=False).get("holdings", read_holdings())
 
 try:
-    # [v109 duplicate route disabled] @app.route("/api/v114_force_sync_holdings", methods=["GET", "POST"])
+    # [v109 duplicate route disabled] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
     def api_v109_force_sync_holdings_dup2():
         full = str(request.args.get("full", "1")).lower() not in ["0", "false", "no"]
         return jsonify(v109_force_sync_holdings(full_sync=full))
@@ -4093,7 +4097,7 @@ def sync_kiwoom_holdings_to_local():
     return v109_force_sync_holdings(full_sync=True).get("holdings", read_holdings())
 
 try:
-    # [v109 duplicate route disabled] @app.route("/api/v114_force_sync_holdings", methods=["GET", "POST"])
+    # [v109 duplicate route disabled] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
     def api_v109_force_sync_holdings_dup2_dup2():
         full = str(request.args.get("full", "1")).lower() not in ["0", "false", "no"]
         return jsonify(v109_force_sync_holdings(full_sync=full))
@@ -5469,7 +5473,7 @@ def watch_loop():
             print("v109 watch loop error:", e)
         time.sleep(WATCH_INTERVAL)
 
-# [v113 route disabled old] @app.route("/api/v114_force_sync_holdings", methods=["GET", "POST"])
+# [v113 route disabled old] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
 def api_v109_force_sync_holdings():
     return jsonify(v109_force_sync_holdings(full_sync=True))
 
@@ -5477,7 +5481,7 @@ def api_v109_force_sync_holdings():
 def api_v109_holdings():
     return jsonify(v109_force_sync_holdings(full_sync=True))
 
-# [v113 route disabled old] @app.route("/api/v114_server_holdings", methods=["GET", "POST"])
+# [v113 route disabled old] @app.route("/api/v115_server_holdings", methods=["GET", "POST"])
 def api_server_holdings_v109():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -5534,7 +5538,7 @@ def api_v109_reset_all_holdings():
 
 
 # ============================================================
-# v114 BUY_QTY_HOLDINGS_FIX ENGINE
+# v115 AUTO_SYNC_SMART_SIZE ENGINE
 # ============================================================
 ORDER_LOCK = globals().get("ORDER_LOCK") or threading.Lock()
 STATE_LOCK = globals().get("STATE_LOCK") or threading.RLock()
@@ -5849,7 +5853,7 @@ def api_v109_trailing_test():
 
 
 # ============================================================
-# v114 BUY_QTY_HOLDINGS_FIX PATCH
+# v115 AUTO_SYNC_SMART_SIZE PATCH
 # 트레일링 스탑 실시간 감시 / 오타 방어 / REST 호출 제한 / 감시속도 최적화
 # ============================================================
 V109_WATCH_INTERVAL = safe_float(os.getenv("V109_WATCH_INTERVAL", "2"), 2)
@@ -6227,7 +6231,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v114",
+        "title": "KIWOOM REAL AUTO v115",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6235,7 +6239,7 @@ def api_v113_version():
 
 
 # ============================================================
-# v114 BUY_QTY_HOLDINGS_FIX
+# v115 AUTO_SYNC_SMART_SIZE
 # 보유종목 앱 표시 최종 수정: 키움 실제잔고 → 화면 보유탭 강제 표시
 # ============================================================
 V113_MASTER_HOLDINGS_FILE = os.path.join(DATA_DIR, "v113_master_holdings.json") if "DATA_DIR" in globals() else str(BASE_DIR / "v113_master_holdings.json")
@@ -6532,7 +6536,7 @@ def v113_server_holdings_response():
     return v113_force_sync_holdings(full_sync=True)
 
 
-# [v114 duplicate route disabled] @app.route("/api/v114_server_holdings", methods=["GET", "POST"])
+# [v114 duplicate route disabled] @app.route("/api/v115_server_holdings", methods=["GET", "POST"])
 def api_v113_server_holdings():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -6545,7 +6549,7 @@ def api_v113_server_holdings():
     return jsonify(v113_server_holdings_response())
 
 
-# [v114 duplicate route disabled] @app.route("/api/v114_force_sync_holdings", methods=["GET", "POST"])
+# [v114 duplicate route disabled] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
 def api_v113_force_sync_holdings():
     return jsonify(v113_force_sync_holdings(full_sync=True))
 
@@ -6570,9 +6574,9 @@ def api_v113_restore_holdings():
 
 
 # 기존 URL을 누르는 경우도 v113으로 강제 연결
-@app.route("/api/server_holdings", methods=["GET", "POST"])
+# [v115 duplicate route disabled] @app.route("/api/server_holdings", methods=["GET", "POST"])
 @app.route("/api/server_holdings_v109", methods=["GET", "POST"])
-@app.route("/api/holdings", methods=["GET", "POST"])
+# [v115 duplicate route disabled] @app.route("/api/holdings", methods=["GET", "POST"])
 @app.route("/api/real_holdings", methods=["GET", "POST"])
 @app.route("/api/kiwoom_holdings", methods=["GET", "POST"])
 @app.route("/api/force_sync_holdings", methods=["GET", "POST"])
@@ -6584,7 +6588,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v114", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v115", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
 
 
 
@@ -6997,7 +7001,7 @@ def v113_fetch_kiwoom_holdings():
     return v114_fetch_kiwoom_holdings()
 
 
-# [v114 duplicate route disabled] @app.route("/api/v114_force_sync_holdings", methods=["GET", "POST"])
+# [v114 duplicate route disabled] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
 def api_v114_force_sync_holdings():
     if "v113_force_sync_holdings" in globals():
         res = v113_force_sync_holdings(full_sync=True)
@@ -7007,7 +7011,7 @@ def api_v114_force_sync_holdings():
     return jsonify(res)
 
 
-# [v114 duplicate route disabled] @app.route("/api/v114_server_holdings", methods=["GET", "POST"])
+# [v114 duplicate route disabled] @app.route("/api/v115_server_holdings", methods=["GET", "POST"])
 def api_v114_server_holdings():
     res = v113_force_sync_holdings(full_sync=True) if "v113_force_sync_holdings" in globals() else v114_fetch_kiwoom_holdings()
     res["version"] = "v114"
@@ -7037,18 +7041,290 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v114", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v115", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
-@app.route("/api/v114_force_sync_holdings", methods=["GET", "POST"])
+# [v115 duplicate route disabled] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
 def api_v113_force_sync_holdings_v114_override():
     return api_v114_force_sync_holdings()
 
 
-@app.route("/api/v114_server_holdings", methods=["GET", "POST"])
+# [v115 duplicate route disabled] @app.route("/api/v115_server_holdings", methods=["GET", "POST"])
 def api_v113_server_holdings_v114_override():
     return api_v114_server_holdings()
+
+
+
+
+
+# ============================================================
+# v115 AUTO SYNC + SMART POSITION SIZE
+# 매수 후 실제잔고 자동동기화 / AI 점수 기반 매수수량 확대
+# ============================================================
+V115_SMART_SIZE_ENABLED = str(os.getenv("V115_SMART_SIZE_ENABLED", "true")).lower() in ["1", "true", "yes", "on"]
+V115_MAX_CASH_USE_RATE = safe_float(os.getenv("V115_MAX_CASH_USE_RATE", "0.82"), 0.82)
+V115_MID_CASH_USE_RATE = safe_float(os.getenv("V115_MID_CASH_USE_RATE", "0.55"), 0.55)
+V115_LOW_CASH_USE_RATE = safe_float(os.getenv("V115_LOW_CASH_USE_RATE", "0.33"), 0.33)
+V115_MIN_BUY_QTY = int(safe_float(os.getenv("V115_MIN_BUY_QTY", "1"), 1))
+V115_SYNC_AFTER_BUY_DELAY_SEC = safe_float(os.getenv("V115_SYNC_AFTER_BUY_DELAY_SEC", "1.5"), 1.5)
+
+
+def v115_orderable_cash():
+    if "v114_orderable_cash" in globals():
+        return v114_orderable_cash()
+    return 0, {"ok": False, "message": "주문가능금액 함수 없음"}
+
+
+def v115_score_of_pick(pick):
+    if not isinstance(pick, dict):
+        return 0
+    return max(
+        safe_float(pick.get("aiScore", 0), 0),
+        safe_float(pick.get("aiScoreV109", 0), 0),
+        safe_float(pick.get("aiScoreV110", 0), 0),
+        safe_float(pick.get("score", 0), 0),
+        safe_float(pick.get("orderPriority", 0), 0),
+    )
+
+
+def v115_cash_use_rate(score, current_positions=0, max_positions=3):
+    score = safe_float(score, 0)
+    if score >= 95:
+        rate = V115_MAX_CASH_USE_RATE
+    elif score >= 85:
+        rate = V115_MID_CASH_USE_RATE
+    else:
+        rate = V115_LOW_CASH_USE_RATE
+    try:
+        remain_slots = max(1, int(max_positions) - int(current_positions))
+        slot_rate = min(0.95, 1.0 / remain_slots)
+        rate = min(rate, max(slot_rate, V115_LOW_CASH_USE_RATE))
+    except Exception:
+        pass
+    return max(0.05, min(0.95, rate))
+
+
+def v115_calc_final_order_qty(pick=None, live_price=0):
+    pick = pick or {}
+    price = safe_float(live_price or pick.get("price", pick.get("buyPrice", pick.get("buyZone", 0))), 0)
+    if price <= 0:
+        return 0, {"ok": False, "message": "현재가가 0원이어서 주문수량 계산 불가", "v115": True}
+
+    orderable, raw = v115_orderable_cash()
+    if orderable < price:
+        return 0, {
+            "ok": False,
+            "message": f"주문가능금액 부족: 주문가능 {orderable:,.0f}원 / 현재가 {price:,.0f}원",
+            "orderable_cash": int(orderable),
+            "price": int(price),
+            "v115": True,
+            "raw": raw
+        }
+
+    state = read_trade_state() if "read_trade_state" in globals() else {}
+    max_positions = max(1, int(safe_float(state.get("max_positions", globals().get("MAX_POSITION_COUNT", 3)), 3)))
+    current_positions = get_current_position_count() if "get_current_position_count" in globals() else len(read_holdings())
+    score = v115_score_of_pick(pick)
+    rate = v115_cash_use_rate(score, current_positions, max_positions) if V115_SMART_SIZE_ENABLED else safe_float(globals().get("POSITION_CASH_RATE", 0.33), 0.33)
+    safety = safe_float(globals().get("ORDER_CASH_SAFETY_RATE", 0.96), 0.96)
+    use_cash = max(price, orderable * rate * safety)
+    qty = int(use_cash // price)
+    if qty <= 0 and orderable >= price:
+        qty = 1
+        use_cash = price
+
+    return qty, {
+        "ok": qty >= V115_MIN_BUY_QTY,
+        "message": f"v115 AI 스마트수량 {qty}주 산정",
+        "label": "v115 AI 스마트 진입금액",
+        "qty": int(qty),
+        "price": int(price),
+        "orderable_cash": int(orderable),
+        "kiwoom_orderable_cash": int(orderable),
+        "cash_use_rate": round(rate, 3),
+        "score": round(score, 2),
+        "estimated_order_amount": int(qty * price),
+        "final_order_budget": int(use_cash),
+        "current_positions": current_positions,
+        "max_positions": max_positions,
+        "raw": raw,
+        "v115": True
+    }
+
+
+# 수량 계산 함수 통일
+v114_calc_final_order_qty = v115_calc_final_order_qty
+v109_calc_final_order_qty = v115_calc_final_order_qty
+v109_calc_order_qty_from_ai_budget = v115_calc_final_order_qty
+calc_auto_cash_order_qty = v115_calc_final_order_qty
+
+
+def get_auto_order_budget():
+    orderable, raw = v115_orderable_cash()
+    safety = safe_float(globals().get("ORDER_CASH_SAFETY_RATE", 0.96), 0.96)
+    return {
+        "ok": orderable > 0,
+        "message": f"v115 키움 주문가능금액 {orderable:,.0f}원 확인",
+        "orderable_cash": int(orderable),
+        "kiwoom_orderable_cash": int(orderable),
+        "budget": int(orderable * V115_MAX_CASH_USE_RATE * safety),
+        "final_order_budget": int(orderable * V115_MAX_CASH_USE_RATE * safety),
+        "cash_info": raw,
+        "v115": True
+    }
+
+
+def v115_sync_holdings_now():
+    for fn_name in ["v114_fetch_kiwoom_holdings", "v113_force_sync_holdings", "v112_fetch_real_holdings", "v111_sync_master_holdings"]:
+        try:
+            fn = globals().get(fn_name)
+            if not fn:
+                continue
+            try:
+                res = fn(full_sync=True)
+            except TypeError:
+                try:
+                    res = fn(force=True)
+                except TypeError:
+                    res = fn()
+            if isinstance(res, dict):
+                items = res.get("holdings", res.get("items", res.get("data", [])))
+                if isinstance(items, list):
+                    try:
+                        write_holdings(items)
+                    except Exception:
+                        pass
+                    return {"ok": True, "source": fn_name, "count": len(items), "holdings": items}
+        except Exception as e:
+            last_error = str(e)
+            continue
+    return {"ok": False, "message": "매수 후 보유종목 동기화 실패"}
+
+
+def v115_force_sync_holdings_after_buy():
+    time.sleep(max(0, V115_SYNC_AFTER_BUY_DELAY_SEC))
+    return v115_sync_holdings_now()
+
+
+_ORIG_KIWOOM_ORDER_V115 = globals().get("kiwoom_order")
+
+def kiwoom_order(side, code, qty, price=0, order_type="market"):
+    result = _ORIG_KIWOOM_ORDER_V115(side, code, qty, price, order_type) if _ORIG_KIWOOM_ORDER_V115 else {"ok": False, "message": "기존 주문함수 없음"}
+    try:
+        side_s = str(side).lower()
+        ok = isinstance(result, dict) and (result.get("ok") or str(result.get("return_code", "")) in ["0", "00"])
+        if ok and (side_s in ["buy", "매수", "1"]):
+            result["v115_after_buy_sync"] = v115_force_sync_holdings_after_buy()
+    except Exception as e:
+        if isinstance(result, dict):
+            result["v115_after_buy_sync_error"] = str(e)
+    return result
+
+
+_ORIG_AUTO_BUY_BEST_PICK_V115 = globals().get("auto_buy_best_pick")
+
+def auto_buy_best_pick(args=None, use_latest_ui_pick=False):
+    fixed = {}
+    try:
+        if args:
+            for k in args.keys():
+                fixed[k] = args.get(k)
+    except Exception:
+        fixed = {}
+    fixed["minQty"] = 1
+    fixed["minScore"] = min(safe_float(fixed.get("minScore", 65), 65), 65)
+    fixed["minAmount"] = min(safe_float(fixed.get("minAmount", 300000000), 300000000), 300000000)
+
+    result = _ORIG_AUTO_BUY_BEST_PICK_V115(args=fixed, use_latest_ui_pick=False) if _ORIG_AUTO_BUY_BEST_PICK_V115 else {"ok": False, "message": "기존 자동매수 함수 없음"}
+    try:
+        if isinstance(result, dict) and result.get("ok"):
+            result["v115_after_buy_sync"] = v115_force_sync_holdings_after_buy()
+    except Exception as e:
+        if isinstance(result, dict):
+            result["v115_after_buy_sync_error"] = str(e)
+
+    if isinstance(result, dict) and not result.get("ok"):
+        msg = str(result.get("message", ""))
+        if "자동 계산" in msg or "수량" in msg or "qty" in msg.lower():
+            orderable, _ = v115_orderable_cash()
+            result["message"] = f"v115 매수 보류: 주문가능금액 {orderable:,.0f}원 기준 1주 이상 가능한 AI 후보를 찾지 못했습니다. 필터를 낮춰 재탐색합니다."
+            result["v115_fixed"] = True
+    return result
+
+
+def v115_real_holdings_payload():
+    sync = v115_sync_holdings_now()
+    items = sync.get("holdings", []) if isinstance(sync, dict) else []
+    return {
+        "ok": bool(sync.get("ok")) if isinstance(sync, dict) else False,
+        "version": "v115",
+        "holdings": items,
+        "items": items,
+        "data": items,
+        "count": len(items),
+        "registeredCount": len(items),
+        "source": sync.get("source", "UNKNOWN") if isinstance(sync, dict) else "UNKNOWN",
+        "message": "v115 키움 실제잔고 기준 보유종목 동기화",
+        "cash": get_auto_order_budget(),
+    }
+
+
+@app.route("/api/v115_smart_qty_test")
+def api_v115_smart_qty_test():
+    code = request.args.get("code", "")
+    price = safe_float(request.args.get("price", 0), 0)
+    score = safe_float(request.args.get("score", 100), 100)
+    if price <= 0 and code:
+        price, src = get_trade_live_price(code, fallback=True)
+    qty, info = v115_calc_final_order_qty({"code": code, "price": price, "score": score, "orderPriority": score}, price)
+    return jsonify({"ok": qty > 0, "version": "v115", "qty": qty, "info": info})
+
+
+# [v115 duplicate route disabled] @app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
+def api_v115_force_sync_holdings():
+    return jsonify(v115_real_holdings_payload())
+
+
+# [v115 duplicate route disabled] @app.route("/api/v115_server_holdings", methods=["GET", "POST"])
+def api_v115_server_holdings():
+    return jsonify(v115_real_holdings_payload())
+
+
+@app.route("/api/v115_cash")
+def api_v115_cash():
+    return jsonify({"ok": True, "version": "v115", "budget": get_auto_order_budget()})
+
+
+@app.route("/api/v115_version")
+def api_v115_version():
+    return jsonify({
+        "ok": True,
+        "version": "v115",
+        "title": "KIWOOM REAL AUTO v115",
+        "engine": "AUTO_SYNC_SMART_SIZE",
+        "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
+    })
+
+
+@app.route("/api/v115_server_holdings", methods=["GET", "POST"])
+def api_v114_server_holdings_v115_override():
+    return api_v115_server_holdings()
+
+
+@app.route("/api/v115_force_sync_holdings", methods=["GET", "POST"])
+def api_v114_force_sync_holdings_v115_override():
+    return api_v115_force_sync_holdings()
+
+
+@app.route("/api/server_holdings", methods=["GET", "POST"])
+def api_server_holdings_v115_override():
+    return api_v115_server_holdings()
+
+
+@app.route("/api/holdings", methods=["GET", "POST"])
+def api_holdings_v115_override():
+    return api_v115_server_holdings()
 
 
 if __name__ == '__main__':
