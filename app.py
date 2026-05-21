@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v127_FILTER_COLLAPSE_FAST_PICK_REAL_CASH_ONLY
-파일명: app_kiwoom_real_auto_scalping_v127_background_cache_fast_dashboard.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v128_CACHE_INSTANT_NO_ERROR_FIX
+파일명: app_kiwoom_real_auto_scalping_v128_cache_instant_no_error_fix.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -3095,7 +3095,7 @@ def api_auto_trade_quick_set():
             state['panic_stop'] = False
         state['last_status'] = '실전 자동매매 ON' if enabled else '실전 자동매매 OFF'
         state['last_status_time'] = now_kst().strftime('%Y-%m-%d %H:%M:%S')
-        state['last_order_message'] = 'v125 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
+        state['last_order_message'] = 'v128 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
         write_trade_state(state)
         if enabled:
             try:
@@ -3240,7 +3240,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v127</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v128</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3340,7 +3340,7 @@ function clearMoneyFast(){
   const el=$(activeMoneyInputId||"atTotal");
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
-function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v127_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v127_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>조회 오류: "+e.message+"</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v127_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`⚠️ 보유종목 조회 지연: 화면은 마지막 정상값을 유지합니다. 5초 후 다시 확인하세요.`;}}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
+function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function renderPick(p){if(!p)return"<div class='empty'>조건에 맞는 단타 후보가 없습니다. 조건을 낮춰보세요.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v128_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>🟡 후보 캐시 준비중입니다. 화면은 유지됩니다. 5초 후 상태 확인을 눌러주세요.</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v128_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>감시 후보가 없습니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>🟡 급등 후보 캐시 준비중입니다. 서버가 계산을 마치면 자동 표시됩니다.</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v128_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`🟡 키움 조회는 백그라운드 진행중입니다. 현재 화면은 마지막 정상 보유값을 유지합니다.`;}}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
   // v109 FETCH FIX
   // 초기 화면에서 키움 실보유 동기화(sync=1)와 현재가 갱신(refresh=1)을 동시에 호출하면
   // 모바일/Render 환경에서 20초 이상 걸려 Fetch is aborted가 발생할 수 있습니다.
@@ -3349,7 +3349,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
 
   let d={holdings:[]};
   try{
-    d=await fetchJson("/api/v127_holdings_cached?start_sync=1",{timeoutMs:4500});
+    d=await fetchJson("/api/v128_holdings_cached?start_sync=1",{timeoutMs:4500});
   }catch(e){
     $("holdingStatus").innerHTML=`⚠️ 보유종목 조회 실패: ${e.message}`;
     return;
@@ -3367,7 +3367,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
           body:JSON.stringify({holdings:backup}),
           timeoutMs:60000
         });
-        d=await fetchJson("/api/v127_holdings_cached?start_sync=1",{timeoutMs:4500});
+        d=await fetchJson("/api/v128_holdings_cached?start_sync=1",{timeoutMs:4500});
         list=d.holdings||[];
       }catch(e){
         $("holdingStatus").innerHTML=`⚠️ 브라우저 백업 복구 실패: ${e.message}`;
@@ -3382,7 +3382,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
   if(list.length){
     setTimeout(async()=>{
       try{
-        const rd=await fetchJson("/api/v127_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});
+        const rd=await fetchJson("/api/v128_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});
         if(rd.holdings){
           renderHoldings(rd.holdings);
         }
@@ -3562,7 +3562,7 @@ function renderAutoTradeDashboard(d, openDetail=false){
     </details>`;
 }
 async function autoTradeStatus(){
-  const d=await fetchJson("/api/v127_status_light",{timeoutMs:3000});
+  const d=await fetchJson("/api/v128_status_light",{timeoutMs:3000});
   renderAutoTradeDashboard(d,false);
 }
 async function refreshAutoTradeDetail(){
@@ -6450,7 +6450,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v127",
+        "title": "KIWOOM REAL AUTO v128",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6807,7 +6807,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v127", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v128", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
 
 
 
@@ -7260,7 +7260,7 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v127", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v128", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
@@ -7520,7 +7520,7 @@ def api_v115_version():
     return jsonify({
         "ok": True,
         "version": "v115",
-        "title": "KIWOOM REAL AUTO v127",
+        "title": "KIWOOM REAL AUTO v128",
         "engine": "AUTO_SYNC_SMART_SIZE",
         "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
     })
@@ -7559,7 +7559,7 @@ def api_v116_version():
     return jsonify({
         "ok": True,
         "version": "v116",
-        "title": "KIWOOM REAL AUTO v127",
+        "title": "KIWOOM REAL AUTO v128",
         "engine": "LOADING_JS_FIX",
         "message": "v116 로딩 멈춤 JS 오류 수정 및 키움 실보유 동기화 유지"
     })
@@ -8022,7 +8022,7 @@ def api_v117_version():
     return jsonify({
         "ok": True,
         "version": "v117",
-        "title": "KIWOOM REAL AUTO v127",
+        "title": "KIWOOM REAL AUTO v128",
         "engine": "STRONG_SIZE_HOLDING_SYNC",
         "message": "v117 강한 매수수량 + 키움 실보유 자동동기화 강화 적용"
     })
@@ -8296,7 +8296,7 @@ def api_v118_version():
     return jsonify({
         "ok": True,
         "version": "v121",
-        "title": "KIWOOM REAL AUTO v127",
+        "title": "KIWOOM REAL AUTO v128",
         "engine": "REAL_HOLDINGS_AUTO_SYNC_FIX",
         "message": "v119 빠른 보유표시 + 백그라운드 동기화 + 주문락 문구 수정 적용"
     })
@@ -8711,12 +8711,12 @@ def api_v119_version():
 
 
 # ============================================================
-# v127 BACKGROUND_CACHE_FAST_DASHBOARD
+# v128 CACHE_INSTANT_NO_ERROR_FIX
 # - 무거운 후보/잔고 조회는 백그라운드에서 갱신
 # - 화면 버튼은 마지막 정상 캐시를 즉시 표시
 # - 실제 주문/매도 직전에는 기존 로직 그대로 키움 현재가/주문가능금액을 재확인
 # ============================================================
-V127_VERSION = "v127 BACKGROUND_CACHE_FAST_DASHBOARD"
+V127_VERSION = "v128 CACHE_INSTANT_NO_ERROR_FIX"
 V127_CANDIDATE_TTL_SEC = int(os.getenv("V127_CANDIDATE_TTL_SEC", "30"))
 V127_CACHE_LOCK = threading.Lock()
 V127_CANDIDATE_CACHE = {
@@ -8818,7 +8818,7 @@ def v127_candidate_payload(start_refresh=True, params=None):
     return safe_json(cache)
 
 
-@app.route("/api/v127_best_pick_cached")
+@app.route("/api/v128_best_pick_cached")
 def api_v127_best_pick_cached():
     params = v127_params_from_request(request.args)
     payload = v127_candidate_payload(start_refresh=True, params=params)
@@ -8834,7 +8834,7 @@ def api_v127_best_pick_cached():
     })
 
 
-@app.route("/api/v127_watch_candidates_cached")
+@app.route("/api/v128_watch_candidates_cached")
 def api_v127_watch_candidates_cached():
     params = v127_params_from_request(request.args)
     payload = v127_candidate_payload(start_refresh=True, params=params)
@@ -8859,7 +8859,7 @@ def api_v127_refresh_candidates():
     return jsonify(payload)
 
 
-@app.route("/api/v127_holdings_cached", methods=["GET", "POST"])
+@app.route("/api/v128_holdings_cached", methods=["GET", "POST"])
 def api_v127_holdings_cached():
     start_sync = str(request.args.get("start_sync", "1")).lower() in ["1", "true", "yes"]
     # v119 캐시 구조를 그대로 사용하되, 화면 응답은 즉시 반환합니다.
@@ -8883,7 +8883,7 @@ def api_v127_holdings_cached():
         })
 
 
-@app.route("/api/v127_status_light")
+@app.route("/api/v128_status_light")
 def api_v127_status_light():
     state = read_trade_state()
     kd = state.get("last_kiwoom_debug", {}) or {}
@@ -8927,6 +8927,296 @@ try:
     v127_start_candidate_refresh(v127_params_from_request({}), force=True)
 except Exception as _e:
     print("v127 initial candidate refresh skipped:", _e)
+
+
+# ============================================================
+# v128 CACHE_INSTANT_NO_ERROR_FIX
+# 목적:
+# 1) 화면 API는 절대 무거운 키움/후보 계산을 직접 기다리지 않음
+# 2) 후보/보유/상태는 마지막 정상 캐시를 즉시 반환
+# 3) 실제 주문/매도 직전에는 기존 로직 그대로 키움 현재가/주문가능금액을 재확인
+# ============================================================
+V128_VERSION = "v128 CACHE_INSTANT_NO_ERROR_FIX"
+V128_CANDIDATE_TTL_SEC = int(os.getenv("V128_CANDIDATE_TTL_SEC", "25"))
+V128_FAST_LIMIT = int(os.getenv("V128_FAST_LIMIT", "500"))
+V128_CACHE_LOCK = threading.Lock()
+V128_CANDIDATE_CACHE = {
+    "ok": False,
+    "pick": None,
+    "items": [],
+    "updated": "",
+    "ts": 0,
+    "running": False,
+    "error": "",
+    "params": {}
+}
+
+
+def v128_fast_score_candidates(params=None):
+    """화면 표시용 초고속 후보 계산. 키움 API를 호출하지 않습니다."""
+    params = params or {}
+    cash = safe_float(params.get("cash", 500000), 500000)
+    min_qty = safe_int(params.get("minQty", 1), 1)
+    max_change = safe_float(params.get("maxChange", 7), 7)
+    min_amount = safe_float(params.get("minAmount", 1000000000), 1000000000)
+    min_score = safe_float(params.get("minScore", 70), 70)
+    price_ranges = []
+    for part in str(params.get("priceRanges", "5000-20000,20000-50000,50000-200000")).split(','):
+        try:
+            a, b = part.split('-')
+            price_ranges.append((safe_float(a), safe_float(b)))
+        except Exception:
+            pass
+
+    df = get_market_df(limit=V128_FAST_LIMIT)
+    if df is None or df.empty:
+        return []
+    df = df.copy()
+    cc = 'ChagesRatio' if 'ChagesRatio' in df.columns else ('Change' if 'Change' in df.columns else None)
+    for col in ['Close', 'Volume', 'Amount', 'Marcap']:
+        df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0)
+    df['dayChange'] = pd.to_numeric(df[cc], errors='coerce').fillna(0) if cc else 0
+    df['Name'] = df['Name'].astype(str)
+    df['Code'] = df['Code'].astype(str).str.zfill(6)
+    exclude = ['스팩','SPAC','ETF','ETN','인버스','레버리지','KODEX','TIGER','KBSTAR','ARIRANG','HANARO']
+    df = df[~df['Name'].str.upper().apply(lambda n:any(x.upper() in n for x in exclude) or n.endswith('우'))].copy()
+    df = df[(df['Close'] >= 10) & (df['Amount'] >= min_amount) & (df['dayChange'] >= 0.2) & (df['dayChange'] <= max_change)].copy()
+    if price_ranges:
+        mask = False
+        for lo, hi in price_ranges:
+            mask = mask | ((df['Close'] >= lo) & (df['Close'] <= hi))
+        df = df[mask].copy()
+    if df.empty:
+        return []
+    df['theme'] = df['Name'].apply(classify_theme).apply(normalize_theme)
+    df['amountRank'] = df['Amount'].rank(pct=True) * 100
+    df['volumeRank'] = df['Volume'].rank(pct=True) * 100
+    df['marcapRank'] = df['Marcap'].rank(pct=True) * 100
+    df['sweetSpot'] = (100 - (df['dayChange'] - 3.5).abs() * 8).clip(lower=20, upper=100)
+    df['themeWeight'] = df['theme'].apply(lambda x: WEIGHT.get(x, 1.0))
+    df['score'] = (df['amountRank']*.34 + df['volumeRank']*.25 + df['marcapRank']*.15 + df['sweetSpot']*.26) * df['themeWeight']
+    df = df[df['score'] >= min_score].sort_values('score', ascending=False)
+    out = []
+    for _, row in df.head(10).iterrows():
+        price = safe_float(row['Close'])
+        qty = int(cash // price) if price else 0
+        if qty < min_qty:
+            continue
+        orderbook = {}
+        ai = v109_calculate_scalping_score(row, price, orderbook)
+        item = {
+            'code': str(row['Code']).zfill(6),
+            'name': str(row['Name']),
+            'market': str(row.get('Market','')),
+            'theme': normalize_theme(row['theme']),
+            'price': round(price),
+            'priceSource': 'KRX_CACHE',
+            'score': ai['aiScoreV109'],
+            'dayChange': round(safe_float(row['dayChange']), 2),
+            'amount': round(safe_float(row['Amount'])),
+            'qtyPossible': qty,
+            'buyZone': round(price * .995),
+            'target': round(price * 1.035),
+            'stop': round(price * .975),
+            'comment': f"v128 캐시 후보: {ai['scalpingStatus']} · {', '.join(ai['scalpingReasons'])}. 화면은 KRX 캐시 기준이며, 실제 주문 직전에는 키움 현재가/주문가능금액으로 다시 검증합니다."
+        }
+        item.update(ai)
+        out.append(item)
+    return sorted(out, key=lambda x: safe_float(x.get('orderPriority', x.get('score', 0))), reverse=True)
+
+
+def v128_refresh_candidates_worker(params=None):
+    global V128_CANDIDATE_CACHE
+    params = params or v127_params_from_request({})
+    try:
+        with V128_CACHE_LOCK:
+            if V128_CANDIDATE_CACHE.get('running'):
+                return dict(V128_CANDIDATE_CACHE)
+            V128_CANDIDATE_CACHE['running'] = True
+            V128_CANDIDATE_CACHE['error'] = ''
+        picks = v128_fast_score_candidates(params)
+        pick = picks[0] if picks else None
+        payload = {
+            'ok': bool(pick), 'pick': pick, 'items': picks[:8],
+            'updated': now_kst().strftime('%Y-%m-%d %H:%M:%S'),
+            'ts': time.time(), 'running': False, 'error': '', 'params': params,
+            'version': V128_VERSION
+        }
+        with V128_CACHE_LOCK:
+            V128_CANDIDATE_CACHE.update(payload)
+        if pick:
+            try:
+                state = read_trade_state()
+                state['latest_ui_pick'] = pick
+                state['latest_ui_args'] = params
+                write_trade_state(state)
+            except Exception:
+                pass
+        return payload
+    except Exception as e:
+        with V128_CACHE_LOCK:
+            V128_CANDIDATE_CACHE['running'] = False
+            V128_CANDIDATE_CACHE['error'] = str(e)[:300]
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def v128_start_candidate_refresh(params=None, force=False):
+    params = params or v127_params_from_request({})
+    with V128_CACHE_LOCK:
+        running = bool(V128_CANDIDATE_CACHE.get('running'))
+        age = time.time() - safe_float(V128_CANDIDATE_CACHE.get('ts', 0), 0) if V128_CANDIDATE_CACHE.get('ts') else 999999
+    if running:
+        return False
+    if (not force) and age < V128_CANDIDATE_TTL_SEC:
+        return False
+    try:
+        threading.Thread(target=v128_refresh_candidates_worker, args=(params,), daemon=True).start()
+        return True
+    except Exception:
+        return False
+
+
+def v128_candidate_payload(params=None, start_refresh=True):
+    params = params or v127_params_from_request({})
+    with V128_CACHE_LOCK:
+        cache = dict(V128_CANDIDATE_CACHE)
+    if not cache.get('pick'):
+        # 이전 상태 파일 후보라도 즉시 표시
+        try:
+            st = read_trade_state()
+            lp = st.get('latest_ui_pick')
+            if lp:
+                cache['pick'] = lp
+                cache['items'] = [lp]
+                cache['ok'] = True
+                cache['updated'] = st.get('last_status_time', '') or cache.get('updated','')
+        except Exception:
+            pass
+    age = time.time() - safe_float(cache.get('ts', 0), 0) if cache.get('ts') else None
+    if start_refresh and (age is None or age > V128_CANDIDATE_TTL_SEC):
+        v128_start_candidate_refresh(params=params, force=False)
+        with V128_CACHE_LOCK:
+            new_cache = dict(V128_CANDIDATE_CACHE)
+        if new_cache.get('pick'):
+            cache = new_cache
+    cache['version'] = V128_VERSION
+    cache['cacheAgeSec'] = round(age, 1) if age is not None else None
+    cache['refreshing'] = bool(cache.get('running')) or (age is None)
+    cache['message'] = 'v128 즉시 캐시 표시: 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.'
+    return safe_json(cache)
+
+
+@app.route('/api/v128_best_pick_cached')
+def api_v128_best_pick_cached():
+    params = v127_params_from_request(request.args)
+    payload = v128_candidate_payload(params=params, start_refresh=True)
+    return jsonify({
+        'ok': bool(payload.get('pick')),
+        'pick': payload.get('pick'),
+        'updated': payload.get('updated'),
+        'cacheAgeSec': payload.get('cacheAgeSec'),
+        'refreshing': payload.get('refreshing'),
+        'message': payload.get('message'),
+        'error': payload.get('error',''),
+        'version': V128_VERSION
+    })
+
+
+@app.route('/api/v128_watch_candidates_cached')
+def api_v128_watch_candidates_cached():
+    params = v127_params_from_request(request.args)
+    payload = v128_candidate_payload(params=params, start_refresh=True)
+    return jsonify({
+        'ok': True,
+        'items': payload.get('items') or ([payload.get('pick')] if payload.get('pick') else []),
+        'updated': payload.get('updated'),
+        'cacheAgeSec': payload.get('cacheAgeSec'),
+        'refreshing': payload.get('refreshing'),
+        'message': payload.get('message'),
+        'error': payload.get('error',''),
+        'version': V128_VERSION
+    })
+
+
+@app.route('/api/v128_refresh_candidates', methods=['GET','POST'])
+def api_v128_refresh_candidates():
+    params = v127_params_from_request(request.args)
+    started = v128_start_candidate_refresh(params=params, force=True)
+    payload = v128_candidate_payload(params=params, start_refresh=False)
+    payload['started'] = started
+    return jsonify(payload)
+
+
+@app.route('/api/v128_holdings_cached', methods=['GET','POST'])
+def api_v128_holdings_cached():
+    start_sync = str(request.args.get('start_sync','0')).lower() in ['1','true','yes']
+    # 화면 응답은 캐시만 즉시 반환. start_sync=1일 때만 백그라운드 동기화 요청.
+    if start_sync:
+        try:
+            if 'v118_start_background_sync' in globals():
+                v118_start_background_sync(force=False)
+            elif 'v119_start_sync' in globals():
+                v119_start_sync(force=False)
+        except Exception:
+            pass
+    cache = v119_read_cache() if 'v119_read_cache' in globals() else {}
+    items = []
+    updated = ''
+    if isinstance(cache, dict):
+        items = cache.get('holdings') or cache.get('items') or []
+        updated = cache.get('updatedAt') or cache.get('updated') or ''
+    if not items:
+        items = read_holdings()
+    return jsonify(safe_json({
+        'ok': True,
+        'version': V128_VERSION,
+        'holdings': items,
+        'items': items,
+        'count': len(items),
+        'source': 'INSTANT_CACHE',
+        'cacheUpdatedAt': updated,
+        'sync': {'running': bool(start_sync), 'mode': 'background'},
+        'message': 'v128 즉시 보유 캐시 표시. 키움 실잔고 동기화는 백그라운드에서 진행합니다.'
+    }))
+
+
+@app.route('/api/v128_status_light')
+def api_v128_status_light():
+    st = read_trade_state()
+    cache = v119_read_cache() if 'v119_read_cache' in globals() else {}
+    hitems = cache.get('holdings', []) if isinstance(cache, dict) else read_holdings()
+    with V128_CACHE_LOCK:
+        cc = dict(V128_CANDIDATE_CACHE)
+    return jsonify(safe_json({
+        'ok': True,
+        'version': V128_VERSION,
+        'state': st,
+        'market_open': market_is_open(),
+        'kiwoom_ready': kiwoom_ready(),
+        'kiwoom_debug': st.get('last_kiwoom_debug', {}),
+        'account_cash': {'source':'FAST_SKIP', 'cash':0, 'message':'v128 경량확인은 키움 API를 직접 호출하지 않습니다.'},
+        'holding_count': len(hitems),
+        'holdings_cache_updated': cache.get('updatedAt','') if isinstance(cache, dict) else '',
+        'candidate_cache_updated': cc.get('updated',''),
+        'candidate_refreshing': cc.get('running', False),
+        'trade_count_today': st.get('trade_count_today',0),
+        'max_trades_per_day': st.get('max_trades_per_day',10),
+        'min_order_cash': st.get('min_order_cash',0),
+        'max_positions': st.get('max_positions',3),
+        'target_rate_percent': round(safe_float(st.get('target_rate',0))*100,2),
+        'stop_rate_percent': round(safe_float(st.get('stop_rate',0))*100,2),
+        'profit_guard_percent': round(safe_float(st.get('profit_guard_rate',0))*100,2),
+        'trailing_stop_percent': round(safe_float(st.get('trailing_stop_rate',0))*100,2),
+        'force_exit_time': st.get('force_exit_time','15:15'),
+        'real_trading_env': KIWOOM_REAL_TRADING,
+        'dry_run': KIWOOM_DRY_RUN,
+        'message': 'v128 정상: 화면 상태 확인은 캐시만 읽어 즉시 응답합니다.'
+    }))
+
+try:
+    v128_start_candidate_refresh(v127_params_from_request({}), force=True)
+except Exception as _e:
+    print('v128 initial candidate refresh skipped:', _e)
 
 
 if __name__ == '__main__':
