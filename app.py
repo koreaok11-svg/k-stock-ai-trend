@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v128_CACHE_INSTANT_NO_ERROR_FIX
-파일명: app_kiwoom_real_auto_scalping_v128_cache_instant_no_error_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v129_STABILITY_ASYNC_LOCK_SQLITE_READY
+파일명: app_kiwoom_real_auto_scalping_v129_stability_async_lock_sqlite_ready.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -3095,7 +3095,7 @@ def api_auto_trade_quick_set():
             state['panic_stop'] = False
         state['last_status'] = '실전 자동매매 ON' if enabled else '실전 자동매매 OFF'
         state['last_status_time'] = now_kst().strftime('%Y-%m-%d %H:%M:%S')
-        state['last_order_message'] = 'v128 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
+        state['last_order_message'] = 'v129 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
         write_trade_state(state)
         if enabled:
             try:
@@ -3240,7 +3240,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v128</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v129</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -6450,7 +6450,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v128",
+        "title": "KIWOOM REAL AUTO v129",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6807,7 +6807,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v128", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v129", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
 
 
 
@@ -7260,7 +7260,7 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v128", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v129", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
@@ -7520,7 +7520,7 @@ def api_v115_version():
     return jsonify({
         "ok": True,
         "version": "v115",
-        "title": "KIWOOM REAL AUTO v128",
+        "title": "KIWOOM REAL AUTO v129",
         "engine": "AUTO_SYNC_SMART_SIZE",
         "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
     })
@@ -7559,7 +7559,7 @@ def api_v116_version():
     return jsonify({
         "ok": True,
         "version": "v116",
-        "title": "KIWOOM REAL AUTO v128",
+        "title": "KIWOOM REAL AUTO v129",
         "engine": "LOADING_JS_FIX",
         "message": "v116 로딩 멈춤 JS 오류 수정 및 키움 실보유 동기화 유지"
     })
@@ -8022,7 +8022,7 @@ def api_v117_version():
     return jsonify({
         "ok": True,
         "version": "v117",
-        "title": "KIWOOM REAL AUTO v128",
+        "title": "KIWOOM REAL AUTO v129",
         "engine": "STRONG_SIZE_HOLDING_SYNC",
         "message": "v117 강한 매수수량 + 키움 실보유 자동동기화 강화 적용"
     })
@@ -8296,7 +8296,7 @@ def api_v118_version():
     return jsonify({
         "ok": True,
         "version": "v121",
-        "title": "KIWOOM REAL AUTO v128",
+        "title": "KIWOOM REAL AUTO v129",
         "engine": "REAL_HOLDINGS_AUTO_SYNC_FIX",
         "message": "v119 빠른 보유표시 + 백그라운드 동기화 + 주문락 문구 수정 적용"
     })
@@ -8770,7 +8770,7 @@ def v127_refresh_candidates_worker(params=None):
                 state["latest_ui_pick"] = pick
                 state["latest_ui_args"] = params
                 write_trade_state(state)
-                update_trade_status("후보 캐시 갱신", f"v127 백그라운드 후보 갱신: {pick.get('name')}({pick.get('code')})", candidate=pick)
+                update_trade_status("후보 캐시 갱신", f"v129 백그라운드 후보 갱신: {pick.get('name')}({pick.get('code')})", candidate=pick)
             except Exception:
                 pass
         return payload
@@ -8918,7 +8918,7 @@ def api_v127_status_light():
         "force_exit_time": state.get("force_exit_time", "15:15"),
         "real_trading_env": KIWOOM_REAL_TRADING,
         "dry_run": KIWOOM_DRY_RUN,
-        "message": "v127 경량 상태확인: Render alive/캐시 상태만 즉시 확인합니다."
+        "message": "v129 경량 상태확인: Render alive/캐시 상태만 즉시 확인합니다."
     }))
 
 
@@ -8936,7 +8936,7 @@ except Exception as _e:
 # 2) 후보/보유/상태는 마지막 정상 캐시를 즉시 반환
 # 3) 실제 주문/매도 직전에는 기존 로직 그대로 키움 현재가/주문가능금액을 재확인
 # ============================================================
-V128_VERSION = "v128 CACHE_INSTANT_NO_ERROR_FIX"
+V128_VERSION = "v129 STABILITY_ASYNC_LOCK_SQLITE_READY"
 V128_CANDIDATE_TTL_SEC = int(os.getenv("V128_CANDIDATE_TTL_SEC", "25"))
 V128_FAST_LIMIT = int(os.getenv("V128_FAST_LIMIT", "500"))
 V128_CACHE_LOCK = threading.Lock()
@@ -9018,7 +9018,7 @@ def v128_fast_score_candidates(params=None):
             'buyZone': round(price * .995),
             'target': round(price * 1.035),
             'stop': round(price * .975),
-            'comment': f"v128 캐시 후보: {ai['scalpingStatus']} · {', '.join(ai['scalpingReasons'])}. 화면은 KRX 캐시 기준이며, 실제 주문 직전에는 키움 현재가/주문가능금액으로 다시 검증합니다."
+            'comment': f"v129 캐시 후보: {ai['scalpingStatus']} · {', '.join(ai['scalpingReasons'])}. 화면은 KRX 캐시 기준이며, 실제 주문 직전에는 키움 현재가/주문가능금액으로 다시 검증합니다."
         }
         item.update(ai)
         out.append(item)
@@ -9102,7 +9102,7 @@ def v128_candidate_payload(params=None, start_refresh=True):
     cache['version'] = V128_VERSION
     cache['cacheAgeSec'] = round(age, 1) if age is not None else None
     cache['refreshing'] = bool(cache.get('running')) or (age is None)
-    cache['message'] = 'v128 즉시 캐시 표시: 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.'
+    cache['message'] = 'v129 즉시 캐시 표시: 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.'
     return safe_json(cache)
 
 
@@ -9176,7 +9176,7 @@ def api_v128_holdings_cached():
         'source': 'INSTANT_CACHE',
         'cacheUpdatedAt': updated,
         'sync': {'running': bool(start_sync), 'mode': 'background'},
-        'message': 'v128 즉시 보유 캐시 표시. 키움 실잔고 동기화는 백그라운드에서 진행합니다.'
+        'message': 'v129 즉시 보유 캐시 표시. 키움 실잔고 동기화는 백그라운드에서 진행합니다.'
     }))
 
 
@@ -9194,7 +9194,7 @@ def api_v128_status_light():
         'market_open': market_is_open(),
         'kiwoom_ready': kiwoom_ready(),
         'kiwoom_debug': st.get('last_kiwoom_debug', {}),
-        'account_cash': {'source':'FAST_SKIP', 'cash':0, 'message':'v128 경량확인은 키움 API를 직접 호출하지 않습니다.'},
+        'account_cash': {'source':'FAST_SKIP', 'cash':0, 'message':'v129 경량확인은 키움 API를 직접 호출하지 않습니다.'},
         'holding_count': len(hitems),
         'holdings_cache_updated': cache.get('updatedAt','') if isinstance(cache, dict) else '',
         'candidate_cache_updated': cc.get('updated',''),
@@ -9210,13 +9210,257 @@ def api_v128_status_light():
         'force_exit_time': st.get('force_exit_time','15:15'),
         'real_trading_env': KIWOOM_REAL_TRADING,
         'dry_run': KIWOOM_DRY_RUN,
-        'message': 'v128 정상: 화면 상태 확인은 캐시만 읽어 즉시 응답합니다.'
+        'message': 'v129 정상: 화면 상태 확인은 캐시만 읽어 즉시 응답합니다.'
     }))
 
 try:
     v128_start_candidate_refresh(v127_params_from_request({}), force=True)
 except Exception as _e:
-    print('v128 initial candidate refresh skipped:', _e)
+    print('v129 initial candidate refresh skipped:', _e)
+
+
+# =====================================================================
+# v129 STABILITY_ASYNC_LOCK_SQLITE_READY
+# - 파일 JSON 동시 읽기/쓰기 LOCK + atomic write
+# - 텔레그램 알림 비동기 큐 분리
+# - Render IP 조회 캐시/짧은 timeout
+# - 호가 JSON 탐색 최대 깊이 제한
+# - watch thread 중복 생성 방지 강화
+# =====================================================================
+import queue as _v129_queue
+import tempfile as _v129_tempfile
+
+V129_VERSION = "v129 STABILITY_ASYNC_LOCK_SQLITE_READY"
+V129_FILE_LOCK = threading.RLock()
+V129_THREAD_LOCK = threading.RLock()
+V129_TG_QUEUE = _v129_queue.Queue(maxsize=int(os.getenv("TELEGRAM_QUEUE_MAX", "200")))
+V129_TG_WORKER_STARTED = False
+
+# 기존 파일 JSON 저장 방식 유지하되, 깨진 JSON 방지를 위해 atomic write 적용
+def _v129_atomic_json_write(path, data):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = _v129_tempfile.mkstemp(prefix=p.name + '.', suffix='.tmp', dir=str(p.parent))
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+        os.replace(tmp, str(p))
+        return True
+    except Exception as e:
+        try:
+            os.unlink(tmp)
+        except Exception:
+            pass
+        print('v129 atomic write error:', e, flush=True)
+        return False
+
+def _v129_safe_json_read(path, default):
+    with V129_FILE_LOCK:
+        try:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except json.JSONDecodeError as e:
+            print('v129 json decode warning:', path, e, flush=True)
+        except Exception as e:
+            print('v129 json read warning:', path, e, flush=True)
+    return default
+
+# 최종 read/write override: 이전 중복 정의보다 뒤에서 다시 정의하여 전역 함수 교체
+def read_holdings():
+    data = _v129_safe_json_read(HOLDINGS_FILE, [])
+    return data if isinstance(data, list) else []
+
+def write_holdings(items):
+    with V129_FILE_LOCK:
+        return _v129_atomic_json_write(HOLDINGS_FILE, items or [])
+
+def read_trade_state():
+    data = _v129_safe_json_read(TRADE_STATE_FILE, {})
+    state = dict(TRADE_DEFAULTS)
+    if isinstance(data, dict):
+        state.update(data)
+    return state
+
+def write_trade_state(state):
+    with V129_FILE_LOCK:
+        return _v129_atomic_json_write(TRADE_STATE_FILE, state or {})
+
+# 텔레그램 발송은 자동매매/감시 루프를 막지 않도록 큐로 분리
+def _v129_send_telegram_direct(text):
+    token=os.getenv('TELEGRAM_BOT_TOKEN','').strip(); chat_id=os.getenv('TELEGRAM_CHAT_ID','').strip()
+    if not token or not chat_id:
+        return False,'TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 설정되지 않았습니다.'
+    try:
+        r=requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            json={'chat_id':chat_id,'text':text,'parse_mode':'HTML','disable_web_page_preview':True},
+            timeout=float(os.getenv('TELEGRAM_TIMEOUT_SEC','3.0'))
+        )
+        return (True,'sent') if r.status_code==200 else (False,r.text[:500])
+    except Exception as e:
+        return False,str(e)
+
+def _v129_telegram_worker():
+    while True:
+        text = V129_TG_QUEUE.get()
+        try:
+            ok, msg = _v129_send_telegram_direct(text)
+            try:
+                st = read_trade_state()
+                st['last_telegram_status'] = {'ok': ok, 'message': msg, 'time': now_kst().strftime('%Y-%m-%d %H:%M:%S')}
+                write_trade_state(st)
+            except Exception:
+                pass
+        except Exception as e:
+            print('v129 telegram worker error:', e, flush=True)
+        finally:
+            V129_TG_QUEUE.task_done()
+
+def v129_ensure_telegram_worker():
+    global V129_TG_WORKER_STARTED
+    if V129_TG_WORKER_STARTED:
+        return
+    with V129_THREAD_LOCK:
+        if V129_TG_WORKER_STARTED:
+            return
+        t = threading.Thread(target=_v129_telegram_worker, daemon=True, name='v129_telegram_worker')
+        t.start()
+        V129_TG_WORKER_STARTED = True
+
+v129_ensure_telegram_worker()
+
+def send_telegram_message(text):
+    """호출부에는 즉시 성공을 반환하고 실제 발송은 백그라운드 큐에서 처리합니다."""
+    try:
+        v129_ensure_telegram_worker()
+        V129_TG_QUEUE.put_nowait(str(text or ''))
+        return True, 'queued'
+    except _v129_queue.Full:
+        return False, '텔레그램 큐가 가득 찼습니다. 잠시 후 다시 시도하세요.'
+    except Exception as e:
+        return False, str(e)
+
+# Render public IP는 대시보드 흐름을 막지 않도록 짧은 timeout + 캐시 사용
+_V129_RENDER_IP_TS = 0
+
+def get_render_public_ip(force=False):
+    global _LAST_RENDER_IP_INFO, _V129_RENDER_IP_TS
+    try:
+        now_ts = time.time()
+        ttl = int(os.getenv('RENDER_IP_CACHE_SEC', '21600'))
+        if not force and _LAST_RENDER_IP_INFO.get('ip') and (now_ts - _V129_RENDER_IP_TS) < ttl:
+            return _LAST_RENDER_IP_INFO
+        timeout = float(os.getenv('RENDER_IP_TIMEOUT_SEC', '1.2'))
+        ip = ''; source = ''
+        for url, name in [('https://api.ipify.org','api.ipify.org'), ('https://ifconfig.me/ip','ifconfig.me')]:
+            try:
+                r = requests.get(url, timeout=timeout)
+                if r.status_code == 200 and r.text.strip():
+                    ip = r.text.strip(); source = name; break
+            except Exception:
+                pass
+        if ip:
+            _LAST_RENDER_IP_INFO = {'ok': True, 'ip': ip, 'source': source, 'checked_at': now_kst().strftime('%Y-%m-%d %H:%M:%S'), 'message': '이 IP를 키움 REST API 허용 IP에 등록하세요.'}
+            _V129_RENDER_IP_TS = now_ts
+            return _LAST_RENDER_IP_INFO
+        if _LAST_RENDER_IP_INFO.get('ip'):
+            _LAST_RENDER_IP_INFO['message'] = 'IP 재확인은 지연되었지만 마지막 정상 IP 캐시를 유지합니다.'
+            return _LAST_RENDER_IP_INFO
+        return {'ok': False, 'ip': '', 'source': 'NONE', 'checked_at': now_kst().strftime('%Y-%m-%d %H:%M:%S'), 'message': '공인 IP 확인 지연'}
+    except Exception as e:
+        return {'ok': False, 'ip': '', 'source': 'ERROR', 'checked_at': now_kst().strftime('%Y-%m-%d %H:%M:%S'), 'message': str(e)}
+
+# 깊이 제한 있는 반복 탐색 함수
+def v129_deep_find_number(obj, keys, max_depth=5, max_nodes=300):
+    try:
+        q = [(obj, 0)]
+        seen = 0
+        while q and seen < max_nodes:
+            cur, depth = q.pop(0); seen += 1
+            if depth > max_depth:
+                continue
+            if isinstance(cur, dict):
+                for k in keys:
+                    if k in cur:
+                        n = abs(safe_float(str(cur.get(k, '')).replace(',', '').replace('+', '').replace('-', ''), 0))
+                        if n > 0:
+                            return n
+                for v in cur.values():
+                    if isinstance(v, (dict, list)):
+                        q.append((v, depth + 1))
+            elif isinstance(cur, list):
+                for item in cur[:100]:
+                    if isinstance(item, (dict, list)):
+                        q.append((item, depth + 1))
+    except Exception:
+        pass
+    return 0
+
+def v109_get_orderbook_metrics(code):
+    code = str(code).zfill(6)
+    result = {'bid_total': 0, 'ask_total': 0, 'bid_ask_ratio': 0, 'orderbook_source': 'NONE'}
+    try:
+        if not kiwoom_ready():
+            return result
+        token = kiwoom_get_token()
+        headers = {'Content-Type': 'application/json;charset=UTF-8','authorization': 'Bearer ' + token,'cont-yn': 'N','next-key': '','api-id': 'ka10004'}
+        r = requests.post(KIWOOM_BASE_URL + '/api/dostk/stkinfo', json={'stk_cd': code}, headers=headers, timeout=float(os.getenv('KIWOOM_ORDERBOOK_TIMEOUT_SEC','3.0')))
+        try:
+            data = r.json() if r.text else {}
+        except Exception:
+            data = {'raw': r.text[:1000]}
+        bid = v129_deep_find_number(data, ['tot_bid_req','tot_bid_qty','bid_total','매수호가총잔량','buy_total_qty'])
+        ask = v129_deep_find_number(data, ['tot_ask_req','tot_ask_qty','ask_total','매도호가총잔량','sell_total_qty'])
+        ratio = round(bid / ask, 3) if ask > 0 else 0
+        if bid > 0 or ask > 0:
+            result.update({'bid_total': bid, 'ask_total': ask, 'bid_ask_ratio': ratio, 'orderbook_source': 'KIWOOM'})
+        return result
+    except Exception as e:
+        try: update_kiwoom_debug('orderbook_exception', code, 0, str(e))
+        except Exception: pass
+        return result
+
+# watch thread는 살아있으면 새로 만들지 않고, 죽었을 때만 교체
+def ensure_watch_running():
+    with V129_THREAD_LOCK:
+        WATCH_STATE['running'] = True
+        t = WATCH_STATE.get('thread')
+        if t is not None and t.is_alive():
+            return True
+        t = threading.Thread(target=watch_loop, daemon=True, name='watch_loop_v129')
+        WATCH_STATE['thread'] = t
+        t.start()
+    return True
+
+@app.route('/api/v129_status_light')
+def api_v129_status_light():
+    st = read_trade_state()
+    cache = v119_read_cache() if 'v119_read_cache' in globals() else {}
+    hitems = cache.get('holdings', []) if isinstance(cache, dict) else read_holdings()
+    try:
+        cc = dict(V128_CANDIDATE_CACHE)
+    except Exception:
+        cc = {}
+    return jsonify(safe_json({
+        'ok': True,
+        'version': V129_VERSION,
+        'state': st,
+        'market_open': market_is_open(),
+        'kiwoom_ready': kiwoom_ready(),
+        'kiwoom_debug': st.get('last_kiwoom_debug', {}),
+        'telegram_queue_size': V129_TG_QUEUE.qsize(),
+        'holding_count': len(hitems),
+        'holdings_cache_updated': cache.get('updatedAt','') if isinstance(cache, dict) else '',
+        'candidate_cache_updated': cc.get('updated',''),
+        'candidate_refreshing': cc.get('running', False),
+        'message': 'v129 안정화 상태확인: 파일락/비동기텔레그램/캐시 상태 정상'
+    }))
 
 
 if __name__ == '__main__':
