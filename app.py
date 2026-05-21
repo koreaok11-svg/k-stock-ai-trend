@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v129_STABILITY_ASYNC_LOCK_SQLITE_READY
-파일명: app_kiwoom_real_auto_scalping_v129_stability_async_lock_sqlite_ready.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v130_SCROLL_FIX_CACHE_FALLBACK_REALIZED_NOTE
+파일명: app_kiwoom_real_auto_scalping_v130_scroll_fix_cache_fallback_realized_note.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -3095,7 +3095,7 @@ def api_auto_trade_quick_set():
             state['panic_stop'] = False
         state['last_status'] = '실전 자동매매 ON' if enabled else '실전 자동매매 OFF'
         state['last_status_time'] = now_kst().strftime('%Y-%m-%d %H:%M:%S')
-        state['last_order_message'] = 'v129 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
+        state['last_order_message'] = 'v130 빠른 버튼 API로 즉시 반영되었습니다. 키움 실전 정보는 상세창에서 확인할 수 있습니다.'
         write_trade_state(state)
         if enabled:
             try:
@@ -3175,7 +3175,7 @@ def api_v109_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v127_FILTER_COLLAPSE_FAST_PICK_REAL_CASH_ONLY",
+            "version": "KIWOOM REAL AUTO SCALPING v130_SCROLL_FIX_CACHE_FALLBACK_REALIZED_NOTE",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -3240,7 +3240,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v129</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v130</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -6513,7 +6513,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v129",
+        "title": "KIWOOM REAL AUTO v130",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6870,7 +6870,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v129", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v130", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
 
 
 
@@ -7323,7 +7323,7 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v129", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v130", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
@@ -7583,7 +7583,7 @@ def api_v115_version():
     return jsonify({
         "ok": True,
         "version": "v115",
-        "title": "KIWOOM REAL AUTO v129",
+        "title": "KIWOOM REAL AUTO v130",
         "engine": "AUTO_SYNC_SMART_SIZE",
         "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
     })
@@ -7622,7 +7622,7 @@ def api_v116_version():
     return jsonify({
         "ok": True,
         "version": "v116",
-        "title": "KIWOOM REAL AUTO v129",
+        "title": "KIWOOM REAL AUTO v130",
         "engine": "LOADING_JS_FIX",
         "message": "v116 로딩 멈춤 JS 오류 수정 및 키움 실보유 동기화 유지"
     })
@@ -8085,7 +8085,7 @@ def api_v117_version():
     return jsonify({
         "ok": True,
         "version": "v117",
-        "title": "KIWOOM REAL AUTO v129",
+        "title": "KIWOOM REAL AUTO v130",
         "engine": "STRONG_SIZE_HOLDING_SYNC",
         "message": "v117 강한 매수수량 + 키움 실보유 자동동기화 강화 적용"
     })
@@ -8359,7 +8359,7 @@ def api_v118_version():
     return jsonify({
         "ok": True,
         "version": "v121",
-        "title": "KIWOOM REAL AUTO v129",
+        "title": "KIWOOM REAL AUTO v130",
         "engine": "REAL_HOLDINGS_AUTO_SYNC_FIX",
         "message": "v119 빠른 보유표시 + 백그라운드 동기화 + 주문락 문구 수정 적용"
     })
@@ -8833,7 +8833,7 @@ def v127_refresh_candidates_worker(params=None):
                 state["latest_ui_pick"] = pick
                 state["latest_ui_args"] = params
                 write_trade_state(state)
-                update_trade_status("후보 캐시 갱신", f"v129 백그라운드 후보 갱신: {pick.get('name')}({pick.get('code')})", candidate=pick)
+                update_trade_status("후보 캐시 갱신", f"v130 백그라운드 후보 갱신: {pick.get('name')}({pick.get('code')})", candidate=pick)
             except Exception:
                 pass
         return payload
@@ -8981,7 +8981,7 @@ def api_v127_status_light():
         "force_exit_time": state.get("force_exit_time", "15:15"),
         "real_trading_env": KIWOOM_REAL_TRADING,
         "dry_run": KIWOOM_DRY_RUN,
-        "message": "v129 경량 상태확인: Render alive/캐시 상태만 즉시 확인합니다."
+        "message": "v130 경량 상태확인: Render alive/캐시 상태만 즉시 확인합니다."
     }))
 
 
@@ -9262,7 +9262,7 @@ def api_v128_holdings_cached():
         'source': 'INSTANT_CACHE',
         'cacheUpdatedAt': updated,
         'sync': {'running': bool(start_sync), 'mode': 'background'},
-        'message': 'v129 즉시 보유 캐시 표시. 키움 실잔고 동기화는 백그라운드에서 진행합니다.'
+        'message': 'v130 즉시 보유 캐시 표시. 키움 실잔고 동기화는 백그라운드에서 진행합니다.'
     }))
 
 
