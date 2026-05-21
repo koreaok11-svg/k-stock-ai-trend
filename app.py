@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v119 REAL_HOLDINGS_AUTO_SYNC_FIX
-파일명: app_kiwoom_real_auto_scalping_v119_real_holdings_auto_sync_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v120 REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX
+파일명: app_kiwoom_real_auto_scalping_v120_real_holdings_profit_fast_button_fix.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -2262,7 +2262,7 @@ def try_rebuy_after_sell(sold_code=""):
             update_trade_status("재매수 대기", "장중이 아니므로 신규 매수를 진행하지 않습니다.")
             return {"ok": False, "message": "market closed"}
 
-        # v119 REAL_HOLDINGS_AUTO_SYNC_FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
+        # v120 REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
 
         if safe_float(state.get("daily_realized_pnl", 0)) <= safe_float(state.get("daily_max_loss", -30000)):
             update_trade_status("재매수 중지", "하루 최대 손실 제한에 도달하여 신규 매수를 중지합니다.")
@@ -2988,7 +2988,8 @@ def api_kiwoom_cash_legacy():
 @app.route('/api/auto_trade/status')
 def api_auto_trade_status():
     state = read_trade_state()
-    cash_info = get_trade_cash_info()
+    fast = str(request.args.get('fast', '0')).lower() in ['1', 'true', 'yes']
+    cash_info = {'ok': None, 'cash': 0, 'source': 'FAST_SKIP', 'message': '빠른 상태조회: 키움 예수금 조회 생략'} if fast else get_trade_cash_info()
     return jsonify({
         'ok': True,
         'state': state,
@@ -3059,8 +3060,11 @@ def api_auto_trade_panic_stop():
     state['auto_trade_enabled'] = False
     state['panic_stop'] = True
     write_trade_state(state)
-    send_telegram_message('🛑 <b>긴급정지 실행</b>\n실전 자동매매를 OFF 했습니다.')
-    return jsonify({'ok': True, 'state': state})
+    try:
+        threading.Thread(target=send_telegram_message, args=('🛑 <b>긴급정지 실행</b>\n실전 자동매매를 OFF 했습니다.',), daemon=True).start()
+    except Exception:
+        pass
+    return jsonify({'ok': True, 'state': state, 'message': '긴급정지 완료. 텔레그램은 백그라운드 발송합니다.'})
 
 @app.route('/api/kiwoom_price_test/<code>')
 def api_kiwoom_price_test(code):
@@ -3111,7 +3115,7 @@ def api_v109_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v119 REAL_HOLDINGS_AUTO_SYNC_FIX",
+            "version": "KIWOOM REAL AUTO SCALPING v120 REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -3175,7 +3179,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v119</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v120</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3438,7 +3442,7 @@ function manualSettingsGuide(){
 }
 
 async function autoTradeStatus(){
-  const d=await fetchJson("/api/auto_trade/status");
+  const d=await fetchJson("/api/auto_trade/status?fast=1",{timeoutMs:8000});
   const s=d.state||{};
   const ac=d.account_cash||{};
   $("autoTradeBox").innerHTML=`상태: <b>${s.auto_trade_enabled?"ON":"OFF"}</b> · 키움설정 ${d.kiwoom_ready?"완료":"필요"} · 실전ENV ${d.real_trading_env?"true":"false"} · DRY_RUN ${d.dry_run?"true":"false"} · 장중 ${d.market_open?"예":"아니오"}<br>
@@ -3477,8 +3481,8 @@ async function setAutoTrade(on){
     scalp_mode:true
   };
   const d=await fetchJson("/api/auto_trade/set",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  await autoTradeStatus();
   alert(on?"실전 자동매매 ON 요청 완료":"자동매매 OFF 완료");
+  autoTradeStatus();
 }
 async function buyNow(){
   if(!confirm("현재 화면 필터 기준 AI 최종 1종목을 키움 API로 즉시 매수 시도할까요?\n\n목표/손절은 % 기준입니다. 예: 2.5 = +2.5%, -1.8 = -1.8%")) return;
@@ -3488,8 +3492,8 @@ async function buyNow(){
 }
 async function panicStop(){
   await fetchJson("/api/auto_trade/panic_stop",{method:"POST"});
-  await autoTradeStatus();
   alert("긴급정지 완료");
+  autoTradeStatus();
 }
 
 async function kiwoomPriceTest(){
@@ -5582,7 +5586,7 @@ def api_v109_reset_all_holdings():
 
 
 # ============================================================
-# v119 REAL_HOLDINGS_AUTO_SYNC_FIX ENGINE
+# v120 REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX ENGINE
 # ============================================================
 ORDER_LOCK = globals().get("ORDER_LOCK") or threading.Lock()
 STATE_LOCK = globals().get("STATE_LOCK") or threading.RLock()
@@ -5897,7 +5901,7 @@ def api_v109_trailing_test():
 
 
 # ============================================================
-# v119 REAL_HOLDINGS_AUTO_SYNC_FIX PATCH
+# v120 REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX PATCH
 # 트레일링 스탑 실시간 감시 / 오타 방어 / REST 호출 제한 / 감시속도 최적화
 # ============================================================
 V109_WATCH_INTERVAL = safe_float(os.getenv("V109_WATCH_INTERVAL", "2"), 2)
@@ -6275,7 +6279,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v119",
+        "title": "KIWOOM REAL AUTO v120",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6283,7 +6287,7 @@ def api_v113_version():
 
 
 # ============================================================
-# v119 REAL_HOLDINGS_AUTO_SYNC_FIX
+# v120 REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX
 # 보유종목 앱 표시 최종 수정: 키움 실제잔고 → 화면 보유탭 강제 표시
 # ============================================================
 V113_MASTER_HOLDINGS_FILE = os.path.join(DATA_DIR, "v113_master_holdings.json") if "DATA_DIR" in globals() else str(BASE_DIR / "v113_master_holdings.json")
@@ -6632,7 +6636,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v119", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v120", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
 
 
 
@@ -7085,7 +7089,7 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v119", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v120", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
@@ -7345,7 +7349,7 @@ def api_v115_version():
     return jsonify({
         "ok": True,
         "version": "v115",
-        "title": "KIWOOM REAL AUTO v119",
+        "title": "KIWOOM REAL AUTO v120",
         "engine": "AUTO_SYNC_SMART_SIZE",
         "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
     })
@@ -7384,7 +7388,7 @@ def api_v116_version():
     return jsonify({
         "ok": True,
         "version": "v116",
-        "title": "KIWOOM REAL AUTO v119",
+        "title": "KIWOOM REAL AUTO v120",
         "engine": "LOADING_JS_FIX",
         "message": "v116 로딩 멈춤 JS 오류 수정 및 키움 실보유 동기화 유지"
     })
@@ -7847,7 +7851,7 @@ def api_v117_version():
     return jsonify({
         "ok": True,
         "version": "v117",
-        "title": "KIWOOM REAL AUTO v119",
+        "title": "KIWOOM REAL AUTO v120",
         "engine": "STRONG_SIZE_HOLDING_SYNC",
         "message": "v117 강한 매수수량 + 키움 실보유 자동동기화 강화 적용"
     })
@@ -7893,7 +7897,7 @@ V118_TELEGRAM_ERROR_COOLDOWN_SEC = safe_float(os.getenv("V118_TELEGRAM_ERROR_COO
 V118_BACKGROUND_SYNC_LOCK = threading.Lock()
 V118_LAST_ERROR_SENT = {}
 V118_STATE = {
-    "version": "v119",
+    "version": "v120",
     "last_sync_start": "",
     "last_sync_success": "",
     "last_sync_error": "",
@@ -7943,7 +7947,7 @@ def v118_load_cache():
 def v118_save_cache(items, source="UNKNOWN"):
     items = items if isinstance(items, list) else []
     payload = {
-        "version": "v119",
+        "version": "v120",
         "ts": time.time(),
         "updatedAt": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
         "source": source,
@@ -8060,7 +8064,7 @@ def v118_fast_holdings_payload(start_sync=True):
 
     return {
         "ok": True,
-        "version": "v119",
+        "version": "v120",
         "mode": "FAST_CACHE_PLUS_BACKGROUND_SYNC",
         "holdings": items,
         "items": items,
@@ -8120,8 +8124,8 @@ def api_v118_holdings_debug():
 def api_v118_version():
     return jsonify({
         "ok": True,
-        "version": "v119",
-        "title": "KIWOOM REAL AUTO v119",
+        "version": "v120",
+        "title": "KIWOOM REAL AUTO v120",
         "engine": "REAL_HOLDINGS_AUTO_SYNC_FIX",
         "message": "v119 빠른 보유표시 + 백그라운드 동기화 + 주문락 문구 수정 적용"
     })
@@ -8154,18 +8158,18 @@ def api_holdings_v118_override():
 
 
 # =====================================================================
-# v119 REAL_HOLDINGS_AUTO_SYNC_FIX
+# v120 REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX
 # - 실제 키움 실보유 자동동기화 강화
 # - Kiwoom 잔고 응답 재귀 파싱
 # - timeout/일시 실패 시 기존 보유 캐시 삭제 금지
 # - v118 빠른 UI가 v119 동기화 결과를 즉시 표시하도록 연결
 # - 현재 화면 기준 비상 보정값: 삼성중공업 10주, 제주반도체 2주
 # =====================================================================
-V119_VERSION = "v119"
-V119_ENGINE = "REAL_HOLDINGS_AUTO_SYNC_FIX"
+V119_VERSION = "v120"
+V119_ENGINE = "REAL_HOLDINGS_PROFIT_FAST_BUTTON_FIX"
 V119_HOLDINGS_CACHE_FILE = str(BASE_DIR / "sungil_real_holdings_v119_cache.json")
-V119_SYNC_RETRY = int(os.getenv("KIWOOM_HOLDINGS_SYNC_RETRY", "3"))
-V119_SYNC_TIMEOUT = int(os.getenv("KIWOOM_HOLDINGS_SYNC_TIMEOUT", "18"))
+V119_SYNC_RETRY = int(os.getenv("KIWOOM_HOLDINGS_SYNC_RETRY", "1"))
+V119_SYNC_TIMEOUT = int(os.getenv("KIWOOM_HOLDINGS_SYNC_TIMEOUT", "5"))
 V119_CACHE_TTL_SEC = int(os.getenv("V119_HOLDINGS_CACHE_TTL_SEC", "8"))
 V119_LAST_SYNC = {"running": False, "last_result": None, "last_error": "", "last_success": "", "last_start": ""}
 V119_SYNC_LOCK = threading.Lock()
@@ -8204,20 +8208,30 @@ def v119_code_value(v):
 
 
 def parse_kiwoom_holdings(data):
-    """v119: 키움 REST 잔고 응답을 재귀적으로 탐색하여 실제 보유종목을 추출합니다."""
+    """v120: 키움 REST 잔고 응답을 재귀적으로 탐색하여 실제 보유종목/매입가/수익률을 추출합니다."""
     if not isinstance(data, dict):
         return []
 
-    code_keys = ["stk_cd", "stkcd", "pdno", "code", "isu_cd", "isuCd", "종목코드", "종목번호", "prdt_code"]
-    name_keys = ["stk_nm", "stkNm", "prdt_name", "prdtName", "name", "종목명", "상품명"]
-    qty_keys = ["rmnd_qty", "rmndQty", "hldg_qty", "hldgQty", "hold_qty", "qty", "보유수량", "잔고수량", "현재보유수량", "ord_psbl_qty", "매도가능수량"]
-    sellable_keys = ["ord_psbl_qty", "sell_psbl_qty", "매도가능수량", "주문가능수량"]
-    buy_keys = ["avg_prc", "avgPrc", "pchs_avg_pric", "pchsAvgPric", "buyPrice", "매입평균가", "평균단가", "매입가", "매수가"]
-    cur_keys = ["cur_prc", "curPrc", "prpr", "current_price", "lastPrice", "현재가", "평가가격"]
-    buy_amt_keys = ["pchs_amt", "buyAmount", "매입금액", "매입액"]
-    eval_amt_keys = ["evlt_amt", "evlu_amt", "evalAmount", "평가금액", "평가액"]
-    pnl_keys = ["evltv_prft", "evlu_pfls_amt", "profitAmount", "평가손익", "손익금액"]
-    rate_keys = ["prft_rt", "evlu_pfls_rt", "profitRate", "수익률"]
+    code_keys = ["stk_cd", "stkcd", "stk_cd_nm", "pdno", "code", "isu_cd", "isuCd", "종목코드", "종목번호", "단축코드", "prdt_code", "stock_code"]
+    name_keys = ["stk_nm", "stkNm", "prdt_name", "prdtName", "name", "종목명", "상품명", "isu_nm", "kor_isnm"]
+    qty_keys = ["rmnd_qty", "rmndQty", "hldg_qty", "hldgQty", "hold_qty", "qty", "jan_qty", "잔고수량", "보유수량", "현재보유수량", "매매가능수량", "ord_psbl_qty", "매도가능수량"]
+    sellable_keys = ["ord_psbl_qty", "sell_psbl_qty", "매도가능수량", "주문가능수량", "매매가능수량"]
+    buy_keys = [
+        "avg_prc", "avgPrc", "pchs_avg_pric", "pchsAvgPric", "pchs_avg_prc", "pur_pric", "buyPrice",
+        "매입평균가", "평균단가", "평균가", "매입단가", "취득단가", "매수가", "매입가", "매입 평균가"
+    ]
+    cur_keys = ["cur_prc", "curPrc", "prpr", "current_price", "now_prc", "lastPrice", "현재가", "평가가격", "현재가격"]
+    buy_amt_keys = ["pchs_amt", "pchsAmt", "pchs_amt_smtl", "buyAmount", "purchaseAmount", "매입금액", "매입액", "총매입", "총매입금액", "취득금액"]
+    eval_amt_keys = ["evlt_amt", "evlu_amt", "evltv_amt", "evluAmt", "evalAmount", "평가금액", "평가액", "평가금", "총평가"]
+    pnl_keys = ["evltv_prft", "evlu_pfls_amt", "evlt_prft", "evlu_pfls", "profitAmount", "평가손익", "손익금액", "평가손익금액", "손익"]
+    rate_keys = ["prft_rt", "evlu_pfls_rt", "evltv_prft_rt", "profitRate", "수익률", "손익률", "평가손익률"]
+
+    def num_signed(item, keys, default=0):
+        raw = v119_get_first(item, keys, default)
+        s = str(raw).replace(",", "").replace("%", "").strip()
+        s = s.replace("▲", "").replace("△", "").replace("+", "")
+        # 키움 현재가는 부호가 붙는 경우가 있어 현재가/단가는 호출부에서 abs 처리합니다.
+        return safe_float(s, default)
 
     result = []
     seen = set()
@@ -8227,34 +8241,42 @@ def parse_kiwoom_holdings(data):
                 continue
             raw_code = v119_get_first(item, code_keys, "")
             code = v119_code_value(raw_code)
-            if not code.isdigit() or code == "000000":
+            if not code.isdigit() or code == "000000" or code in seen:
                 continue
-            qty = v119_num(item, qty_keys, 0)
+            qty = abs(num_signed(item, qty_keys, 0))
             if qty <= 0:
-                continue
-            if code in seen:
                 continue
             seen.add(code)
 
             name = str(v119_get_first(item, name_keys, code)).strip() or code
-            buy = v119_num(item, buy_keys, 0)
-            cur = v119_num(item, cur_keys, 0)
-            sellable = v119_num(item, sellable_keys, qty) or qty
-            buy_amount = v119_num(item, buy_amt_keys, 0) or (buy * qty)
-            eval_amount = v119_num(item, eval_amt_keys, 0)
-            profit_amount = safe_float(v119_get_first(item, pnl_keys, 0), 0)
-            profit_rate = safe_float(str(v119_get_first(item, rate_keys, 0)).replace("%", "").replace(",", ""), 0)
+            buy = abs(num_signed(item, buy_keys, 0))
+            cur_account = abs(num_signed(item, cur_keys, 0))
+            sellable = abs(num_signed(item, sellable_keys, qty)) or qty
+            buy_amount = abs(num_signed(item, buy_amt_keys, 0))
+            eval_amount = abs(num_signed(item, eval_amt_keys, 0))
+            profit_amount = num_signed(item, pnl_keys, 0)
+            profit_rate = num_signed(item, rate_keys, 0)
+
+            # 매입가가 0으로 내려오는 계정/필드 방어: 총매입금액/수량으로 역산
+            if buy <= 0 and buy_amount > 0 and qty > 0:
+                buy = buy_amount / qty
+            # 평가금액과 평가손익이 있으면 총매입금액 역산 후 매입가 보정
+            if buy <= 0 and eval_amount > 0 and profit_amount != 0 and qty > 0:
+                derived_buy_amount = eval_amount - profit_amount
+                if derived_buy_amount > 0:
+                    buy_amount = derived_buy_amount
+                    buy = derived_buy_amount / qty
 
             try:
                 live, src = get_trade_live_price(code, fallback=True)
-                if live >= 10:
-                    cur = live
-                else:
-                    src = "KIWOOM_ACCOUNT"
             except Exception:
-                src = "KIWOOM_ACCOUNT"
+                live, src = 0, "KIWOOM_ACCOUNT"
+            cur = live if live >= 10 else cur_account
             if cur <= 0:
                 cur = buy
+                src = "KIWOOM_ACCOUNT"
+            if buy_amount <= 0 and buy > 0:
+                buy_amount = buy * qty
             if eval_amount <= 0 and cur > 0:
                 eval_amount = cur * qty
             if profit_amount == 0 and buy > 0 and cur > 0:
@@ -8265,6 +8287,7 @@ def parse_kiwoom_holdings(data):
             state = read_trade_state()
             target_rate = normalize_rate_input(state.get("target_rate", 0.027), 0.027)
             stop_rate = normalize_rate_input(state.get("stop_rate", -0.018), -0.018)
+            base = buy if buy > 0 else cur
             result.append({
                 "id": f"kiwoom-{code}",
                 "name": name,
@@ -8273,9 +8296,10 @@ def parse_kiwoom_holdings(data):
                 "buyAmount": round(buy_amount),
                 "qty": int(qty),
                 "sellableQty": int(sellable),
-                "target": round((buy or cur) * (1 + target_rate)) if (buy or cur) else 0,
-                "stop": round((buy or cur) * (1 + stop_rate)) if (buy or cur) else 0,
+                "target": round(base * (1 + target_rate)) if base else 0,
+                "stop": round(base * (1 + stop_rate)) if base else 0,
                 "lastPrice": round(cur),
+                "accountCurrentPrice": round(cur_account) if cur_account else 0,
                 "priceSource": src,
                 "autoTrade": True,
                 "fromKiwoomAccount": True,
@@ -8287,12 +8311,11 @@ def parse_kiwoom_holdings(data):
                 "profitAmount": round(profit_amount),
                 "profitRate": round(profit_rate, 2),
                 "holdingStatus": "키움실보유",
-                "aiComment": ai_comment(cur, buy, (buy or cur) * (1 + target_rate), (buy or cur) * (1 + stop_rate), qty),
-                "syncSource": "KIWOOM_REAL_BALANCE_V119",
-                "updatedBy": "v119"
+                "aiComment": ai_comment(cur, buy, base * (1 + target_rate) if base else 0, base * (1 + stop_rate) if base else 0, qty) if buy > 0 else "AI 코멘트: 키움 잔고에서 매입가 확인 대기 중입니다.",
+                "syncSource": "KIWOOM_REAL_BALANCE_V120",
+                "updatedBy": "v120"
             })
     return result
-
 
 def v119_read_cache():
     try:
