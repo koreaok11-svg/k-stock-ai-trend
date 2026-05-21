@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v133_THREAD_CACHE_SECURITY_FIX
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v134_LAST_PRE_HALT_HOLDINGS_KEEP
 파일명: app_kiwoom_real_auto_scalping_v133_thread_cache_security_fix.py
 
 실전 운영용 경량화 버전입니다.
@@ -3246,7 +3246,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v133</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v134</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -9583,7 +9583,7 @@ def api_v131_status_light():
 
 
 # ============================================================
-# v133_THREAD_CACHE_SECURITY_FIX
+# v134_LAST_PRE_HALT_HOLDINGS_KEEP
 # - 장마감/키움 빈응답/timeout 때 실제 보유 캐시를 절대 0개로 덮어쓰지 않음
 # - 마지막 정상 보유종목 별도 백업 유지
 # - 화면용 캐시는 즉시 표시, 키움 직접 조회는 백그라운드에서만 갱신
@@ -9851,7 +9851,7 @@ def api_v132_holdings_guard_status():
 
 
 # ============================================================
-# v133_THREAD_CACHE_SECURITY_FIX
+# v134_LAST_PRE_HALT_HOLDINGS_KEEP
 # 1) watch thread/파일 I/O lock 단일화
 # 2) 오래된 후보 캐시 경고 플래그 추가
 # 3) MASTER/USER 비밀번호 기본값 제거: 환경변수 없으면 로그인 차단
@@ -10066,3 +10066,336 @@ except Exception:
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '10000'))
     app.run(host='0.0.0.0', port=port)
+
+
+
+# ============================================================
+# v134_LAST_PRE_HALT_HOLDINGS_KEEP
+# - 키움 거래중지/장마감/빈응답/timeout 때 보유탭이 0개로 보이지 않도록
+#   거래중지 직전 마지막 정상 보유 데이터를 영구 백업하고 화면에 유지합니다.
+# - 기존 버전별 cache/holdings 파일도 자동 스캔하여 마지막 정상값을 복구합니다.
+# ============================================================
+V134_VERSION = "v134"
+V134_ENGINE = "LAST_PRE_HALT_HOLDINGS_KEEP"
+V134_PERMANENT_LAST_VALID_FILE = str(BASE_DIR / "sungil_last_valid_holdings_PERMANENT.json")
+V134_RECOVERY_SCAN_SEC = int(os.getenv("V134_RECOVERY_SCAN_SEC", "10"))
+V134_STATE = {"last_scan_ts": 0, "last_scan_result": None}
+
+try:
+    V132_VERSION = V134_VERSION
+    V132_ENGINE = V134_ENGINE
+    V119_VERSION = V134_VERSION
+    V119_ENGINE = V134_ENGINE
+except Exception:
+    pass
+
+# 원본 함수 백업
+try:
+    _V134_ORIG_READ_HOLDINGS = read_holdings
+except Exception:
+    _V134_ORIG_READ_HOLDINGS = None
+try:
+    _V134_ORIG_WRITE_HOLDINGS = write_holdings
+except Exception:
+    _V134_ORIG_WRITE_HOLDINGS = None
+try:
+    _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS = v132_get_best_cached_holdings
+except Exception:
+    _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS = None
+try:
+    _V134_ORIG_V119_SAVE_CACHE = v119_save_cache
+except Exception:
+    _V134_ORIG_V119_SAVE_CACHE = None
+
+
+def v134_is_valid_holding_item(h):
+    try:
+        if not isinstance(h, dict):
+            return False
+        code = str(h.get("code") or h.get("stk_cd") or h.get("종목코드") or "").replace("A", "").strip().zfill(6)
+        qty = safe_float(h.get("qty") or h.get("quantity") or h.get("보유수량") or h.get("rmnd_qty") or 0, 0)
+        name = str(h.get("name") or h.get("stk_nm") or h.get("종목명") or "").strip()
+        return code.isdigit() and code != "000000" and (qty > 0 or bool(name))
+    except Exception:
+        return False
+
+
+def v134_normalize_holdings_list(items):
+    out = []
+    if not isinstance(items, list):
+        return out
+    for h in items:
+        if not isinstance(h, dict):
+            continue
+        hh = dict(h)
+        code = str(hh.get("code") or hh.get("stk_cd") or hh.get("종목코드") or hh.get("pdno") or "").replace("A", "").strip().zfill(6)
+        if code.isdigit() and code != "000000":
+            hh["code"] = code
+        if v134_is_valid_holding_item(hh):
+            hh.setdefault("status", "감시중")
+            hh.setdefault("sourceNote", "거래중지/장마감 보호 캐시")
+            out.append(hh)
+    # 중복코드 제거: 뒤쪽보다 앞쪽 우선
+    seen = set(); dedup = []
+    for h in out:
+        c = str(h.get("code", "")).zfill(6)
+        if c in seen:
+            continue
+        seen.add(c); dedup.append(h)
+    return dedup
+
+
+def v134_write_permanent_last_valid(items, source="V134_LAST_PRE_HALT"):
+    items = v134_normalize_holdings_list(items)
+    if not items:
+        return False
+    payload = {
+        "version": V134_VERSION,
+        "engine": V134_ENGINE,
+        "source": source,
+        "updatedAt": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+        "ts": time.time(),
+        "count": len(items),
+        "message": "키움 거래중지/장마감/조회실패 시 화면에 유지할 마지막 정상 보유 데이터입니다.",
+        "holdings": items,
+    }
+    try:
+        tmp = V134_PERMANENT_LAST_VALID_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, V134_PERMANENT_LAST_VALID_FILE)
+        return True
+    except Exception as e:
+        try:
+            print("v134 permanent backup write failed:", e, flush=True)
+        except Exception:
+            pass
+        return False
+
+
+def v134_read_permanent_last_valid():
+    try:
+        if os.path.exists(V134_PERMANENT_LAST_VALID_FILE):
+            with open(V134_PERMANENT_LAST_VALID_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            items = v134_normalize_holdings_list(data.get("holdings", []) if isinstance(data, dict) else [])
+            if items:
+                return {**(data if isinstance(data, dict) else {}), "holdings": items, "count": len(items), "source": (data.get("source") if isinstance(data, dict) else "V134_PERMANENT")}
+    except Exception:
+        pass
+    return {"holdings": [], "count": 0, "source": "EMPTY", "updatedAt": "", "ts": 0}
+
+
+def v134_extract_holdings_from_json_obj(obj):
+    """여러 버전 cache/json 구조에서 holdings 리스트를 안전하게 추출."""
+    candidates = []
+    try:
+        if isinstance(obj, dict):
+            for key in ["holdings", "items", "data", "list"]:
+                v = obj.get(key)
+                if isinstance(v, list):
+                    candidates.append(v)
+            # 중첩 dict 1~2단계만 탐색
+            for v in obj.values():
+                if isinstance(v, dict):
+                    for key in ["holdings", "items", "data", "list"]:
+                        vv = v.get(key)
+                        if isinstance(vv, list):
+                            candidates.append(vv)
+        elif isinstance(obj, list):
+            candidates.append(obj)
+    except Exception:
+        pass
+    best = []
+    for arr in candidates:
+        items = v134_normalize_holdings_list(arr)
+        if len(items) > len(best):
+            best = items
+    return best
+
+
+def v134_scan_previous_holdings_files(force=False):
+    """BASE_DIR와 /tmp 안의 이전 버전 보유/cache 파일에서 마지막 정상 보유를 복구."""
+    try:
+        now = time.time()
+        if (not force) and V134_STATE.get("last_scan_result") and now - V134_STATE.get("last_scan_ts", 0) < V134_RECOVERY_SCAN_SEC:
+            return V134_STATE["last_scan_result"]
+        dirs = []
+        for d in [str(BASE_DIR), "/tmp", "/var/data"]:
+            if d and os.path.isdir(d) and d not in dirs:
+                dirs.append(d)
+        best_items = []
+        best_meta = {"source": "SCAN_EMPTY", "updatedAt": "", "ts": 0, "file": ""}
+        for d in dirs:
+            try:
+                for name in os.listdir(d):
+                    low = name.lower()
+                    if not ("holding" in low or "balance" in low or "real_only" in low or "real_holdings" in low):
+                        continue
+                    if not (low.endswith(".json") or low.endswith(".txt")):
+                        continue
+                    path = os.path.join(d, name)
+                    try:
+                        if os.path.getsize(path) <= 2:
+                            continue
+                        with open(path, "r", encoding="utf-8") as f:
+                            obj = json.load(f)
+                        items = v134_extract_holdings_from_json_obj(obj)
+                        if not items:
+                            continue
+                        ts = 0
+                        if isinstance(obj, dict):
+                            ts = safe_float(obj.get("ts", 0), 0)
+                        if ts <= 0:
+                            ts = os.path.getmtime(path)
+                        # 가장 최근이면서 보유수 많은 데이터 우선
+                        score = ts + len(items) * 1000000000
+                        best_score = best_meta.get("score", -1)
+                        if score > best_score:
+                            best_items = items
+                            best_meta = {"source": "V134_SCAN_RECOVERY", "updatedAt": now_kst().strftime("%Y-%m-%d %H:%M:%S"), "ts": ts, "file": path, "score": score}
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        result = {**best_meta, "holdings": best_items, "count": len(best_items)}
+        V134_STATE["last_scan_ts"] = now
+        V134_STATE["last_scan_result"] = result
+        if best_items:
+            v134_write_permanent_last_valid(best_items, source="V134_SCAN_RECOVERY")
+        return result
+    except Exception:
+        return {"holdings": [], "count": 0, "source": "SCAN_ERROR", "updatedAt": "", "ts": 0}
+
+
+def v134_get_last_pre_halt_holdings():
+    """최종 fallback 순서: 현재 로컬 > v119/v132 캐시 > 영구백업 > 파일스캔."""
+    # 1) 원본 read_holdings 결과
+    try:
+        if _V134_ORIG_READ_HOLDINGS:
+            items = v134_normalize_holdings_list(_V134_ORIG_READ_HOLDINGS())
+            if items:
+                v134_write_permanent_last_valid(items, source="LOCAL_CURRENT_V134")
+                return items, "LOCAL_CURRENT_V134"
+    except Exception:
+        pass
+    # 2) 기존 v132 best
+    try:
+        if _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS:
+            items, source = _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS()
+            items = v134_normalize_holdings_list(items)
+            if items:
+                v134_write_permanent_last_valid(items, source=str(source or "V132_BEST"))
+                return items, str(source or "V132_BEST")
+    except Exception:
+        pass
+    # 3) 영구 백업
+    data = v134_read_permanent_last_valid()
+    items = data.get("holdings", [])
+    if items:
+        return items, data.get("source", "V134_PERMANENT")
+    # 4) 이전 파일 스캔
+    scan = v134_scan_previous_holdings_files()
+    items = scan.get("holdings", [])
+    if items:
+        return items, scan.get("source", "V134_SCAN_RECOVERY")
+    return [], "EMPTY"
+
+
+def read_holdings():
+    """v134: 화면 표시용 read는 로컬이 비어도 마지막 정상 보유를 반환합니다."""
+    items, source = v134_get_last_pre_halt_holdings()
+    if items:
+        # 화면에 거래중지 전 데이터임을 표시할 수 있도록 표식 추가
+        marked = []
+        for h in items:
+            hh = dict(h)
+            hh.setdefault("cacheSource", source)
+            if source not in ["LOCAL_CURRENT_V134", "KIWOOM_REAL_BALANCE", "KIWOOM_REAL_BALANCE_V132", "KIWOOM_REAL_BALANCE_V134"]:
+                hh.setdefault("status", "마지막 정상 보유 유지")
+                hh.setdefault("sourceNote", "키움 거래중지/장마감/조회지연으로 거래중지 직전 데이터를 표시 중")
+            marked.append(hh)
+        return marked
+    return []
+
+
+def write_holdings(items):
+    """v134: 빈 리스트는 마지막 정상 백업을 지우지 않습니다. 비어있지 않으면 즉시 백업."""
+    items_norm = v134_normalize_holdings_list(items if isinstance(items, list) else [])
+    if items_norm:
+        v134_write_permanent_last_valid(items_norm, source="WRITE_HOLDINGS_V134")
+    try:
+        if _V134_ORIG_WRITE_HOLDINGS:
+            return _V134_ORIG_WRITE_HOLDINGS(items if isinstance(items, list) else [])
+    except Exception:
+        pass
+    return False
+
+
+def v132_get_best_cached_holdings():
+    items, source = v134_get_last_pre_halt_holdings()
+    return items, source
+
+
+def v119_save_cache(items, source="KIWOOM_REAL_BALANCE"):
+    """v134: 빈 캐시 저장 차단 + 비어있지 않은 캐시는 영구 백업."""
+    items_norm = v134_normalize_holdings_list(items if isinstance(items, list) else [])
+    if not items_norm and str(source).upper() not in ["EXPLICIT_CLEAR", "USER_CLEAR"]:
+        keep, keep_source = v134_get_last_pre_halt_holdings()
+        return {
+            "version": V134_VERSION,
+            "engine": V134_ENGINE,
+            "updatedAt": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
+            "ts": time.time(),
+            "source": "V134_EMPTY_CACHE_BLOCKED",
+            "count": len(keep),
+            "holdings": keep,
+            "blocked_empty_overwrite": True,
+            "message": f"빈 보유 응답 저장 차단. 마지막 정상 보유 {len(keep)}종목 유지({keep_source})."
+        }
+    if items_norm:
+        v134_write_permanent_last_valid(items_norm, source=str(source or "KIWOOM_REAL_BALANCE_V134"))
+    if _V134_ORIG_V119_SAVE_CACHE:
+        try:
+            return _V134_ORIG_V119_SAVE_CACHE(items_norm, source=source)
+        except Exception:
+            pass
+    return {"version": V134_VERSION, "engine": V134_ENGINE, "holdings": items_norm, "count": len(items_norm), "source": source, "updatedAt": now_kst().strftime("%Y-%m-%d %H:%M:%S"), "ts": time.time()}
+
+
+@app.route('/api/v134_last_pre_halt_holdings')
+def api_v134_last_pre_halt_holdings():
+    items, source = v134_get_last_pre_halt_holdings()
+    return jsonify({
+        "ok": bool(items),
+        "version": V134_VERSION,
+        "engine": V134_ENGINE,
+        "count": len(items),
+        "source": source,
+        "message": "거래중지/장마감/조회지연 시 표시할 마지막 정상 보유 데이터입니다." if items else "저장된 마지막 정상 보유 데이터가 없습니다.",
+        "holdings": safe_json(items),
+        "permanent": v134_read_permanent_last_valid(),
+        "scan": v134_scan_previous_holdings_files(),
+    })
+
+@app.route('/api/v134_recover_holdings')
+def api_v134_recover_holdings():
+    scan = v134_scan_previous_holdings_files(force=True)
+    items = scan.get("holdings", [])
+    if items:
+        v134_write_permanent_last_valid(items, source="V134_MANUAL_RECOVERY")
+        try:
+            if _V134_ORIG_WRITE_HOLDINGS:
+                _V134_ORIG_WRITE_HOLDINGS(items)
+        except Exception:
+            pass
+        return jsonify({"ok": True, "version": V134_VERSION, "count": len(items), "source": scan.get("file"), "message": "이전 캐시에서 보유종목을 복구했습니다.", "holdings": safe_json(items)})
+    return jsonify({"ok": False, "version": V134_VERSION, "message": "복구 가능한 이전 보유 캐시를 찾지 못했습니다.", "scan": scan})
+
+try:
+    print("=" * 70, flush=True)
+    print("KIWOOM REAL AUTO", V134_VERSION, V134_ENGINE, "loaded", flush=True)
+    print("LAST_PRE_HALT_HOLDINGS_FILE =", V134_PERMANENT_LAST_VALID_FILE, flush=True)
+    print("=" * 70, flush=True)
+except Exception:
+    pass
