@@ -3224,7 +3224,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v122</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v123</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -6391,7 +6391,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v122",
+        "title": "KIWOOM REAL AUTO v123",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6748,7 +6748,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v122", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v123", "title": "KIWOOM REAL AUTO v123", "engine": "CLICK_DETAIL_STATUS_FIX", "state": V113_STATE, "message": "v123 상세 진행내용 접기/펼치기 및 표시 정리 패치가 적용되었습니다."})
 
 
 
@@ -7201,7 +7201,7 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v122", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v123", "title": "KIWOOM REAL AUTO v123", "engine": "CLICK_DETAIL_STATUS_FIX", "message": "v123 상세 진행내용 접기/펼치기 및 표시 정리 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
@@ -7461,7 +7461,7 @@ def api_v115_version():
     return jsonify({
         "ok": True,
         "version": "v115",
-        "title": "KIWOOM REAL AUTO v122",
+        "title": "KIWOOM REAL AUTO v123",
         "engine": "AUTO_SYNC_SMART_SIZE",
         "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
     })
@@ -7500,7 +7500,7 @@ def api_v116_version():
     return jsonify({
         "ok": True,
         "version": "v116",
-        "title": "KIWOOM REAL AUTO v122",
+        "title": "KIWOOM REAL AUTO v123",
         "engine": "LOADING_JS_FIX",
         "message": "v116 로딩 멈춤 JS 오류 수정 및 키움 실보유 동기화 유지"
     })
@@ -7963,7 +7963,7 @@ def api_v117_version():
     return jsonify({
         "ok": True,
         "version": "v117",
-        "title": "KIWOOM REAL AUTO v122",
+        "title": "KIWOOM REAL AUTO v123",
         "engine": "STRONG_SIZE_HOLDING_SYNC",
         "message": "v117 강한 매수수량 + 키움 실보유 자동동기화 강화 적용"
     })
@@ -8237,7 +8237,7 @@ def api_v118_version():
     return jsonify({
         "ok": True,
         "version": "v121",
-        "title": "KIWOOM REAL AUTO v122",
+        "title": "KIWOOM REAL AUTO v123",
         "engine": "REAL_HOLDINGS_AUTO_SYNC_FIX",
         "message": "v119 빠른 보유표시 + 백그라운드 동기화 + 주문락 문구 수정 적용"
     })
