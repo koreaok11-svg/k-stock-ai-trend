@@ -3530,13 +3530,13 @@ function renderAutoTradeDashboard(d, openDetail=false){
       <summary>🔎 상세 진행내용 보기 / 숨기기</summary>
       <div class="detailScroll">
         <button class="detailBtn" onclick="refreshAutoTradeDetail()">🔄 키움 실전 정보 새로고침</button>
-        <b>실전 운영 대시보드</b><br>${apiLabel}
+        <b>실전 운영 대시보드</b><br>${apiLabel}<br><span class="muted">오늘 실현손익/거래횟수는 앱 자동매매가 기록한 값입니다. MTS에서 직접 매매한 내역까지 키움 일별체결 API로 가져오려면 별도 연동이 필요합니다.</span>
         <div class="infoGrid">
           <div class="infoItem"><small>💰 키움 주문가능금액</small><b>${cashText}</b></div>
           <div class="infoItem"><small>🏦 예수금/추정현금</small><b>${deposit?deposit+"원":"-"}</b></div>
           <div class="infoItem"><small>📦 보유종목</small><b>${holdingCount}종목</b></div>
-          <div class="infoItem"><small>📈 오늘 실현손익</small><b>${Number(s.daily_realized_pnl||0).toLocaleString()}원</b></div>
-          <div class="infoItem"><small>🔁 오늘 거래횟수</small><b>${d.trade_count_today||0}/${d.max_trades_per_day||10}회</b></div>
+          <div class="infoItem"><small>📈 오늘 실현손익</small><b>${Number(s.daily_realized_pnl||0).toLocaleString()}원</b><br><small class="muted">앱 자동매매 체결 기준</small></div>
+          <div class="infoItem"><small>🔁 오늘 거래횟수</small><b>${d.trade_count_today||0}/${d.max_trades_per_day||10}회</b><br><small class="muted">앱 자동매매 기준</small></div>
           <div class="infoItem"><small>⚙️ 최소진입/동시보유</small><b>${Number(d.min_order_cash||0).toLocaleString()}원 / ${d.max_positions||3}종목</b></div>
         </div>
 
@@ -3589,7 +3589,7 @@ async function setAutoTrade(on){
     box.innerHTML=`상태: <b>${on?"ON":"OFF"}</b> · 화면 즉시 반영<br><span class="muted">서버 저장 중입니다. 키움 잔고/가격 확인은 백그라운드에서 진행됩니다.</span>`;
   }
   if(detail){
-    detail.innerHTML=`<details class="statusDetails" open><summary>🔎 상세 진행내용 보기 / 숨기기</summary><div class="detailScroll"><b>최근 진행상태:</b> ${on?"실전 자동매매 ON 화면 반영":"자동매매 OFF 화면 반영"}<br><b>메시지:</b> v125 빠른 버튼 방식으로 요청 전송 중...<br><span class="muted">요청 완료 후 키움 실전 정보는 자동으로 상세창에 갱신됩니다.</span></div></details>`;
+    detail.innerHTML=`<details class="statusDetails" open><summary>🔎 상세 진행내용 보기 / 숨기기</summary><div class="detailScroll"><b>최근 진행상태:</b> ${on?"실전 자동매매 ON 화면 반영":"자동매매 OFF 화면 반영"}<br><b>메시지:</b> v130 빠른 버튼 방식으로 요청 전송 중...<br><span class="muted">요청 완료 후 키움 실전 정보는 자동으로 상세창에 갱신됩니다.</span></div></details>`;
   }
 
   const body={
@@ -3690,6 +3690,69 @@ async function startWatch(){const d=await fetchJson("/api/server_watch/start",{m
     try{setInterval(()=>{try{if(typeof v115RefreshHoldings==="function") v115RefreshHoldings(); else loadHoldings()}catch(e){}},20000)}catch(e){}
     try{setInterval(()=>{try{autoTradeStatus()}catch(e){}},10000)}catch(e){}
   });
+})();
+
+
+
+/* ============================================================
+   v130 SCROLL_FIX_CACHE_FALLBACK_REALIZED_NOTE - UI PATCH
+   - 자동 갱신 중 사용자가 보고 있는 위치를 보존
+   - 사용자가 스크롤/터치 중이면 자동 새로고침을 건너뜀
+   - 후보 조회는 마지막 정상 후보를 유지하고 백그라운드 갱신
+============================================================ */
+(function(){
+  let v130LastUserAction = 0;
+  function markUser(){ v130LastUserAction = Date.now(); }
+  ['scroll','touchstart','touchmove','wheel'].forEach(ev=>window.addEventListener(ev, markUser, {passive:true}));
+  function userReading(){ return window.scrollY > 220 && (Date.now() - v130LastUserAction) < 15000; }
+  function preserveScrollRun(fn){
+    const y = window.scrollY;
+    const r = Promise.resolve().then(fn);
+    return r.finally(()=>{ if(userReading()) window.scrollTo(0, y); });
+  }
+  const nativeSetInterval = window.setInterval.bind(window);
+  window.setInterval = function(fn, delay){
+    if(delay===20000 || delay===10000){
+      return nativeSetInterval(function(){
+        if(userReading()) return;
+        return preserveScrollRun(fn);
+      }, delay);
+    }
+    return nativeSetInterval(fn, delay);
+  };
+
+  if(typeof loadBest === 'function'){
+    const oldLoadBest = loadBest;
+    loadBest = async function(){
+      const box = document.getElementById('bestBox');
+      const prev = box ? box.innerHTML : '';
+      if(box && prev && !prev.includes('아직 조회')) box.insertAdjacentHTML('afterbegin', "<div class='empty'>🟡 후보 갱신중... 기존 후보를 유지합니다.</div>");
+      try{ await preserveScrollRun(()=>oldLoadBest()); }
+      catch(e){ if(box && prev) box.innerHTML = prev; }
+    };
+  }
+  if(typeof loadWatch === 'function'){
+    const oldLoadWatch = loadWatch;
+    loadWatch = async function(){
+      const box = document.getElementById('watchBox');
+      const prev = box ? box.innerHTML : '';
+      if(box && prev && !prev.includes('다음 단타')) box.insertAdjacentHTML('afterbegin', "<div class='empty'>🟡 감시 후보 갱신중... 기존 후보를 유지합니다.</div>");
+      try{ await preserveScrollRun(()=>oldLoadWatch()); }
+      catch(e){ if(box && prev) box.innerHTML = prev; }
+    };
+  }
+  if(typeof refreshHoldings === 'function'){
+    const oldRefreshHoldings = refreshHoldings;
+    refreshHoldings = async function(){ if(userReading()) return; return preserveScrollRun(()=>oldRefreshHoldings()); };
+  }
+  if(typeof loadHoldings === 'function'){
+    const oldLoadHoldings = loadHoldings;
+    loadHoldings = async function(autoRestore=true){ if(userReading() && autoRestore!==false) return; return preserveScrollRun(()=>oldLoadHoldings(autoRestore)); };
+  }
+  if(typeof autoTradeStatus === 'function'){
+    const oldAutoTradeStatus = autoTradeStatus;
+    autoTradeStatus = async function(){ if(userReading()) return; return preserveScrollRun(()=>oldAutoTradeStatus()); };
+  }
 })();
 
 </script></body></html>'''
@@ -8936,7 +8999,7 @@ except Exception as _e:
 # 2) 후보/보유/상태는 마지막 정상 캐시를 즉시 반환
 # 3) 실제 주문/매도 직전에는 기존 로직 그대로 키움 현재가/주문가능금액을 재확인
 # ============================================================
-V128_VERSION = "v129 STABILITY_ASYNC_LOCK_SQLITE_READY"
+V128_VERSION = "v130 SCROLL_FIX_CACHE_FALLBACK_REALIZED_NOTE"
 V128_CANDIDATE_TTL_SEC = int(os.getenv("V128_CANDIDATE_TTL_SEC", "25"))
 V128_FAST_LIMIT = int(os.getenv("V128_FAST_LIMIT", "500"))
 V128_CACHE_LOCK = threading.Lock()
@@ -8960,6 +9023,11 @@ def v128_fast_score_candidates(params=None):
     max_change = safe_float(params.get("maxChange", 7), 7)
     min_amount = safe_float(params.get("minAmount", 1000000000), 1000000000)
     min_score = safe_float(params.get("minScore", 70), 70)
+    # v130: 화면 후보는 "없음/오류"로 끝내지 않도록 1차 조건 실패 시 자동 완화합니다.
+    # 실제 주문 직전에는 기존처럼 키움 현재가/주문가능금액으로 재검증하므로 안전성은 유지됩니다.
+    original_min_amount = min_amount
+    original_min_score = min_score
+    fallback_used = False
     price_ranges = []
     for part in str(params.get("priceRanges", "5000-20000,20000-50000,50000-200000")).split(','):
         try:
@@ -8980,12 +9048,23 @@ def v128_fast_score_candidates(params=None):
     df['Code'] = df['Code'].astype(str).str.zfill(6)
     exclude = ['스팩','SPAC','ETF','ETN','인버스','레버리지','KODEX','TIGER','KBSTAR','ARIRANG','HANARO']
     df = df[~df['Name'].str.upper().apply(lambda n:any(x.upper() in n for x in exclude) or n.endswith('우'))].copy()
+    base_df = df.copy()
     df = df[(df['Close'] >= 10) & (df['Amount'] >= min_amount) & (df['dayChange'] >= 0.2) & (df['dayChange'] <= max_change)].copy()
     if price_ranges:
         mask = False
         for lo, hi in price_ranges:
             mask = mask | ((df['Close'] >= lo) & (df['Close'] <= hi))
         df = df[mask].copy()
+    if df.empty:
+        fallback_used = True
+        min_amount = min(original_min_amount, 300000000)
+        max_change = max(max_change, 12)
+        df = base_df[(base_df['Close'] >= 10) & (base_df['Amount'] >= min_amount) & (base_df['dayChange'] >= 0.05) & (base_df['dayChange'] <= max_change)].copy()
+        if price_ranges:
+            mask = False
+            for lo, hi in price_ranges:
+                mask = mask | ((df['Close'] >= lo) & (df['Close'] <= hi))
+            df = df[mask].copy()
     if df.empty:
         return []
     df['theme'] = df['Name'].apply(classify_theme).apply(normalize_theme)
@@ -8995,7 +9074,14 @@ def v128_fast_score_candidates(params=None):
     df['sweetSpot'] = (100 - (df['dayChange'] - 3.5).abs() * 8).clip(lower=20, upper=100)
     df['themeWeight'] = df['theme'].apply(lambda x: WEIGHT.get(x, 1.0))
     df['score'] = (df['amountRank']*.34 + df['volumeRank']*.25 + df['marcapRank']*.15 + df['sweetSpot']*.26) * df['themeWeight']
-    df = df[df['score'] >= min_score].sort_values('score', ascending=False)
+    filtered = df[df['score'] >= min_score].copy()
+    if filtered.empty:
+        fallback_used = True
+        relaxed_score = max(45, min(original_min_score, 70) - 15)
+        filtered = df[df['score'] >= relaxed_score].copy()
+    if filtered.empty:
+        filtered = df.sort_values('score', ascending=False).head(10).copy()
+    df = filtered.sort_values('score', ascending=False)
     out = []
     for _, row in df.head(10).iterrows():
         price = safe_float(row['Close'])
@@ -9018,7 +9104,7 @@ def v128_fast_score_candidates(params=None):
             'buyZone': round(price * .995),
             'target': round(price * 1.035),
             'stop': round(price * .975),
-            'comment': f"v129 캐시 후보: {ai['scalpingStatus']} · {', '.join(ai['scalpingReasons'])}. 화면은 KRX 캐시 기준이며, 실제 주문 직전에는 키움 현재가/주문가능금액으로 다시 검증합니다."
+            'comment': f"v130 캐시 후보: {ai['scalpingStatus']} · {', '.join(ai['scalpingReasons'])}. {'필터 조건을 일부 완화해 표시했습니다. ' if fallback_used else ''}화면은 KRX 캐시 기준이며, 실제 주문 직전에는 키움 현재가/주문가능금액으로 다시 검증합니다."
         }
         item.update(ai)
         out.append(item)
@@ -9102,7 +9188,7 @@ def v128_candidate_payload(params=None, start_refresh=True):
     cache['version'] = V128_VERSION
     cache['cacheAgeSec'] = round(age, 1) if age is not None else None
     cache['refreshing'] = bool(cache.get('running')) or (age is None)
-    cache['message'] = 'v129 즉시 캐시 표시: 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.'
+    cache['message'] = 'v130 즉시 캐시 표시: 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.'
     return safe_json(cache)
 
 
@@ -9194,7 +9280,7 @@ def api_v128_status_light():
         'market_open': market_is_open(),
         'kiwoom_ready': kiwoom_ready(),
         'kiwoom_debug': st.get('last_kiwoom_debug', {}),
-        'account_cash': {'source':'FAST_SKIP', 'cash':0, 'message':'v129 경량확인은 키움 API를 직접 호출하지 않습니다.'},
+        'account_cash': {'source':'FAST_SKIP', 'cash':0, 'message':'v130 경량확인은 키움 API를 직접 호출하지 않습니다.'},
         'holding_count': len(hitems),
         'holdings_cache_updated': cache.get('updatedAt','') if isinstance(cache, dict) else '',
         'candidate_cache_updated': cc.get('updated',''),
@@ -9210,17 +9296,17 @@ def api_v128_status_light():
         'force_exit_time': st.get('force_exit_time','15:15'),
         'real_trading_env': KIWOOM_REAL_TRADING,
         'dry_run': KIWOOM_DRY_RUN,
-        'message': 'v129 정상: 화면 상태 확인은 캐시만 읽어 즉시 응답합니다.'
+        'message': 'v130 정상: 화면 상태 확인은 캐시만 읽어 즉시 응답합니다.'
     }))
 
 try:
     v128_start_candidate_refresh(v127_params_from_request({}), force=True)
 except Exception as _e:
-    print('v129 initial candidate refresh skipped:', _e)
+    print('v130 initial candidate refresh skipped:', _e)
 
 
 # =====================================================================
-# v129 STABILITY_ASYNC_LOCK_SQLITE_READY
+# v130 SCROLL_FIX_CACHE_FALLBACK_REALIZED_NOTE
 # - 파일 JSON 동시 읽기/쓰기 LOCK + atomic write
 # - 텔레그램 알림 비동기 큐 분리
 # - Render IP 조회 캐시/짧은 timeout
@@ -9230,7 +9316,7 @@ except Exception as _e:
 import queue as _v129_queue
 import tempfile as _v129_tempfile
 
-V129_VERSION = "v129 STABILITY_ASYNC_LOCK_SQLITE_READY"
+V129_VERSION = "v130 SCROLL_FIX_CACHE_FALLBACK_REALIZED_NOTE"
 V129_FILE_LOCK = threading.RLock()
 V129_THREAD_LOCK = threading.RLock()
 V129_TG_QUEUE = _v129_queue.Queue(maxsize=int(os.getenv("TELEGRAM_QUEUE_MAX", "200")))
@@ -9459,7 +9545,7 @@ def api_v129_status_light():
         'holdings_cache_updated': cache.get('updatedAt','') if isinstance(cache, dict) else '',
         'candidate_cache_updated': cc.get('updated',''),
         'candidate_refreshing': cc.get('running', False),
-        'message': 'v129 안정화 상태확인: 파일락/비동기텔레그램/캐시 상태 정상'
+        'message': 'v130 안정화 상태확인: 파일락/비동기텔레그램/캐시 상태 정상'
     }))
 
 
