@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v121 FAST_AUTO_TRADE_BUTTON_STATE_FIX
-파일명: app_kiwoom_real_auto_scalping_v121_fast_auto_trade_button_state_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v122 INSTANT_ON_BUTTON_GET_FIX
+파일명: app_kiwoom_real_auto_scalping_v122_instant_on_button_get_fix.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -2262,7 +2262,7 @@ def try_rebuy_after_sell(sold_code=""):
             update_trade_status("재매수 대기", "장중이 아니므로 신규 매수를 진행하지 않습니다.")
             return {"ok": False, "message": "market closed"}
 
-        # v121 FAST_AUTO_TRADE_BUTTON_STATE_FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
+        # v122 INSTANT_ON_BUTTON_GET_FIX: 기존 보유종목이 있어도 최대 보유종목 수와 예수금이 허용하면 신규 후보를 추가 매수합니다.
 
         if safe_float(state.get("daily_realized_pnl", 0)) <= safe_float(state.get("daily_max_loss", -30000)):
             update_trade_status("재매수 중지", "하루 최대 손실 제한에 도달하여 신규 매수를 중지합니다.")
@@ -3062,6 +3062,35 @@ def api_auto_trade_set():
             pass
     return jsonify({'ok': True, 'state': state, 'message': state.get('last_order_message')})
 
+
+@app.route('/api/auto_trade/quick_set', methods=['GET'])
+def api_auto_trade_quick_set():
+    """
+    v122: 모바일 버튼 전용 초고속 ON/OFF API.
+    - JSON POST보다 빠른 GET 방식
+    - 키움 예수금/잔고/후보조회 절대 실행하지 않음
+    - 화면 버튼 상태 저장만 즉시 처리
+    """
+    try:
+        enabled_q = request.args.get('enabled', '0')
+        enabled = str(enabled_q).lower() in ['1', 'true', 'yes', 'on']
+        state = read_trade_state()
+        state['auto_trade_enabled'] = enabled
+        if enabled:
+            state['panic_stop'] = False
+        state['last_status'] = '실전 자동매매 ON' if enabled else '실전 자동매매 OFF'
+        state['last_status_time'] = now_kst().strftime('%Y-%m-%d %H:%M:%S')
+        state['last_order_message'] = 'v122 빠른 버튼 API로 즉시 반영되었습니다. 키움 조회는 백그라운드에서 따로 진행합니다.'
+        write_trade_state(state)
+        if enabled:
+            try:
+                threading.Thread(target=ensure_watch_running, daemon=True).start()
+            except Exception:
+                pass
+        return jsonify({'ok': True, 'fast': True, 'state': state, 'message': state['last_order_message']})
+    except Exception as e:
+        return jsonify({'ok': False, 'message': str(e), 'state': read_trade_state()}), 200
+
 @app.route('/api/auto_trade/buy_now', methods=['POST', 'GET'])
 def api_auto_trade_buy_now():
     # 화면에서 누른 즉시매수는 화면 필터 조건을 그대로 사용합니다.
@@ -3131,7 +3160,7 @@ def api_v109_dashboard():
 
         return jsonify(safe_json({
             "ok": True,
-            "version": "KIWOOM REAL AUTO SCALPING v121 FAST_AUTO_TRADE_BUTTON_STATE_FIX",
+            "version": "KIWOOM REAL AUTO SCALPING v122 INSTANT_ON_BUTTON_GET_FIX",
             "time": now_kst().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "holding_count": len(holdings),
@@ -3195,7 +3224,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v121</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v122</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3481,12 +3510,16 @@ async function autoTradeStatus(){
 async function setAutoTrade(on){
   const box=$("autoTradeBox");
   const detail=$("autoTradeDetailBox");
+
+  // v122: 사용자가 누르는 즉시 화면부터 ON/OFF로 바꿉니다.
+  // 서버 저장과 키움 확인은 뒤에서 처리하므로 버튼이 멈춘 것처럼 보이지 않습니다.
   if(box){
-    box.innerHTML=`상태: <b>${on?"ON 요청중":"OFF 요청중"}</b><br><span class="muted">버튼 요청을 서버에 즉시 저장 중입니다. 키움 잔고/가격 확인은 백그라운드에서 진행됩니다.</span>`;
+    box.innerHTML=`상태: <b>${on?"ON":"OFF"}</b> · 화면 즉시 반영<br><span class="muted">서버 저장 중입니다. 키움 잔고/가격 확인은 백그라운드에서 진행됩니다.</span>`;
   }
   if(detail){
-    detail.innerHTML=`<b>최근 진행상태:</b> ${on?"실전 자동매매 ON 요청":"자동매매 OFF 요청"}<br><b>메시지:</b> 서버 응답 대기 중...`;
+    detail.innerHTML=`<b>최근 진행상태:</b> ${on?"실전 자동매매 ON 화면 반영":"자동매매 OFF 화면 반영"}<br><b>메시지:</b> v122 빠른 버튼 방식으로 요청 전송 중...`;
   }
+
   const body={
     auto_trade_enabled:on,
     panic_stop:false,
@@ -3504,23 +3537,30 @@ async function setAutoTrade(on){
     force_exit_time:$("atExitTime")?.value||"15:15",
     scalp_mode:true
   };
+
   try{
-    const d=await fetchJson("/api/auto_trade/set",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),timeoutMs:3500});
+    // 1순위: GET 초고속 저장. 모바일/Render에서 POST JSON보다 훨씬 덜 막힙니다.
+    const d=await fetchJson(`/api/auto_trade/quick_set?enabled=${on?1:0}&ts=${Date.now()}`,{method:"GET",timeoutMs:12000});
     const s=d.state||{};
     if(box){
-      box.innerHTML=`상태: <b>${s.auto_trade_enabled?"ON":"OFF"}</b> · 버튼 반영 완료<br><span class="muted">${d.message||"저장 완료"}</span>`;
+      box.innerHTML=`상태: <b>${s.auto_trade_enabled?"ON":"OFF"}</b> · 빠른 반영 완료<br><span class="muted">${d.message||"저장 완료"}</span>`;
     }
     if(detail){
       detail.innerHTML=`<b>최근 진행상태:</b> ${s.last_status||"저장 완료"}<br><b>상태시간:</b> ${s.last_status_time||"-"}<br><b>메시지:</b> ${s.last_order_message||d.message||"-"}`;
     }
-    // 무거운 상태조회는 버튼 응답 후 백그라운드로 실행
-    setTimeout(()=>autoTradeStatus().catch(e=>console.log("autoTradeStatus skipped",e.message)), 300);
+
+    // 2순위: 상세 설정값은 별도 백그라운드 저장. 실패해도 ON/OFF 자체는 유지합니다.
+    fetchJson("/api/auto_trade/set",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),timeoutMs:15000})
+      .then(()=>setTimeout(()=>autoTradeStatus().catch(e=>console.log("status skipped",e.message)),500))
+      .catch(e=>console.log("background setting save skipped",e.message));
+
   }catch(e){
+    // v122: 네트워크가 느려도 에러로 끝내지 않고, 상태확인 안내만 표시합니다.
     if(box){
-      box.innerHTML=`상태: <b>${on?"ON 요청 확인 필요":"OFF 요청 확인 필요"}</b><br><span class="muted">${e.message}</span>`;
+      box.innerHTML=`상태: <b>${on?"ON 화면 반영":"OFF 화면 반영"}</b><br><span class="muted">서버 응답이 늦습니다. 상태확인을 한번 눌러 저장 여부를 확인하세요.</span>`;
     }
     if(detail){
-      detail.innerHTML=`<b>최근 진행상태:</b> 버튼 요청 지연<br><b>메시지:</b> ${e.message}<br><span class="muted">서버가 느릴 수 있습니다. 2~3초 뒤 상태 확인을 눌러 확인하세요.</span>`;
+      detail.innerHTML=`<b>최근 진행상태:</b> 버튼 화면 반영 완료 / 서버 확인 대기<br><b>메시지:</b> ${e.message}<br><span class="muted">Render 서버가 잠시 느릴 때 발생합니다. 같은 버튼을 여러 번 누르지 말고 5초 후 상태 확인을 눌러주세요.</span>`;
     }
   }
 }
@@ -5626,7 +5666,7 @@ def api_v109_reset_all_holdings():
 
 
 # ============================================================
-# v121 FAST_AUTO_TRADE_BUTTON_STATE_FIX ENGINE
+# v122 INSTANT_ON_BUTTON_GET_FIX ENGINE
 # ============================================================
 ORDER_LOCK = globals().get("ORDER_LOCK") or threading.Lock()
 STATE_LOCK = globals().get("STATE_LOCK") or threading.RLock()
@@ -5941,7 +5981,7 @@ def api_v109_trailing_test():
 
 
 # ============================================================
-# v121 FAST_AUTO_TRADE_BUTTON_STATE_FIX PATCH
+# v122 INSTANT_ON_BUTTON_GET_FIX PATCH
 # 트레일링 스탑 실시간 감시 / 오타 방어 / REST 호출 제한 / 감시속도 최적화
 # ============================================================
 V109_WATCH_INTERVAL = safe_float(os.getenv("V109_WATCH_INTERVAL", "2"), 2)
@@ -6319,7 +6359,7 @@ def api_v113_version():
     return jsonify({
         "ok": True,
         "version": "v113",
-        "title": "KIWOOM REAL AUTO v121",
+        "title": "KIWOOM REAL AUTO v122",
         "engine": "MASTER HOLDINGS",
         "message": "v113 파일이 정상 반영되었습니다."
     })
@@ -6327,7 +6367,7 @@ def api_v113_version():
 
 
 # ============================================================
-# v121 FAST_AUTO_TRADE_BUTTON_STATE_FIX
+# v122 INSTANT_ON_BUTTON_GET_FIX
 # 보유종목 앱 표시 최종 수정: 키움 실제잔고 → 화면 보유탭 강제 표시
 # ============================================================
 V113_MASTER_HOLDINGS_FILE = os.path.join(DATA_DIR, "v113_master_holdings.json") if "DATA_DIR" in globals() else str(BASE_DIR / "v113_master_holdings.json")
@@ -6676,7 +6716,7 @@ def api_v113_compat_holdings():
 
 @app.route("/api/v113_version")
 def api_v113_version():
-    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v121", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
+    return jsonify({"ok": True, "version": "v113", "title": "KIWOOM REAL AUTO v122", "engine": "REAL HOLDINGS FINAL FIX", "state": V113_STATE, "message": "v113 실제잔고 보유탭 최종 패치가 적용되었습니다."})
 
 
 
@@ -7129,7 +7169,7 @@ def api_v114_cash():
 
 @app.route("/api/v114_version")
 def api_v114_version():
-    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v121", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
+    return jsonify({"ok": True, "version": "v114", "title": "KIWOOM REAL AUTO v122", "engine": "BUY_QTY_HOLDINGS_FIX", "message": "v114 1주 매수/보유종목 동기화 패치 적용"})
 
 
 # 기존 UI가 호출하는 URL도 v114로 강제 연결
@@ -7389,7 +7429,7 @@ def api_v115_version():
     return jsonify({
         "ok": True,
         "version": "v115",
-        "title": "KIWOOM REAL AUTO v121",
+        "title": "KIWOOM REAL AUTO v122",
         "engine": "AUTO_SYNC_SMART_SIZE",
         "message": "v115 매수 후 자동잔고동기화 + AI 스마트 수량 산정 적용"
     })
@@ -7428,7 +7468,7 @@ def api_v116_version():
     return jsonify({
         "ok": True,
         "version": "v116",
-        "title": "KIWOOM REAL AUTO v121",
+        "title": "KIWOOM REAL AUTO v122",
         "engine": "LOADING_JS_FIX",
         "message": "v116 로딩 멈춤 JS 오류 수정 및 키움 실보유 동기화 유지"
     })
@@ -7891,7 +7931,7 @@ def api_v117_version():
     return jsonify({
         "ok": True,
         "version": "v117",
-        "title": "KIWOOM REAL AUTO v121",
+        "title": "KIWOOM REAL AUTO v122",
         "engine": "STRONG_SIZE_HOLDING_SYNC",
         "message": "v117 강한 매수수량 + 키움 실보유 자동동기화 강화 적용"
     })
@@ -8165,7 +8205,7 @@ def api_v118_version():
     return jsonify({
         "ok": True,
         "version": "v121",
-        "title": "KIWOOM REAL AUTO v121",
+        "title": "KIWOOM REAL AUTO v122",
         "engine": "REAL_HOLDINGS_AUTO_SYNC_FIX",
         "message": "v119 빠른 보유표시 + 백그라운드 동기화 + 주문락 문구 수정 적용"
     })
@@ -8198,7 +8238,7 @@ def api_holdings_v118_override():
 
 
 # =====================================================================
-# v121 FAST_AUTO_TRADE_BUTTON_STATE_FIX
+# v122 INSTANT_ON_BUTTON_GET_FIX
 # - 실제 키움 실보유 자동동기화 강화
 # - Kiwoom 잔고 응답 재귀 파싱
 # - timeout/일시 실패 시 기존 보유 캐시 삭제 금지
