@@ -166,7 +166,7 @@ def send_telegram_message(text):
         r=requests.post(f'https://api.telegram.org/bot{token}/sendMessage',json={'chat_id':chat_id,'text':text,'parse_mode':'HTML','disable_web_page_preview':True},timeout=8)
         return (True,'sent') if r.status_code==200 else (False,r.text[:500])
     except Exception as e: return False,str(e)
-
+    
 HOLDINGS_FILE=os.getenv('SERVER_HOLDINGS_FILE','/tmp/sungil_holdings_v109.json')
 WATCH_STATE={'running':False,'thread':None,'last_alerts':{},'last_check':'','last_prices':{},'best_code':'','best_score':0}
 WATCH_LOCK=threading.Lock(); WATCH_INTERVAL=int(os.getenv('SERVER_WATCH_INTERVAL','20')); BEST_PICK_GAP=float(os.getenv('BEST_PICK_MIN_SCORE_GAP','3.0'))
