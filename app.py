@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
-파일명: app_kiwoom_real_auto_scalping_v142_compact_candidate_holdings_cache_repair.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
+파일명: app_kiwoom_real_auto_scalping_v143_auth_holdings_clean_stable.py
 
 실전 운영용 경량화 버전입니다.
 
-v132 보강:
+v143 보강:
 - 후보가 없을 때 조건 자동 완화
 - 금액/수량 조건 때문에 후보가 모두 사라지지 않도록 표시 후보 유지
 - 마지막 정상 후보 캐시 우선 표시
@@ -3246,7 +3246,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v142</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v143</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3346,7 +3346,7 @@ function clearMoneyFast(){
   const el=$(activeMoneyInputId||"atTotal");
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
-function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function v133StaleWarning(d){try{if(d&&d.is_stale_data){return `<div class='empty' style='border:2px solid #f59e0b;background:#fff3cd'>🔴 후보 데이터가 오래되었습니다. 최근 갱신 ${d.cache_age_sec||0}초 전 · 실제 매수 전에는 키움 현재가를 다시 확인합니다.</div>`} if(d&&d.cache_age_sec>60){return `<div class='empty'>🟡 후보 캐시 ${d.cache_age_sec}초 전 기준입니다.</div>`}}catch(e){}return ''}function renderPick(p){
+function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function v143StaleWarning(d){try{if(d&&d.is_stale_data){return `<div class='empty' style='border:2px solid #f59e0b;background:#fff3cd'>🔴 후보 데이터가 오래되었습니다. 최근 갱신 ${d.cache_age_sec||0}초 전 · 실제 매수 전에는 키움 현재가를 다시 확인합니다.</div>`} if(d&&d.cache_age_sec>60){return `<div class='empty'>🟡 후보 캐시 ${d.cache_age_sec}초 전 기준입니다.</div>`}}catch(e){}return ''}function renderPick(p){
   if(!p)return "<div class='empty'>현재 강한 단타 후보가 부족합니다. 조건 자동완화 캐시를 갱신 중이며, 실제 매수 전에는 키움 현재가로 재검증합니다.</div>";
   const id='pick_'+String(p.code||'x')+'_'+Math.random().toString(36).slice(2,7);
   const amountText = p.amount ? (Number(p.amount)/100000000).toFixed(1)+'억' : '-';
@@ -3368,7 +3368,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
         <div class="metric"><small>수량가능</small><b>${p.qtyPossible||'-'}</b></div>
         <div class="metric"><small>가격출처</small><b>${p.priceSource||'-'}</b></div>
       </div>
-      <div class="comment" style="margin-top:10px">AI 코멘트: ${p.comment||'-'}<br><span class="muted">v142: 후보 화면은 캐시/빠른조회 기준입니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</span></div>
+      <div class="comment" style="margin-top:10px">AI 코멘트: ${p.comment||'-'}<br><span class="muted">v143: 후보 화면은 캐시/빠른조회 기준입니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</span></div>
     </div>
   </div>`
 }
@@ -3376,12 +3376,12 @@ function togglePickDetail(id){
   const el=$(id); if(!el)return;
   el.style.display = el.style.display==='none' || !el.style.display ? 'block' : 'none';
 }
-function saveBrowserHoldingBackup(list){try{if(Array.isArray(list)&&list.length)localStorage.setItem('sungil_last_holdings_backup_v142',JSON.stringify({time:new Date().toISOString(),items:list}));}catch(e){}}
-function getBrowserHoldingBackupV142(){try{const raw=localStorage.getItem('sungil_last_holdings_backup_v142')||localStorage.getItem('sungil_last_holdings_backup')||localStorage.getItem('sungil_holdings_backup');if(!raw)return [];const obj=JSON.parse(raw);return Array.isArray(obj)?obj:(obj.items||obj.holdings||[]);}catch(e){return []}}
-async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v142_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>🟡 후보 캐시 준비중입니다. 화면은 유지됩니다. 5초 후 상태 확인을 눌러주세요.</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v142_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>현재 감시 후보가 부족합니다. 장중 변동성 또는 조건 자동완화 결과를 기다립니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>🟡 급등 후보 캐시 준비중입니다. 서버가 계산을 마치면 자동 표시됩니다.</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v142_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`🟡 키움 조회는 백그라운드 진행중입니다. 현재 화면은 마지막 정상 보유값을 유지합니다.`;}}
+function saveBrowserHoldingBackup(list){try{if(Array.isArray(list)&&list.length)localStorage.setItem('sungil_last_holdings_backup_v143',JSON.stringify({time:new Date().toISOString(),items:list}));}catch(e){}}
+function getBrowserHoldingBackupV142(){try{const raw=localStorage.getItem('sungil_last_holdings_backup_v143')||localStorage.getItem('sungil_last_holdings_backup')||localStorage.getItem('sungil_holdings_backup');if(!raw)return [];const obj=JSON.parse(raw);return Array.isArray(obj)?obj:(obj.items||obj.holdings||[]);}catch(e){return []}}
+async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v143_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>🟡 후보 캐시 준비중입니다. 화면은 유지됩니다. 5초 후 상태 확인을 눌러주세요.</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v143_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>현재 감시 후보가 부족합니다. 장중 변동성 또는 조건 자동완화 결과를 기다립니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>🟡 급등 후보 캐시 준비중입니다. 서버가 계산을 마치면 자동 표시됩니다.</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v143_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`🟡 키움 조회는 백그라운드 진행중입니다. 현재 화면은 마지막 정상 보유값을 유지합니다.`;}}
 async function repairHoldingsCache(){
   try{
-    const d=await fetchJson('/api/v142_repair_holdings_cache?ts='+Date.now(),{timeoutMs:4500});
+    const d=await fetchJson('/api/v143_repair_holdings_cache?ts='+Date.now(),{timeoutMs:4500});
     if(d.holdings) renderHoldings(d.holdings||[]);
     if($('holdingStatus')) $('holdingStatus').innerHTML=(d.message||'보유캐시 복구 확인')+`<br><span class="muted">source: ${d.source||'-'} · count: ${d.count||0}</span>`;
   }catch(e){
@@ -3398,7 +3398,7 @@ async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까�
 
   let d={holdings:[]};
   try{
-    d=await fetchJson("/api/v142_holdings_cached?start_sync=1",{timeoutMs:4500});
+    d=await fetchJson("/api/v143_holdings_cached?start_sync=1",{timeoutMs:4500});
   }catch(e){
     $("holdingStatus").innerHTML=`⚠️ 보유종목 조회 실패: ${e.message}`;
     return;
@@ -3416,7 +3416,7 @@ async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까�
           body:JSON.stringify({holdings:backup}),
           timeoutMs:60000
         });
-        d=await fetchJson("/api/v142_holdings_cached?start_sync=1",{timeoutMs:4500});
+        d=await fetchJson("/api/v143_holdings_cached?start_sync=1",{timeoutMs:4500});
         list=d.holdings||[];
       }catch(e){
         $("holdingStatus").innerHTML=`⚠️ 브라우저 백업 복구 실패: ${e.message}`;
@@ -3431,7 +3431,7 @@ async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까�
   if(list.length){
     setTimeout(async()=>{
       try{
-        const rd=await fetchJson("/api/v142_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});
+        const rd=await fetchJson("/api/v143_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});
         if(rd.holdings){
           renderHoldings(rd.holdings);
         }
@@ -3509,7 +3509,7 @@ function aiCommentText(cur,buy,target,stop,qty,h={}){
 async function manualSellHolding(id,code,name){
   if(!confirm(`${name||code} 보유수량을 키움 시장가 매도로 전송할까요?\n실제 주문 전송 기능입니다. HTS/MTS에서도 반드시 확인하세요.`))return;
   try{
-    const d=await fetchJson('/api/v139_manual_sell_holding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,code}),timeoutMs:10000});
+    const d=await fetchJson('/api/v143_manual_sell_holding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,code}),timeoutMs:10000});
     alert(d.ok ? (d.message||'매도 요청 완료') : (d.message||'매도 요청 실패'));
     if(d.holdings) renderHoldings(d.holdings);
     if($('holdingStatus')) $('holdingStatus').innerHTML=(d.message||'매도 요청 처리')+`<br><span class="muted">실제 체결 여부는 키움 MTS/HTS에서 반드시 확인하세요.</span>`;
@@ -3633,7 +3633,7 @@ function renderAutoTradeDashboard(d, openDetail=false){
     </details>`;
 }
 async function autoTradeStatus(){
-  const d=await fetchJson("/api/v138_status_light",{timeoutMs:3000});
+  const d=await fetchJson("/api/v143_status_light",{timeoutMs:3000});
   renderAutoTradeDashboard(d,false);
 }
 async function refreshAutoTradeDetail(){
@@ -3829,28 +3829,28 @@ async function startWatch(){const d=await fetchJson("/api/server_watch/start",{m
 
 
 // ============================================================
-// v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX FRONT PATCH
+// v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX FRONT PATCH
 // - 키움 인증 실패 시 보유목록 0개로 오해하지 않도록 UI 보호
-// - v132/v138 혼재 메시지를 화면에서 정리
+// - v143/v143 혼재 메시지를 화면에서 정리
 // - 보유카드는 캐시를 우선 표시하고, 인증 실패 시 매도 버튼을 잠급니다.
 // ============================================================
 window.V142_HOLDINGS_DIAG = {auth_failure:false,message:'',source:'INIT',count:0};
-function v140CleanMsg(s){
+function v143CleanMsg(s){
   s=String(s||'');
-  s=s.replace(/v132|v133|v134|v135|v136|v137|v138|v139/g,'v140');
+  s=s.replace(/v143|v143|v143|v143|v143|v143|v143|v143/g,'v143');
   if(s.includes('8050')||s.includes('지정단말')||s.includes('인증에 실패')){
     return '🔴 키움 인증 실패(8050/지정단말기). Render IP, App Key/Secret, 영웅문S# 지정단말기/추가인증을 확인해야 합니다. 기존 보유 캐시는 지우지 않습니다.';
   }
   return s;
 }
-async function v140FetchHoldings(force=false){
-  const d=await fetchJson('/api/v142_holdings_cached?force='+(force?1:0)+'&ts='+Date.now(),{timeoutMs:6500});
+async function v143FetchHoldings(force=false){
+  const d=await fetchJson('/api/v143_holdings_cached?force='+(force?1:0)+'&ts='+Date.now(),{timeoutMs:6500});
   window.V142_HOLDINGS_DIAG=d||{};
   return d;
 }
-function v140HoldingStatusHtml(d){
+function v143HoldingStatusHtml(d){
   d=d||window.V142_HOLDINGS_DIAG||{};
-  const msg=v140CleanMsg(d.message||'키움 실보유 캐시 표시');
+  const msg=v143CleanMsg(d.message||'키움 실보유 캐시 표시');
   const src=d.source||d.holdings_source||'-';
   const count=(d.holdings||[]).length || d.count || 0;
   if(d.auth_failure){
@@ -3864,28 +3864,28 @@ function v140HoldingStatusHtml(d){
 async function loadHoldings(autoRestore=true){
   loadStorageStatus();
   try{
-    const d=await v140FetchHoldings(false);
+    const d=await v143FetchHoldings(false);
     renderHoldings(d.holdings||[]);
-    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v143HoldingStatusHtml(d);
   }catch(e){
     if($('holdingStatus')) $('holdingStatus').innerHTML='🟡 보유 캐시 확인 지연: '+e.message;
   }
 }
 async function refreshHoldings(){
   try{
-    const d=await v140FetchHoldings(true);
+    const d=await v143FetchHoldings(true);
     renderHoldings(d.holdings||[]);
-    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v143HoldingStatusHtml(d);
   }catch(e){
     if($('holdingStatus')) $('holdingStatus').innerHTML='🟡 키움 실보유 새로고침 지연: '+e.message+'<br><span class="muted">화면 보유값은 마지막 정상 캐시를 유지합니다.</span>';
   }
 }
 async function repairHoldingsCache(){
   try{
-    const d=await fetchJson('/api/v142_repair_holdings_cache?ts='+Date.now(),{timeoutMs:4500});
+    const d=await fetchJson('/api/v143_repair_holdings_cache?ts='+Date.now(),{timeoutMs:4500});
     window.V142_HOLDINGS_DIAG=d||{};
     renderHoldings(d.holdings||[]);
-    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v143HoldingStatusHtml(d);
   }catch(e){
     if($('holdingStatus')) $('holdingStatus').innerHTML='보유캐시 복구 실패: '+e.message;
   }
@@ -3895,9 +3895,9 @@ function renderHoldings(list){
   const diag=window.V142_HOLDINGS_DIAG||{};
   if(list.length){ saveBrowserHoldingBackup(list); }
   if(!list.length){ const backup=getBrowserHoldingBackupV142(); if(backup.length){ list=backup; window.V142_HOLDINGS_DIAG={...(diag||{}), source:'BROWSER_LAST_BACKUP_V142', message:'키움 인증/조회 지연으로 브라우저 마지막 정상 보유 캐시를 표시합니다.'}; } }
-  if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml({...diag,holdings:list,count:list.length});
+  if($('holdingStatus')) $('holdingStatus').innerHTML=v143HoldingStatusHtml({...diag,holdings:list,count:list.length});
   if(!list.length){
-    const reason=diag.auth_failure?`<b>키움 API 인증 실패로 보유종목을 조회하지 못했습니다.</b><br>${v140CleanMsg(diag.message)}<br><span class="muted">MTS/HTS의 실제 보유종목은 그대로일 수 있습니다. 키움 인증 정상화 후 새로고침하세요.</span>`:`현재 앱에 표시할 보유 캐시가 없습니다. 자동매수 체결 또는 키움 인증 정상 조회 후 자동 등록됩니다.`;
+    const reason=diag.auth_failure?`<b>키움 API 인증 실패로 보유종목을 조회하지 못했습니다.</b><br>${v143CleanMsg(diag.message)}<br><span class="muted">MTS/HTS의 실제 보유종목은 그대로일 수 있습니다. 키움 인증 정상화 후 새로고침하세요.</span>`:`현재 앱에 표시할 보유 캐시가 없습니다. 자동매수 체결 또는 키움 인증 정상 조회 후 자동 등록됩니다.`;
     $('holdingList').innerHTML=`<div class="empty">${reason}</div>`;
     return;
   }
@@ -3942,20 +3942,20 @@ async function manualSellHolding(id,code,name){
   if((window.V142_HOLDINGS_DIAG||{}).auth_failure){alert('키움 인증 실패 상태입니다. 앱 매도 전송은 잠그고 MTS/HTS 직접 확인을 권장합니다.');return;}
   if(!confirm(`${name||code} 보유수량을 키움 시장가 매도로 전송할까요?\n실제 주문 전송 기능입니다. HTS/MTS에서도 반드시 확인하세요.`))return;
   try{
-    const d=await fetchJson('/api/v142_manual_sell_holding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,code}),timeoutMs:10000});
+    const d=await fetchJson('/api/v143_manual_sell_holding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,code}),timeoutMs:10000});
     alert(d.ok ? (d.message||'매도 요청 완료') : (d.message||'매도 요청 실패'));
     if(d.holdings) renderHoldings(d.holdings);
-    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v143HoldingStatusHtml(d);
   }catch(e){alert('매도 요청 실패: '+e.message);}
 }
 
 
 
-// v142: 키움 인증 실패/보유 캐시 없음 상태에서도 화면에서 보유카드/매도버튼 UI를 확인할 수 있도록
+// v143: 키움 인증 실패/보유 캐시 없음 상태에서도 화면에서 보유카드/매도버튼 UI를 확인할 수 있도록
 // 브라우저 임시 표시 등록 기능을 제공합니다. 실제 주문 전송은 키움 인증 정상일 때만 허용됩니다.
 (function(){
-  const V142_MANUAL_KEY = 'sungil_manual_display_holdings_v142';
-  function v142LoadManualHoldings(){
+  const V142_MANUAL_KEY = 'sungil_manual_display_holdings_v143';
+  function v143LoadManualHoldings(){
     try{
       const raw=localStorage.getItem(V142_MANUAL_KEY)||'';
       if(!raw) return [];
@@ -3964,15 +3964,15 @@ async function manualSellHolding(id,code,name){
       return Array.isArray(arr)?arr:[];
     }catch(e){return []}
   }
-  function v142SaveManualHoldings(items){
+  function v143SaveManualHoldings(items){
     try{localStorage.setItem(V142_MANUAL_KEY, JSON.stringify({time:new Date().toISOString(), items:items||[]}));}catch(e){}
   }
-  window.v142ManualAddHolding=function(){
-    const name=(document.getElementById('v142_m_name')||{}).value||'';
-    const code=(document.getElementById('v142_m_code')||{}).value||'';
-    const buy=Number(((document.getElementById('v142_m_buy')||{}).value||'').replace(/,/g,''));
-    const qty=Number(((document.getElementById('v142_m_qty')||{}).value||'').replace(/,/g,''));
-    const cur=Number(((document.getElementById('v142_m_cur')||{}).value||'').replace(/,/g,''))||buy;
+  window.v143ManualAddHolding=function(){
+    const name=(document.getElementById('v143_m_name')||{}).value||'';
+    const code=(document.getElementById('v143_m_code')||{}).value||'';
+    const buy=Number(((document.getElementById('v143_m_buy')||{}).value||'').replace(/,/g,''));
+    const qty=Number(((document.getElementById('v143_m_qty')||{}).value||'').replace(/,/g,''));
+    const cur=Number(((document.getElementById('v143_m_cur')||{}).value||'').replace(/,/g,''))||buy;
     if(!name.trim() || !code.trim() || !buy || !qty){alert('종목명/종목코드/매수가/수량을 입력해 주세요.');return;}
     const item={
       id:'manual_'+code.trim()+'_'+Date.now(),
@@ -3982,14 +3982,14 @@ async function manualSellHolding(id,code,name){
       priceSource:'MANUAL_DISPLAY', lastCheckedAt:new Date().toLocaleString(),
       manualDisplay:true, priceError:'키움 인증 실패/캐시 없음 시 화면 확인용 수동 표시입니다. 실제 매도는 키움 인증 정상 후 가능합니다.'
     };
-    const curItems=v142LoadManualHoldings().filter(x=>String(x.code).padStart(6,'0')!==item.code);
-    curItems.push(item); v142SaveManualHoldings(curItems);
+    const curItems=v143LoadManualHoldings().filter(x=>String(x.code).padStart(6,'0')!==item.code);
+    curItems.push(item); v143SaveManualHoldings(curItems);
     window.V142_HOLDINGS_DIAG={auth_failure:true, source:'BROWSER_MANUAL_DISPLAY', message:'키움 인증/캐시 없음으로 수동 표시 보유종목을 보여줍니다. 실제 주문 전송은 인증 정상화 후 가능합니다.', count:curItems.length};
     renderHoldings(curItems);
   }
-  window.v142ManualClearHolding=function(){
+  window.v143ManualClearHolding=function(){
     if(!confirm('브라우저 수동 표시 보유목록을 지울까요? 실제 키움 보유종목에는 영향 없습니다.')) return;
-    v142SaveManualHoldings([]); renderHoldings([]);
+    v143SaveManualHoldings([]); renderHoldings([]);
   }
   const oldRender = window.renderHoldings;
   if(typeof oldRender==='function'){
@@ -3998,7 +3998,7 @@ async function manualSellHolding(id,code,name){
       if(!list.length){
         const backup=(typeof getBrowserHoldingBackupV142==='function'?getBrowserHoldingBackupV142():[]) || [];
         if(backup.length){ return oldRender(backup); }
-        const manual=v142LoadManualHoldings();
+        const manual=v143LoadManualHoldings();
         if(manual.length){
           window.V142_HOLDINGS_DIAG={auth_failure:true, source:'BROWSER_MANUAL_DISPLAY', message:'키움 인증/캐시 없음으로 브라우저 수동 표시 보유종목을 보여줍니다.', count:manual.length};
           return oldRender(manual);
@@ -4013,14 +4013,14 @@ async function manualSellHolding(id,code,name){
             <b>🧪 보유카드/매도버튼 화면 확인용 수동 표시</b><br>
             <span class="muted">실제 키움 잔고를 바꾸지 않습니다. 키움 인증이 실패하면 매도 전송은 잠깁니다.</span>
             <div class="grid2" style="margin-top:12px">
-              <input id="v142_m_name" placeholder="종목명 예: 제주반도체">
-              <input id="v142_m_code" placeholder="종목코드 예: 080220">
-              <input id="v142_m_buy" placeholder="매수가 예: 109450">
-              <input id="v142_m_qty" placeholder="수량 예: 2">
-              <input id="v142_m_cur" placeholder="현재가 선택 입력">
+              <input id="v143_m_name" placeholder="종목명 예: 제주반도체">
+              <input id="v143_m_code" placeholder="종목코드 예: 080220">
+              <input id="v143_m_buy" placeholder="매수가 예: 109450">
+              <input id="v143_m_qty" placeholder="수량 예: 2">
+              <input id="v143_m_cur" placeholder="현재가 선택 입력">
             </div>
-            <button class="green" onclick="v142ManualAddHolding()">화면에 보유종목 표시</button>
-            <button class="light" onclick="v142ManualClearHolding()">수동표시 지우기</button>
+            <button class="green" onclick="v143ManualAddHolding()">화면에 보유종목 표시</button>
+            <button class="light" onclick="v143ManualClearHolding()">수동표시 지우기</button>
           </div>`;
         return;
       }
@@ -6422,9 +6422,9 @@ def v109_cached_trade_price(code, fallback=True, ttl=None, force=False):
     return get_trade_live_price(code, fallback=fallback)
 
 
-def v136_update_ai_target_display_fields(h, cur=0):
+def v143_update_ai_target_display_fields(h, cur=0):
     """
-    v136 UI/감시 보강:
+    v143 UI/감시 보강:
     - 기존 목표가(originalTarget)와 AI 상향 목표가(aiDynamicTarget)를 분리 표시
     - 트레일링 보호선/최고가/최고수익률/AI HOLD 사유를 저장
     - 현재가가 표시 목표가보다 높아도 UI가 오래된 목표가로 보이지 않도록 보정
@@ -6537,7 +6537,7 @@ def check_one_holding(h):
     h["trailingActive"] = bool(high_rate >= profit_guard_rate)
     h["trailingStopRate"] = trailing_stop_rate
     h["profitGuardRate"] = profit_guard_rate
-    h = v136_update_ai_target_display_fields(h, cur)
+    h = v143_update_ai_target_display_fields(h, cur)
 
     # 매도 우선순위: 손절 -> 트레일링 -> 목표가
     if stop and cur <= stop:
@@ -9272,7 +9272,7 @@ def api_v127_holdings_cached():
         })
 
 
-@app.route("/api/v138_status_light")
+@app.route("/api/v143_status_light")
 def api_v127_status_light():
     state = read_trade_state()
     kd = state.get("last_kiwoom_debug", {}) or {}
@@ -9596,7 +9596,7 @@ def api_v128_holdings_cached():
     }))
 
 
-@app.route('/api/v138_status_light')
+@app.route('/api/v143_status_light')
 def api_v128_status_light():
     st = read_trade_state()
     cache = v119_read_cache() if 'v119_read_cache' in globals() else {}
@@ -9884,33 +9884,33 @@ def api_v129_status_light():
 # ============================================================
 # v131 endpoint aliases: 화면은 v131로 호출해도 기존 안정화 캐시 로직을 사용합니다.
 # ============================================================
-@app.route('/api/v135_best_pick_cached')
+@app.route('/api/v143_best_pick_cached')
 def api_v131_best_pick_cached():
     return api_v128_best_pick_cached()
 
-@app.route('/api/v135_watch_candidates_cached')
+@app.route('/api/v143_watch_candidates_cached')
 def api_v131_watch_candidates_cached():
     return api_v128_watch_candidates_cached()
 
-@app.route('/api/v138_holdings_cached', methods=['GET','POST'])
+@app.route('/api/v143_holdings_cached', methods=['GET','POST'])
 def api_v131_holdings_cached():
     return api_v128_holdings_cached()
 
-@app.route('/api/v138_status_light')
+@app.route('/api/v143_status_light')
 def api_v131_status_light():
     return api_v127_status_light()
 
 
 
 # ============================================================
-# v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
+# v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
 # - 장마감/키움 빈응답/timeout 때 실제 보유 캐시를 절대 0개로 덮어쓰지 않음
 # - 마지막 정상 보유종목 별도 백업 유지
 # - 화면용 캐시는 즉시 표시, 키움 직접 조회는 백그라운드에서만 갱신
 # ============================================================
-V132_VERSION = "v138"
+V132_VERSION = "v143"
 V132_ENGINE = "AUTH_GUARD_HOLDINGS_UI_REPAIR"
-V132_LAST_VALID_HOLDINGS_FILE = str(BASE_DIR / "sungil_last_valid_holdings_v132.json")
+V132_LAST_VALID_HOLDINGS_FILE = str(BASE_DIR / "sungil_last_valid_holdings_v143.json")
 
 try:
     V119_VERSION = V132_VERSION
@@ -9919,7 +9919,7 @@ except Exception:
     pass
 
 
-def v132_is_after_market_guard_time():
+def v143_is_after_market_guard_time():
     """장마감 직후/야간/주말에는 키움 잔고 API가 빈값 또는 지연을 줄 수 있어 보호모드를 켭니다."""
     try:
         n = now_kst()
@@ -9931,7 +9931,7 @@ def v132_is_after_market_guard_time():
         return False
 
 
-def v132_read_last_valid_holdings():
+def v143_read_last_valid_holdings():
     try:
         if os.path.exists(V132_LAST_VALID_HOLDINGS_FILE):
             with open(V132_LAST_VALID_HOLDINGS_FILE, "r", encoding="utf-8") as f:
@@ -9943,7 +9943,7 @@ def v132_read_last_valid_holdings():
     return {"holdings": [], "updatedAt": "", "source": "EMPTY"}
 
 
-def v132_save_last_valid_holdings(items, source="LAST_VALID"):
+def v143_save_last_valid_holdings(items, source="LAST_VALID"):
     items = items if isinstance(items, list) else []
     if len(items) <= 0:
         return False
@@ -9966,8 +9966,8 @@ def v132_save_last_valid_holdings(items, source="LAST_VALID"):
         return False
 
 
-def v132_get_best_cached_holdings():
-    """화면 표시용 최우선 보유값: 현재 로컬 > v119 캐시 > v132 마지막 정상 백업."""
+def v143_get_best_cached_holdings():
+    """화면 표시용 최우선 보유값: 현재 로컬 > v119 캐시 > v143 마지막 정상 백업."""
     try:
         cur = read_holdings()
         if isinstance(cur, list) and len(cur) > 0:
@@ -9981,15 +9981,15 @@ def v132_get_best_cached_holdings():
             return items, cache.get("source", "V119_CACHE")
     except Exception:
         pass
-    last = v132_read_last_valid_holdings()
+    last = v143_read_last_valid_holdings()
     items = last.get("holdings", []) if isinstance(last, dict) else []
     if isinstance(items, list) and len(items) > 0:
-        return v138_enrich_holdings_for_ui(items), last.get("source", "V138_LAST_VALID")
+        return v143_enrich_holdings_for_ui(items), last.get("source", "V138_LAST_VALID")
     try:
-        scanned, src = v138_scan_holdings_files()
+        scanned, src = v143_scan_holdings_files()
         if scanned:
-            v132_save_last_valid_holdings(scanned, source='V138_SCAN_' + str(src))
-            return v138_enrich_holdings_for_ui(scanned), 'V138_SCAN_' + str(src)
+            v143_save_last_valid_holdings(scanned, source='V138_SCAN_' + str(src))
+            return v143_enrich_holdings_for_ui(scanned), 'V138_SCAN_' + str(src)
     except Exception:
         pass
     return [], "EMPTY"
@@ -10008,13 +10008,13 @@ except Exception:
 
 
 def v119_save_cache(items, source="KIWOOM_REAL_BALANCE"):
-    """v138: 보유종목 캐시는 빈 리스트로 덮어쓰지 않습니다. 명시적 삭제는 clear 버튼에서만 수행합니다."""
+    """v143: 보유종목 캐시는 빈 리스트로 덮어쓰지 않습니다. 명시적 삭제는 clear 버튼에서만 수행합니다."""
     items = items if isinstance(items, list) else []
     if len(items) <= 0 and str(source).upper() not in ["EXPLICIT_CLEAR", "USER_CLEAR"]:
         # 키움 빈응답/장마감 빈값으로 기존 보유가 지워지는 것을 방지
-        keep, keep_source = v132_get_best_cached_holdings()
+        keep, keep_source = v143_get_best_cached_holdings()
         state = read_trade_state()
-        state["last_status"] = "v138 보유 캐시 보호"
+        state["last_status"] = "v143 보유 캐시 보호"
         state["last_status_time"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
         state["last_order_message"] = f"빈 보유 응답은 저장하지 않았습니다. 기존 보유 {len(keep)}종목 유지({keep_source})."
         write_trade_state(state)
@@ -10047,7 +10047,7 @@ def v119_save_cache(items, source="KIWOOM_REAL_BALANCE"):
         pass
 
     if len(items) > 0:
-        v132_save_last_valid_holdings(items, source=source)
+        v143_save_last_valid_holdings(items, source=source)
         write_holdings(items)
     elif str(source).upper() in ["EXPLICIT_CLEAR", "USER_CLEAR"]:
         write_holdings([])
@@ -10055,50 +10055,50 @@ def v119_save_cache(items, source="KIWOOM_REAL_BALANCE"):
 
 
 def kiwoom_get_account_holdings():
-    """v138: 키움 잔고 조회. 실패/빈응답/장마감 지연 시 마지막 정상 보유값을 반환합니다."""
+    """v143: 키움 잔고 조회. 실패/빈응답/장마감 지연 시 마지막 정상 보유값을 반환합니다."""
     if _V132_ORIG_KIWOOM_GET_ACCOUNT_HOLDINGS is None:
-        items, source = v132_get_best_cached_holdings()
+        items, source = v143_get_best_cached_holdings()
         return {"ok": False, "version": V132_VERSION, "holdings": items, "count": len(items), "source": source, "message": "원본 키움 조회 함수 없음 - 캐시 유지"}
 
     try:
         res = _V132_ORIG_KIWOOM_GET_ACCOUNT_HOLDINGS()
     except Exception as e:
-        items, source = v132_get_best_cached_holdings()
+        items, source = v143_get_best_cached_holdings()
         msg = f"키움 잔고 조회 예외. 기존 보유 캐시 유지: {e}"
-        update_kiwoom_debug("v138_holdings_exception_keep_cache", "", 0, msg)
+        update_kiwoom_debug("v143_holdings_exception_keep_cache", "", 0, msg)
         return {"ok": False, "version": V132_VERSION, "holdings": items, "count": len(items), "source": source, "message": msg, "guarded": True}
 
     items = res.get("holdings", []) if isinstance(res, dict) else []
     if isinstance(res, dict) and res.get("ok") and isinstance(items, list) and len(items) > 0:
         v119_save_cache(items, source=res.get("source", "KIWOOM_REAL_BALANCE_V132"))
-        items = v138_enrich_holdings_for_ui(items)
+        items = v143_enrich_holdings_for_ui(items)
         return {**res, "version": V132_VERSION, "engine": V132_ENGINE, "holdings": items, "count": len(items)}
 
     # 빈 응답 또는 실패: 기존 보유값 유지
-    keep, keep_source = v132_get_best_cached_holdings()
-    guard = v132_is_after_market_guard_time()
+    keep, keep_source = v143_get_best_cached_holdings()
+    guard = v143_is_after_market_guard_time()
     msg = (res.get("message", "키움 잔고 빈응답/조회 실패") if isinstance(res, dict) else "키움 잔고 조회 실패")
     if guard:
         msg = "장마감/야간 보호모드: 키움 잔고 API 빈응답 또는 지연으로 기존 보유를 유지합니다. " + str(msg)[:250]
     else:
         msg = "키움 잔고 API 실패/빈응답으로 기존 보유를 유지합니다. " + str(msg)[:250]
     state = read_trade_state()
-    state["last_status"] = "v138 키움 실보유 보호모드"
+    state["last_status"] = "v143 키움 실보유 보호모드"
     state["last_status_time"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
-    state["last_order_message"] = v138_short_kiwoom_reason(msg) + f" / 유지 보유 {len(keep)}종목({keep_source})"
+    state["last_order_message"] = v143_short_kiwoom_reason(msg) + f" / 유지 보유 {len(keep)}종목({keep_source})"
     write_trade_state(state)
-    update_kiwoom_debug("v138_holdings_empty_or_fail_keep_cache", "", 0, state["last_order_message"], res if isinstance(res, dict) else None)
+    update_kiwoom_debug("v143_holdings_empty_or_fail_keep_cache", "", 0, state["last_order_message"], res if isinstance(res, dict) else None)
     return {"ok": False, "version": V132_VERSION, "engine": V132_ENGINE, "holdings": keep, "count": len(keep), "source": keep_source, "message": state["last_order_message"], "guarded": True, "kiwoom": res}
 
 
 def v109_force_sync_holdings(full_sync=True, allow_screen_fallback=False):
-    """v138: 성공 시만 실제잔고 반영, 실패/빈응답/장마감 지연은 마지막 정상 보유값 유지."""
+    """v143: 성공 시만 실제잔고 반영, 실패/빈응답/장마감 지연은 마지막 정상 보유값 유지."""
     res = kiwoom_get_account_holdings()
     items = res.get("holdings", []) if isinstance(res, dict) else []
     if res.get("ok") and isinstance(items, list) and len(items) > 0:
         v119_save_cache(items, source=res.get("source", "KIWOOM_REAL_BALANCE_V132"))
         state = read_trade_state()
-        state["last_status"] = "v138 키움 실보유 동기화 완료"
+        state["last_status"] = "v143 키움 실보유 동기화 완료"
         state["last_status_time"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
         state["last_order_message"] = f"키움 실제잔고 {len(items)}개를 앱 보유종목에 반영했습니다."
         write_trade_state(state)
@@ -10108,7 +10108,7 @@ def v109_force_sync_holdings(full_sync=True, allow_screen_fallback=False):
             pass
         return {"ok": True, "version": V132_VERSION, "engine": V132_ENGINE, "holdings": items, "count": len(items), "source": res.get("source"), "message": state["last_order_message"], "kiwoom": res}
 
-    keep, keep_source = v132_get_best_cached_holdings()
+    keep, keep_source = v143_get_best_cached_holdings()
     if allow_screen_fallback or str(os.getenv("USE_SCREEN_HOLDINGS_FALLBACK", "false")).lower() == "true":
         try:
             screen_items = v119_screen_holdings_from_uploaded_image()
@@ -10119,9 +10119,9 @@ def v109_force_sync_holdings(full_sync=True, allow_screen_fallback=False):
             pass
 
     state = read_trade_state()
-    state["last_status"] = "v138 키움 실보유 보호모드"
+    state["last_status"] = "v143 키움 실보유 보호모드"
     state["last_status_time"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
-    state["last_order_message"] = v138_short_kiwoom_reason(res.get("message", "키움 조회 실패/빈응답. 기존 보유 캐시 유지"))
+    state["last_order_message"] = v143_short_kiwoom_reason(res.get("message", "키움 조회 실패/빈응답. 기존 보유 캐시 유지"))
     write_trade_state(state)
     try:
         V119_LAST_SYNC.update({"running": False, "last_result": res, "last_error": state["last_order_message"]})
@@ -10135,56 +10135,56 @@ def sync_kiwoom_holdings_to_local():
     items = res.get("holdings", []) if isinstance(res, dict) else []
     if isinstance(items, list) and len(items) > 0:
         return items
-    keep, _ = v132_get_best_cached_holdings()
+    keep, _ = v143_get_best_cached_holdings()
     return keep
 
 
-@app.route('/api/v138_holdings_cached', methods=['GET','POST'])
-def api_v132_holdings_cached():
-    # 기존 v128 화면 캐시 로직을 쓰되, 전역 보유 동기화 함수는 v132 보호버전으로 교체되어 있습니다.
+@app.route('/api/v143_holdings_cached', methods=['GET','POST'])
+def api_v143_holdings_cached():
+    # 기존 v128 화면 캐시 로직을 쓰되, 전역 보유 동기화 함수는 v143 보호버전으로 교체되어 있습니다.
     return api_v128_holdings_cached()
 
-@app.route('/api/v135_best_pick_cached')
-def api_v132_best_pick_cached():
+@app.route('/api/v143_best_pick_cached')
+def api_v143_best_pick_cached():
     return api_v128_best_pick_cached()
 
-@app.route('/api/v135_watch_candidates_cached')
-def api_v132_watch_candidates_cached():
+@app.route('/api/v143_watch_candidates_cached')
+def api_v143_watch_candidates_cached():
     return api_v128_watch_candidates_cached()
 
-@app.route('/api/v138_status_light')
-def api_v132_status_light():
+@app.route('/api/v143_status_light')
+def api_v143_status_light():
     try:
         d = api_v127_status_light()
         return d
     except Exception:
-        keep, src = v132_get_best_cached_holdings()
-        return jsonify({"ok": True, "version": V132_VERSION, "holding_count": len(keep), "source": src, "message": "v138 경량 상태: 캐시 기준 정상"})
+        keep, src = v143_get_best_cached_holdings()
+        return jsonify({"ok": True, "version": V132_VERSION, "holding_count": len(keep), "source": src, "message": "v143 경량 상태: 캐시 기준 정상"})
 
-@app.route('/api/v132_holdings_guard_status')
-def api_v132_holdings_guard_status():
-    keep, src = v132_get_best_cached_holdings()
+@app.route('/api/v143_holdings_guard_status')
+def api_v143_holdings_guard_status():
+    keep, src = v143_get_best_cached_holdings()
     return jsonify(safe_json({
         "ok": True,
         "version": V132_VERSION,
         "engine": V132_ENGINE,
-        "after_market_guard": v132_is_after_market_guard_time(),
+        "after_market_guard": v143_is_after_market_guard_time(),
         "holding_count": len(keep),
         "source": src,
-        "last_valid": v132_read_last_valid_holdings(),
+        "last_valid": v143_read_last_valid_holdings(),
         "current": keep,
-        "message": "v138: 키움 빈응답/장마감/timeout 시 기존 보유종목을 지우지 않는 보호모드가 적용되어 있습니다."
+        "message": "v143: 키움 빈응답/장마감/timeout 시 기존 보유종목을 지우지 않는 보호모드가 적용되어 있습니다."
     }))
 
 
 
 # ============================================================
-# v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
+# v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
 # 1) watch thread/파일 I/O lock 단일화
 # 2) 오래된 후보 캐시 경고 플래그 추가
 # 3) MASTER/USER 비밀번호 기본값 제거: 환경변수 없으면 로그인 차단
 # ============================================================
-V133_VERSION = "v133"
+V133_VERSION = "v143"
 V133_ENGINE = "THREAD_CACHE_SECURITY_FIX"
 V133_STALE_SEC = int(os.getenv("CANDIDATE_CACHE_STALE_SEC", "120"))
 
@@ -10208,7 +10208,7 @@ def read_holdings():
                     data = json.load(f)
                 return data if isinstance(data, list) else []
         except Exception as e:
-            print('v133 read_holdings warning:', e, flush=True)
+            print('v143 read_holdings warning:', e, flush=True)
     return []
 
 def write_holdings(items):
@@ -10221,7 +10221,7 @@ def write_holdings(items):
                     json.dump(items or [], f, ensure_ascii=False, indent=2)
                 return True
             except Exception as e:
-                print('v133 write_holdings warning:', e, flush=True)
+                print('v143 write_holdings warning:', e, flush=True)
                 return False
 
 def read_trade_state():
@@ -10235,7 +10235,7 @@ def read_trade_state():
                     st.update(data)
                 return st
         except Exception as e:
-            print('v133 read_trade_state warning:', e, flush=True)
+            print('v143 read_trade_state warning:', e, flush=True)
     return dict(TRADE_DEFAULTS)
 
 def write_trade_state(state):
@@ -10248,7 +10248,7 @@ def write_trade_state(state):
                     json.dump(state or {}, f, ensure_ascii=False, indent=2)
                 return True
             except Exception as e:
-                print('v133 write_trade_state warning:', e, flush=True)
+                print('v143 write_trade_state warning:', e, flush=True)
                 return False
 
 # watch thread 최종 단일 진입점
@@ -10258,12 +10258,12 @@ def ensure_watch_running():
         t = WATCH_STATE.get('thread')
         if t is not None and t.is_alive():
             return True
-        WATCH_STATE['thread'] = threading.Thread(target=watch_loop, daemon=True, name='watch_loop_v133_single')
+        WATCH_STATE['thread'] = threading.Thread(target=watch_loop, daemon=True, name='watch_loop_v143_single')
         WATCH_STATE['thread'].start()
         return True
 
 # 캐시 stale 정보 부여
-def v133_add_stale_meta(payload):
+def v143_add_stale_meta(payload):
     try:
         if not isinstance(payload, dict):
             return payload
@@ -10285,39 +10285,39 @@ def v133_add_stale_meta(payload):
         pass
     return payload
 
-def _v133_response_with_stale(prev_func):
+def _v143_response_with_stale(prev_func):
     try:
         resp = prev_func()
         data = resp.get_json(silent=True) if hasattr(resp, 'get_json') else None
         if isinstance(data, dict):
-            return jsonify(safe_json(v133_add_stale_meta(data)))
+            return jsonify(safe_json(v143_add_stale_meta(data)))
         return resp
     except Exception as e:
         return jsonify({'ok': False, 'version': V133_VERSION, 'engine': V133_ENGINE, 'is_stale_data': True, 'message': '후보 캐시 확인 중 오류. 마지막 정상 후보를 유지하세요.', 'error': str(e)[:300]})
 
 try:
-    _V133_PREV_BEST = app.view_functions.get('api_v131_best_pick_cached') or app.view_functions.get('api_v132_best_pick_cached') or api_v128_best_pick_cached
-    _V133_PREV_WATCH = app.view_functions.get('api_v131_watch_candidates_cached') or app.view_functions.get('api_v132_watch_candidates_cached') or api_v128_watch_candidates_cached
-    def v133_best_pick_cached_view():
-        return _v133_response_with_stale(_V133_PREV_BEST)
-    def v133_watch_candidates_cached_view():
-        return _v133_response_with_stale(_V133_PREV_WATCH)
+    _V133_PREV_BEST = app.view_functions.get('api_v131_best_pick_cached') or app.view_functions.get('api_v143_best_pick_cached') or api_v128_best_pick_cached
+    _V133_PREV_WATCH = app.view_functions.get('api_v131_watch_candidates_cached') or app.view_functions.get('api_v143_watch_candidates_cached') or api_v128_watch_candidates_cached
+    def v143_best_pick_cached_view():
+        return _v143_response_with_stale(_V133_PREV_BEST)
+    def v143_watch_candidates_cached_view():
+        return _v143_response_with_stale(_V133_PREV_WATCH)
     # 같은 URL이 여러 endpoint로 등록된 상태를 모두 새 함수로 교체
-    for ep in ['api_v131_best_pick_cached','api_v132_best_pick_cached']:
+    for ep in ['api_v131_best_pick_cached','api_v143_best_pick_cached']:
         if ep in app.view_functions:
-            app.view_functions[ep] = v133_best_pick_cached_view
-    for ep in ['api_v131_watch_candidates_cached','api_v132_watch_candidates_cached']:
+            app.view_functions[ep] = v143_best_pick_cached_view
+    for ep in ['api_v131_watch_candidates_cached','api_v143_watch_candidates_cached']:
         if ep in app.view_functions:
-            app.view_functions[ep] = v133_watch_candidates_cached_view
+            app.view_functions[ep] = v143_watch_candidates_cached_view
 except Exception as e:
-    print('v133 candidate endpoint override warning:', e, flush=True)
+    print('v143 candidate endpoint override warning:', e, flush=True)
 
 # 로그인 보안: MASTER_PASSWORD/USER_PASSWORD 기본값 0000/1234 제거
 _V133_BOOT_TEMP_PASSWORD = ''
 if not os.getenv('MASTER_PASSWORD') and not os.getenv('USER_PASSWORD'):
     try:
-        import secrets as _v133_secrets
-        _V133_BOOT_TEMP_PASSWORD = _v133_secrets.token_urlsafe(18)
+        import secrets as _v143_secrets
+        _V133_BOOT_TEMP_PASSWORD = _v143_secrets.token_urlsafe(18)
         print('='*70, flush=True)
         print('V133 SECURITY WARNING: MASTER_PASSWORD/USER_PASSWORD is not set.', flush=True)
         print('Temporary password for this boot:', _V133_BOOT_TEMP_PASSWORD, flush=True)
@@ -10326,7 +10326,7 @@ if not os.getenv('MASTER_PASSWORD') and not os.getenv('USER_PASSWORD'):
     except Exception:
         pass
 
-def api_login_check_v133_secure():
+def api_login_check_v143_secure():
     data = request.get_json(force=True, silent=True) or {}
     pw = str(data.get('password','')).strip()
     master = (os.getenv('MASTER_PASSWORD') or '').strip()
@@ -10343,25 +10343,25 @@ def api_login_check_v133_secure():
     return jsonify({'ok': False, 'version': V133_VERSION, 'message': '비밀번호가 맞지 않습니다.'})
 
 try:
-    app.view_functions['api_login_check'] = api_login_check_v133_secure
+    app.view_functions['api_login_check'] = api_login_check_v143_secure
 except Exception as e:
-    print('v133 login override warning:', e, flush=True)
+    print('v143 login override warning:', e, flush=True)
 
-@app.route('/api/v133_security_status')
-def api_v133_security_status():
+@app.route('/api/v143_security_status')
+def api_v143_security_status():
     return jsonify({
         'ok': True,
         'version': V133_VERSION,
         'master_password_set': bool(os.getenv('MASTER_PASSWORD')),
         'user_password_set': bool(os.getenv('USER_PASSWORD')),
         'default_password_blocked': True,
-        'message': 'v133: 기본 비밀번호 0000/1234는 제거되었습니다.'
+        'message': 'v143: 기본 비밀번호 0000/1234는 제거되었습니다.'
     })
 
-@app.route('/api/v133_status_light')
-def api_v133_status_light():
+@app.route('/api/v143_status_light')
+def api_v143_status_light():
     try:
-        keep, src = v132_get_best_cached_holdings()
+        keep, src = v143_get_best_cached_holdings()
     except Exception:
         keep, src = [], 'UNKNOWN'
     try:
@@ -10380,7 +10380,7 @@ def api_v133_status_light():
         'candidate_cache_running': cc.get('running', False),
         'security_default_password_blocked': True,
     }
-    return jsonify(safe_json(v133_add_stale_meta(payload)))
+    return jsonify(safe_json(v143_add_stale_meta(payload)))
 
 try:
     V119_VERSION = V133_VERSION
@@ -10394,13 +10394,13 @@ except Exception:
 
 
 # ============================================================
-# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX PATCH
+# v143_AI_DYNAMIC_TARGET_TRAILING_UI_FIX PATCH
 # - 기존 목표가/AI 상향 목표가/트레일링 보호선 표시 보정
 # - 기존 보유 캐시도 즉시 UI용 필드 보강
 # ============================================================
 try:
-    @app.route("/api/v136_refresh_trailing_fields")
-    def api_v136_refresh_trailing_fields():
+    @app.route("/api/v143_refresh_trailing_fields")
+    def api_v143_refresh_trailing_fields():
         items = read_holdings()
         out = []
         for h in items or []:
@@ -10414,20 +10414,20 @@ try:
                         h["priceSource"] = _src
                 except Exception:
                     pass
-            out.append(v136_update_ai_target_display_fields(h, cur))
+            out.append(v143_update_ai_target_display_fields(h, cur))
         write_holdings(out)
-        return jsonify({"ok": True, "version": "v136", "holdings": out, "message": "AI 상향목표/트레일링 표시 필드 갱신 완료"})
+        return jsonify({"ok": True, "version": "v143", "holdings": out, "message": "AI 상향목표/트레일링 표시 필드 갱신 완료"})
 except Exception:
     pass
 
 
 # ============================================================
-# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
+# v143_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
 # - 키움 거래중지/장마감/빈응답/timeout 때 보유탭이 0개로 보이지 않도록
 #   거래중지 직전 마지막 정상 보유 데이터를 영구 백업하고 화면에 유지합니다.
 # - 기존 버전별 cache/holdings 파일도 자동 스캔하여 마지막 정상값을 복구합니다.
 # ============================================================
-V134_VERSION = "v134"
+V134_VERSION = "v143"
 V134_ENGINE = "LAST_PRE_HALT_HOLDINGS_KEEP"
 V134_PERMANENT_LAST_VALID_FILE = str(BASE_DIR / "sungil_last_valid_holdings_PERMANENT.json")
 V134_RECOVERY_SCAN_SEC = int(os.getenv("V134_RECOVERY_SCAN_SEC", "10"))
@@ -10451,7 +10451,7 @@ try:
 except Exception:
     _V134_ORIG_WRITE_HOLDINGS = None
 try:
-    _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS = v132_get_best_cached_holdings
+    _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS = v143_get_best_cached_holdings
 except Exception:
     _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS = None
 try:
@@ -10460,7 +10460,7 @@ except Exception:
     _V134_ORIG_V119_SAVE_CACHE = None
 
 
-def v134_is_valid_holding_item(h):
+def v143_is_valid_holding_item(h):
     try:
         if not isinstance(h, dict):
             return False
@@ -10472,7 +10472,7 @@ def v134_is_valid_holding_item(h):
         return False
 
 
-def v134_normalize_holdings_list(items):
+def v143_normalize_holdings_list(items):
     out = []
     if not isinstance(items, list):
         return out
@@ -10483,7 +10483,7 @@ def v134_normalize_holdings_list(items):
         code = str(hh.get("code") or hh.get("stk_cd") or hh.get("종목코드") or hh.get("pdno") or "").replace("A", "").strip().zfill(6)
         if code.isdigit() and code != "000000":
             hh["code"] = code
-        if v134_is_valid_holding_item(hh):
+        if v143_is_valid_holding_item(hh):
             hh.setdefault("status", "감시중")
             hh.setdefault("sourceNote", "거래중지/장마감 보호 캐시")
             out.append(hh)
@@ -10497,8 +10497,8 @@ def v134_normalize_holdings_list(items):
     return dedup
 
 
-def v134_write_permanent_last_valid(items, source="V134_LAST_PRE_HALT"):
-    items = v134_normalize_holdings_list(items)
+def v143_write_permanent_last_valid(items, source="V134_LAST_PRE_HALT"):
+    items = v143_normalize_holdings_list(items)
     if not items:
         return False
     payload = {
@@ -10519,18 +10519,18 @@ def v134_write_permanent_last_valid(items, source="V134_LAST_PRE_HALT"):
         return True
     except Exception as e:
         try:
-            print("v134 permanent backup write failed:", e, flush=True)
+            print("v143 permanent backup write failed:", e, flush=True)
         except Exception:
             pass
         return False
 
 
-def v134_read_permanent_last_valid():
+def v143_read_permanent_last_valid():
     try:
         if os.path.exists(V134_PERMANENT_LAST_VALID_FILE):
             with open(V134_PERMANENT_LAST_VALID_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            items = v134_normalize_holdings_list(data.get("holdings", []) if isinstance(data, dict) else [])
+            items = v143_normalize_holdings_list(data.get("holdings", []) if isinstance(data, dict) else [])
             if items:
                 return {**(data if isinstance(data, dict) else {}), "holdings": items, "count": len(items), "source": (data.get("source") if isinstance(data, dict) else "V134_PERMANENT")}
     except Exception:
@@ -10538,7 +10538,7 @@ def v134_read_permanent_last_valid():
     return {"holdings": [], "count": 0, "source": "EMPTY", "updatedAt": "", "ts": 0}
 
 
-def v134_extract_holdings_from_json_obj(obj):
+def v143_extract_holdings_from_json_obj(obj):
     """여러 버전 cache/json 구조에서 holdings 리스트를 안전하게 추출."""
     candidates = []
     try:
@@ -10560,13 +10560,13 @@ def v134_extract_holdings_from_json_obj(obj):
         pass
     best = []
     for arr in candidates:
-        items = v134_normalize_holdings_list(arr)
+        items = v143_normalize_holdings_list(arr)
         if len(items) > len(best):
             best = items
     return best
 
 
-def v134_scan_previous_holdings_files(force=False):
+def v143_scan_previous_holdings_files(force=False):
     """BASE_DIR와 /tmp 안의 이전 버전 보유/cache 파일에서 마지막 정상 보유를 복구."""
     try:
         now = time.time()
@@ -10592,7 +10592,7 @@ def v134_scan_previous_holdings_files(force=False):
                             continue
                         with open(path, "r", encoding="utf-8") as f:
                             obj = json.load(f)
-                        items = v134_extract_holdings_from_json_obj(obj)
+                        items = v143_extract_holdings_from_json_obj(obj)
                         if not items:
                             continue
                         ts = 0
@@ -10614,40 +10614,40 @@ def v134_scan_previous_holdings_files(force=False):
         V134_STATE["last_scan_ts"] = now
         V134_STATE["last_scan_result"] = result
         if best_items:
-            v134_write_permanent_last_valid(best_items, source="V134_SCAN_RECOVERY")
+            v143_write_permanent_last_valid(best_items, source="V134_SCAN_RECOVERY")
         return result
     except Exception:
         return {"holdings": [], "count": 0, "source": "SCAN_ERROR", "updatedAt": "", "ts": 0}
 
 
-def v134_get_last_pre_halt_holdings():
-    """최종 fallback 순서: 현재 로컬 > v119/v132 캐시 > 영구백업 > 파일스캔."""
+def v143_get_last_pre_halt_holdings():
+    """최종 fallback 순서: 현재 로컬 > v119/v143 캐시 > 영구백업 > 파일스캔."""
     # 1) 원본 read_holdings 결과
     try:
         if _V134_ORIG_READ_HOLDINGS:
-            items = v134_normalize_holdings_list(_V134_ORIG_READ_HOLDINGS())
+            items = v143_normalize_holdings_list(_V134_ORIG_READ_HOLDINGS())
             if items:
-                v134_write_permanent_last_valid(items, source="LOCAL_CURRENT_V134")
+                v143_write_permanent_last_valid(items, source="LOCAL_CURRENT_V134")
                 return items, "LOCAL_CURRENT_V134"
     except Exception:
         pass
-    # 2) 기존 v132 best
+    # 2) 기존 v143 best
     try:
         if _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS:
             items, source = _V134_ORIG_V132_GET_BEST_CACHED_HOLDINGS()
-            items = v134_normalize_holdings_list(items)
+            items = v143_normalize_holdings_list(items)
             if items:
-                v134_write_permanent_last_valid(items, source=str(source or "V132_BEST"))
+                v143_write_permanent_last_valid(items, source=str(source or "V132_BEST"))
                 return items, str(source or "V132_BEST")
     except Exception:
         pass
     # 3) 영구 백업
-    data = v134_read_permanent_last_valid()
+    data = v143_read_permanent_last_valid()
     items = data.get("holdings", [])
     if items:
         return items, data.get("source", "V134_PERMANENT")
     # 4) 이전 파일 스캔
-    scan = v134_scan_previous_holdings_files()
+    scan = v143_scan_previous_holdings_files()
     items = scan.get("holdings", [])
     if items:
         return items, scan.get("source", "V134_SCAN_RECOVERY")
@@ -10655,8 +10655,8 @@ def v134_get_last_pre_halt_holdings():
 
 
 def read_holdings():
-    """v134: 화면 표시용 read는 로컬이 비어도 마지막 정상 보유를 반환합니다."""
-    items, source = v134_get_last_pre_halt_holdings()
+    """v143: 화면 표시용 read는 로컬이 비어도 마지막 정상 보유를 반환합니다."""
+    items, source = v143_get_last_pre_halt_holdings()
     if items:
         # 화면에 거래중지 전 데이터임을 표시할 수 있도록 표식 추가
         marked = []
@@ -10672,10 +10672,10 @@ def read_holdings():
 
 
 def write_holdings(items):
-    """v134: 빈 리스트는 마지막 정상 백업을 지우지 않습니다. 비어있지 않으면 즉시 백업."""
-    items_norm = v134_normalize_holdings_list(items if isinstance(items, list) else [])
+    """v143: 빈 리스트는 마지막 정상 백업을 지우지 않습니다. 비어있지 않으면 즉시 백업."""
+    items_norm = v143_normalize_holdings_list(items if isinstance(items, list) else [])
     if items_norm:
-        v134_write_permanent_last_valid(items_norm, source="WRITE_HOLDINGS_V134")
+        v143_write_permanent_last_valid(items_norm, source="WRITE_HOLDINGS_V134")
     try:
         if _V134_ORIG_WRITE_HOLDINGS:
             return _V134_ORIG_WRITE_HOLDINGS(items if isinstance(items, list) else [])
@@ -10684,16 +10684,16 @@ def write_holdings(items):
     return False
 
 
-def v132_get_best_cached_holdings():
-    items, source = v134_get_last_pre_halt_holdings()
+def v143_get_best_cached_holdings():
+    items, source = v143_get_last_pre_halt_holdings()
     return items, source
 
 
 def v119_save_cache(items, source="KIWOOM_REAL_BALANCE"):
-    """v134: 빈 캐시 저장 차단 + 비어있지 않은 캐시는 영구 백업."""
-    items_norm = v134_normalize_holdings_list(items if isinstance(items, list) else [])
+    """v143: 빈 캐시 저장 차단 + 비어있지 않은 캐시는 영구 백업."""
+    items_norm = v143_normalize_holdings_list(items if isinstance(items, list) else [])
     if not items_norm and str(source).upper() not in ["EXPLICIT_CLEAR", "USER_CLEAR"]:
-        keep, keep_source = v134_get_last_pre_halt_holdings()
+        keep, keep_source = v143_get_last_pre_halt_holdings()
         return {
             "version": V134_VERSION,
             "engine": V134_ENGINE,
@@ -10706,7 +10706,7 @@ def v119_save_cache(items, source="KIWOOM_REAL_BALANCE"):
             "message": f"빈 보유 응답 저장 차단. 마지막 정상 보유 {len(keep)}종목 유지({keep_source})."
         }
     if items_norm:
-        v134_write_permanent_last_valid(items_norm, source=str(source or "KIWOOM_REAL_BALANCE_V134"))
+        v143_write_permanent_last_valid(items_norm, source=str(source or "KIWOOM_REAL_BALANCE_V134"))
     if _V134_ORIG_V119_SAVE_CACHE:
         try:
             return _V134_ORIG_V119_SAVE_CACHE(items_norm, source=source)
@@ -10715,9 +10715,9 @@ def v119_save_cache(items, source="KIWOOM_REAL_BALANCE"):
     return {"version": V134_VERSION, "engine": V134_ENGINE, "holdings": items_norm, "count": len(items_norm), "source": source, "updatedAt": now_kst().strftime("%Y-%m-%d %H:%M:%S"), "ts": time.time()}
 
 
-@app.route('/api/v134_last_pre_halt_holdings')
-def api_v134_last_pre_halt_holdings():
-    items, source = v134_get_last_pre_halt_holdings()
+@app.route('/api/v143_last_pre_halt_holdings')
+def api_v143_last_pre_halt_holdings():
+    items, source = v143_get_last_pre_halt_holdings()
     return jsonify({
         "ok": bool(items),
         "version": V134_VERSION,
@@ -10726,16 +10726,16 @@ def api_v134_last_pre_halt_holdings():
         "source": source,
         "message": "거래중지/장마감/조회지연 시 표시할 마지막 정상 보유 데이터입니다." if items else "저장된 마지막 정상 보유 데이터가 없습니다.",
         "holdings": safe_json(items),
-        "permanent": v134_read_permanent_last_valid(),
-        "scan": v134_scan_previous_holdings_files(),
+        "permanent": v143_read_permanent_last_valid(),
+        "scan": v143_scan_previous_holdings_files(),
     })
 
-@app.route('/api/v134_recover_holdings')
-def api_v134_recover_holdings():
-    scan = v134_scan_previous_holdings_files(force=True)
+@app.route('/api/v143_recover_holdings')
+def api_v143_recover_holdings():
+    scan = v143_scan_previous_holdings_files(force=True)
     items = scan.get("holdings", [])
     if items:
-        v134_write_permanent_last_valid(items, source="V134_MANUAL_RECOVERY")
+        v143_write_permanent_last_valid(items, source="V134_MANUAL_RECOVERY")
         try:
             if _V134_ORIG_WRITE_HOLDINGS:
                 _V134_ORIG_WRITE_HOLDINGS(items)
@@ -10755,16 +10755,16 @@ except Exception:
 
 
 # =====================================================================
-# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
+# v143_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
 # 목적:
 # 1) 키움 실보유가 장마감/조회지연/거래중지 때문에 비어 보이지 않도록 마지막 정상값 유지
 # 2) 화면에 왜 조회가 안 되는지 사유 표시
 # 3) 급등/단타 후보는 1개만 표시되지 않도록 KRX_FAST 다중 후보 fallback
 # 4) 텔레그램은 연결확인/테스트 결과를 실제 발송 결과로 보여줌
 # =====================================================================
-V135_VERSION = "v136 AI_DYNAMIC_TARGET_TRAILING_UI_FIX"
+V135_VERSION = "v143 AI_DYNAMIC_TARGET_TRAILING_UI_FIX"
 V135_ENGINE = "HOLDINGS_KEEP_REASON_TELEGRAM_DIRECT_KRX_MULTI"
-V135_LAST_VALID_FILE = str(BASE_DIR / "sungil_v135_last_valid_holdings.json")
+V135_LAST_VALID_FILE = str(BASE_DIR / "sungil_v143_last_valid_holdings.json")
 V135_SYNC_STATE = {"running": False, "last_result": None, "last_sync_ts": 0, "last_reason": ""}
 V135_SYNC_LOCK = threading.RLock()
 
@@ -10776,11 +10776,11 @@ except Exception:
     pass
 
 
-def v135_now_text():
+def v143_now_text():
     return now_kst().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def v135_market_phase():
+def v143_market_phase():
     n = now_kst()
     if n.weekday() >= 5:
         return "WEEKEND", "주말이라 키움 일부 조회/주문 API가 제한될 수 있습니다. 마지막 정상 보유 데이터를 유지합니다."
@@ -10794,8 +10794,8 @@ def v135_market_phase():
     return "AFTER_HOURS", "장마감 이후라 실시간 주문/잔고 관련 API가 제한될 수 있습니다. 마지막 정상 보유 데이터를 유지합니다."
 
 
-def v135_classify_kiwoom_reason(res=None):
-    phase, phase_msg = v135_market_phase()
+def v143_classify_kiwoom_reason(res=None):
+    phase, phase_msg = v143_market_phase()
     txt = str(res or "")
     if not kiwoom_ready():
         return "KIWOOM_ENV_MISSING", "키움 REST 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY가 비어 있습니다."
@@ -10810,7 +10810,7 @@ def v135_classify_kiwoom_reason(res=None):
     return phase, phase_msg
 
 
-def v135_normalize_holding_item(h):
+def v143_normalize_holding_item(h):
     if not isinstance(h, dict):
         return None
     hh = dict(h)
@@ -10823,15 +10823,15 @@ def v135_normalize_holding_item(h):
     hh["code"] = code
     hh["name"] = name or code
     hh["qty"] = int(qty)
-    hh.setdefault("lastCheckedAt", v135_now_text())
+    hh.setdefault("lastCheckedAt", v143_now_text())
     return hh
 
 
-def v135_normalize_holdings(items):
+def v143_normalize_holdings(items):
     out = []
     seen = set()
     for h in items or []:
-        hh = v135_normalize_holding_item(h)
+        hh = v143_normalize_holding_item(h)
         if not hh:
             continue
         c = hh["code"]
@@ -10842,15 +10842,15 @@ def v135_normalize_holdings(items):
     return out
 
 
-def v135_save_last_valid_holdings(items, source="V135"):
-    items = v135_normalize_holdings(items)
+def v143_save_last_valid_holdings(items, source="V135"):
+    items = v143_normalize_holdings(items)
     if not items:
         return False
     payload = {
         "version": V135_VERSION,
         "engine": V135_ENGINE,
         "source": source,
-        "updatedAt": v135_now_text(),
+        "updatedAt": v143_now_text(),
         "ts": time.time(),
         "count": len(items),
         "holdings": safe_json(items),
@@ -10860,42 +10860,42 @@ def v135_save_last_valid_holdings(items, source="V135"):
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
         os.replace(tmp, V135_LAST_VALID_FILE)
-        # v134 영구 캐시도 같이 갱신
+        # v143 영구 캐시도 같이 갱신
         try:
-            if "v134_write_permanent_last_valid" in globals():
-                v134_write_permanent_last_valid(items, source=source)
+            if "v143_write_permanent_last_valid" in globals():
+                v143_write_permanent_last_valid(items, source=source)
         except Exception:
             pass
         return True
     except Exception as e:
-        print("v135 last valid save failed:", e, flush=True)
+        print("v143 last valid save failed:", e, flush=True)
         return False
 
 
-def v135_load_last_valid_holdings():
-    # 1) v135 파일
+def v143_load_last_valid_holdings():
+    # 1) v143 파일
     try:
         if os.path.exists(V135_LAST_VALID_FILE):
             with open(V135_LAST_VALID_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            items = v135_normalize_holdings(data.get("holdings", []))
+            items = v143_normalize_holdings(data.get("holdings", []))
             if items:
                 return items, data.get("source", "V135_LAST_VALID"), data.get("updatedAt", "")
     except Exception:
         pass
-    # 2) v134 permanent
+    # 2) v143 permanent
     try:
-        if "v134_read_permanent_last_valid" in globals():
-            data = v134_read_permanent_last_valid()
-            items = v135_normalize_holdings(data.get("holdings", []))
+        if "v143_read_permanent_last_valid" in globals():
+            data = v143_read_permanent_last_valid()
+            items = v143_normalize_holdings(data.get("holdings", []))
             if items:
                 return items, data.get("source", "V134_PERMANENT"), data.get("updatedAt", "")
     except Exception:
         pass
-    # 3) 현재 로컬 파일 직접 읽기: v134 read_holdings는 재귀 가능성이 있어 원본 우선 사용
+    # 3) 현재 로컬 파일 직접 읽기: v143 read_holdings는 재귀 가능성이 있어 원본 우선 사용
     try:
         base_reader = globals().get("_V134_ORIG_READ_HOLDINGS")
-        items = v135_normalize_holdings(base_reader() if base_reader else [])
+        items = v143_normalize_holdings(base_reader() if base_reader else [])
         if items:
             return items, "LOCAL_FILE", ""
     except Exception:
@@ -10903,45 +10903,45 @@ def v135_load_last_valid_holdings():
     return [], "EMPTY", ""
 
 
-def v135_write_holdings_safe(items, source="V135_WRITE"):
-    items = v135_normalize_holdings(items)
+def v143_write_holdings_safe(items, source="V135_WRITE"):
+    items = v143_normalize_holdings(items)
     if items:
-        v135_save_last_valid_holdings(items, source=source)
+        v143_save_last_valid_holdings(items, source=source)
     try:
         writer = globals().get("_V134_ORIG_WRITE_HOLDINGS") or globals().get("write_holdings")
         # 자기 자신 호출 방지
-        if writer and getattr(writer, "__name__", "") != "v135_write_holdings_safe":
+        if writer and getattr(writer, "__name__", "") != "v143_write_holdings_safe":
             return writer(items)
     except Exception:
         pass
     return False
 
 
-def v135_try_fetch_kiwoom_holdings():
+def v143_try_fetch_kiwoom_holdings():
     """키움 실제잔고를 1회 조회하되 실패하면 빈 목록으로 덮어쓰지 않음."""
     try:
         res = kiwoom_get_account_holdings()
     except Exception as e:
         res = {"ok": False, "message": str(e), "holdings": []}
     if isinstance(res, dict) and res.get("ok"):
-        items = v135_normalize_holdings(res.get("holdings", []))
+        items = v143_normalize_holdings(res.get("holdings", []))
         if items:
-            v135_write_holdings_safe(items, source="KIWOOM_REAL_BALANCE_V135")
+            v143_write_holdings_safe(items, source="KIWOOM_REAL_BALANCE_V135")
             return {"ok": True, "holdings": items, "count": len(items), "source": "KIWOOM_REAL_BALANCE", "message": f"키움 실제잔고 {len(items)}개를 정상 조회했습니다.", "raw": res}
-        reason_code, reason = v135_classify_kiwoom_reason(res)
+        reason_code, reason = v143_classify_kiwoom_reason(res)
         return {"ok": False, "holdings": [], "count": 0, "source": reason_code, "message": "키움 응답은 성공했지만 보유종목이 비어 있습니다. " + reason, "raw": res}
-    reason_code, reason = v135_classify_kiwoom_reason(res)
+    reason_code, reason = v143_classify_kiwoom_reason(res)
     return {"ok": False, "holdings": [], "count": 0, "source": reason_code, "message": reason, "raw": res}
 
 
-def v135_background_holdings_sync(force=False):
+def v143_background_holdings_sync(force=False):
     with V135_SYNC_LOCK:
         if V135_SYNC_STATE.get("running") and not force:
             return False
         V135_SYNC_STATE["running"] = True
     def _job():
         try:
-            res = v135_try_fetch_kiwoom_holdings()
+            res = v143_try_fetch_kiwoom_holdings()
             with V135_SYNC_LOCK:
                 V135_SYNC_STATE["last_result"] = res
                 V135_SYNC_STATE["last_sync_ts"] = time.time()
@@ -10953,22 +10953,22 @@ def v135_background_holdings_sync(force=False):
         finally:
             with V135_SYNC_LOCK:
                 V135_SYNC_STATE["running"] = False
-    threading.Thread(target=_job, daemon=True, name="v135_holdings_sync").start()
+    threading.Thread(target=_job, daemon=True, name="v143_holdings_sync").start()
     return True
 
 
 def read_holdings():
-    """v135 최종: 로컬이 비어도 마지막 정상 보유값을 유지."""
+    """v143 최종: 로컬이 비어도 마지막 정상 보유값을 유지."""
     # 원본 로컬에 정상값이 있으면 우선 사용하고 백업
     try:
         base_reader = globals().get("_V134_ORIG_READ_HOLDINGS")
-        local = v135_normalize_holdings(base_reader() if base_reader else [])
+        local = v143_normalize_holdings(base_reader() if base_reader else [])
         if local:
-            v135_save_last_valid_holdings(local, source="LOCAL_CURRENT_V135")
+            v143_save_last_valid_holdings(local, source="LOCAL_CURRENT_V135")
             return local
     except Exception:
         pass
-    keep, source, updated = v135_load_last_valid_holdings()
+    keep, source, updated = v143_load_last_valid_holdings()
     if keep:
         marked = []
         for h in keep:
@@ -10983,10 +10983,10 @@ def read_holdings():
 
 
 def write_holdings(items):
-    """v135 최종: 빈 목록 저장은 명시적 clear 외에는 마지막 정상 백업을 지우지 않음."""
-    items_norm = v135_normalize_holdings(items if isinstance(items, list) else [])
+    """v143 최종: 빈 목록 저장은 명시적 clear 외에는 마지막 정상 백업을 지우지 않음."""
+    items_norm = v143_normalize_holdings(items if isinstance(items, list) else [])
     if items_norm:
-        return v135_write_holdings_safe(items_norm, source="WRITE_HOLDINGS_V135")
+        return v143_write_holdings_safe(items_norm, source="WRITE_HOLDINGS_V135")
     # 빈 리스트는 파일에 쓸 수 있지만 마지막 정상 백업은 보존
     try:
         writer = globals().get("_V134_ORIG_WRITE_HOLDINGS")
@@ -10997,15 +10997,15 @@ def write_holdings(items):
     return False
 
 
-def v135_holdings_payload(start_sync=False, force=False):
+def v143_holdings_payload(start_sync=False, force=False):
     if start_sync or force:
-        v135_background_holdings_sync(force=force)
-    keep, keep_source, keep_updated = v135_load_last_valid_holdings()
+        v143_background_holdings_sync(force=force)
+    keep, keep_source, keep_updated = v143_load_last_valid_holdings()
     current = read_holdings()
-    items = v135_normalize_holdings(current) or keep
+    items = v143_normalize_holdings(current) or keep
     sync = dict(V135_SYNC_STATE)
     last = sync.get("last_result") or {}
-    phase, phase_msg = v135_market_phase()
+    phase, phase_msg = v143_market_phase()
     if not items and not sync.get("running"):
         msg = last.get("message") or phase_msg or "저장된 보유 캐시가 없습니다. 장중에 키움 실보유 새로고침을 다시 눌러주세요."
     elif sync.get("running"):
@@ -11030,20 +11030,20 @@ def v135_holdings_payload(start_sync=False, force=False):
     }
 
 
-def v135_force_sync_holdings(full_sync=True):
-    res = v135_try_fetch_kiwoom_holdings()
+def v143_force_sync_holdings(full_sync=True):
+    res = v143_try_fetch_kiwoom_holdings()
     if res.get("ok"):
         return {"ok": True, "version": V135_VERSION, "holdings": safe_json(res.get("holdings", [])), "count": res.get("count", 0), "message": res.get("message"), "source": res.get("source")}
-    keep, src, upd = v135_load_last_valid_holdings()
+    keep, src, upd = v143_load_last_valid_holdings()
     return {"ok": False, "version": V135_VERSION, "holdings": safe_json(keep), "count": len(keep), "source": src, "cacheUpdatedAt": upd, "message": res.get("message") + (f" 마지막 정상 보유 {len(keep)}종목을 유지합니다." if keep else " 저장된 마지막 정상 보유가 없습니다."), "kiwoom_error": safe_json(res)}
 
 
 def sync_kiwoom_holdings_to_local():
-    res = v135_force_sync_holdings(full_sync=False)
+    res = v143_force_sync_holdings(full_sync=False)
     return res.get("holdings", read_holdings())
 
 
-def v135_fast_krx_candidates(params=None, limit=8, watch=False):
+def v143_fast_krx_candidates(params=None, limit=8, watch=False):
     params = params or {}
     try:
         cash = safe_float(params.get("cash", 500000), 500000)
@@ -11096,16 +11096,16 @@ def v135_fast_krx_candidates(params=None, limit=8, watch=False):
                 'price':round(p),'priceSource':'KRX_FAST_CACHE','score':round(safe_float(row['score']),2),
                 'dayChange':round(safe_float(row['dayChange']),2),'amount':round(safe_float(row['Amount'])),'qtyPossible':qty,
                 'buyZone':round(p*.995),'target':round(p*1.035),'stop':round(p*.975),
-                'comment':'v142 KRX 빠른 후보: 화면 표시는 KRX 캐시 기준이며 실제 매수 직전에는 키움 현재가·주문가능금액을 다시 확인합니다.'
+                'comment':'v143 KRX 빠른 후보: 화면 표시는 KRX 캐시 기준이며 실제 매수 직전에는 키움 현재가·주문가능금액을 다시 확인합니다.'
             }
             out.append(item)
         return out
     except Exception as e:
-        print('v135_fast_krx_candidates error:', e, flush=True)
+        print('v143_fast_krx_candidates error:', e, flush=True)
         return []
 
 
-def v135_candidates_payload(watch=False):
+def v143_candidates_payload(watch=False):
     params = dict(request.args) if request else {}
     items=[]; prev_message=''
     try:
@@ -11119,8 +11119,8 @@ def v135_candidates_payload(watch=False):
             prev_message = old.get('message','') or old.get('error','')
     except Exception as e:
         prev_message=str(e)
-    items = v135_fast_krx_candidates(params=params, limit=(8 if watch else 5), watch=watch)
-    phase, phase_msg = v135_market_phase()
+    items = v143_fast_krx_candidates(params=params, limit=(8 if watch else 5), watch=watch)
+    phase, phase_msg = v143_market_phase()
     return {
         "ok": bool(items),
         "version": V135_VERSION,
@@ -11128,38 +11128,38 @@ def v135_candidates_payload(watch=False):
         "pick": safe_json(items[0] if items else None),
         "refreshing": False,
         "source": "KRX_FAST_MULTI_FALLBACK",
-        "message": (f"v142 KRX 다중 후보 {len(items)}개 표시. 실제 매수 직전 키움 재확인." if items else "조건에 맞는 후보가 없습니다. " + phase_msg),
+        "message": (f"v143 KRX 다중 후보 {len(items)}개 표시. 실제 매수 직전 키움 재확인." if items else "조건에 맞는 후보가 없습니다. " + phase_msg),
         "previousMessage": prev_message,
         "marketPhase": phase,
         "marketReason": phase_msg,
     }
 
 
-# ---- v135 API routes ----
-@app.route('/api/v138_holdings_cached', methods=['GET','POST'])
-def api_v135_holdings_cached():
+# ---- v143 API routes ----
+@app.route('/api/v143_holdings_cached', methods=['GET','POST'])
+def api_v143_holdings_cached():
     start_sync = str(request.args.get('start_sync','0')).lower() in ['1','true','yes']
     force = str(request.args.get('force','0')).lower() in ['1','true','yes']
-    return jsonify(v135_holdings_payload(start_sync=start_sync, force=force))
+    return jsonify(v143_holdings_payload(start_sync=start_sync, force=force))
 
-@app.route('/api/v135_force_sync_holdings', methods=['GET','POST'])
-def api_v135_force_sync_holdings():
-    return jsonify(v135_force_sync_holdings(full_sync=True))
+@app.route('/api/v143_force_sync_holdings', methods=['GET','POST'])
+def api_v143_force_sync_holdings():
+    return jsonify(v143_force_sync_holdings(full_sync=True))
 
-@app.route('/api/v135_best_pick_cached')
-def api_v135_best_pick_cached():
-    data = v135_candidates_payload(watch=False)
+@app.route('/api/v143_best_pick_cached')
+def api_v143_best_pick_cached():
+    data = v143_candidates_payload(watch=False)
     return jsonify(data)
 
-@app.route('/api/v135_watch_candidates_cached')
-def api_v135_watch_candidates_cached():
-    data = v135_candidates_payload(watch=True)
+@app.route('/api/v143_watch_candidates_cached')
+def api_v143_watch_candidates_cached():
+    data = v143_candidates_payload(watch=True)
     return jsonify(data)
 
-@app.route('/api/v135_diagnose')
-def api_v135_diagnose():
-    keep, src, upd = v135_load_last_valid_holdings()
-    phase, phase_msg = v135_market_phase()
+@app.route('/api/v143_diagnose')
+def api_v143_diagnose():
+    keep, src, upd = v143_load_last_valid_holdings()
+    phase, phase_msg = v143_market_phase()
     st = read_trade_state()
     return jsonify({
         "ok": True,
@@ -11176,7 +11176,7 @@ def api_v135_diagnose():
     })
 
 
-def api_telegram_status_v135():
+def api_telegram_status_v143():
     token_ok=bool(os.getenv('TELEGRAM_BOT_TOKEN','').strip())
     chat_ok=bool(os.getenv('TELEGRAM_CHAT_ID','').strip())
     st=read_trade_state()
@@ -11185,37 +11185,37 @@ def api_telegram_status_v135():
     return jsonify({'ok': token_ok and chat_ok, 'version': V135_VERSION, 'message': msg, 'token_set': token_ok, 'chat_id_set': chat_ok, 'last': last})
 
 
-def api_telegram_test_v135():
-    text='✅ <b>성일의 AI 주식바람</b>\n텔레그램 v142 직접 테스트 발송입니다.\n시간: '+v135_now_text()
+def api_telegram_test_v143():
+    text='✅ <b>성일의 AI 주식바람</b>\n텔레그램 v143 직접 테스트 발송입니다.\n시간: '+v143_now_text()
     if '_v129_send_telegram_direct' in globals():
         ok,msg=_v129_send_telegram_direct(text)
     else:
         ok,msg=send_telegram_message(text)
     try:
-        st=read_trade_state(); st['last_telegram_status']={'ok':ok,'message':msg,'time':v135_now_text(),'test':'direct_v135'}; write_trade_state(st)
+        st=read_trade_state(); st['last_telegram_status']={'ok':ok,'message':msg,'time':v143_now_text(),'test':'direct_v143'}; write_trade_state(st)
     except Exception:
         pass
     return jsonify({'ok':ok,'version':V135_VERSION,'message':msg})
 
-# 기존 URL도 v135 로직으로 교체하여 HTML 수정 누락 시에도 동일 동작
+# 기존 URL도 v143 로직으로 교체하여 HTML 수정 누락 시에도 동일 동작
 try:
-    for ep in ['api_v132_holdings_cached','api_v131_holdings_cached','api_v128_holdings_cached']:
+    for ep in ['api_v143_holdings_cached','api_v131_holdings_cached','api_v128_holdings_cached']:
         if ep in app.view_functions:
-            app.view_functions[ep]=api_v135_holdings_cached
-    for ep in ['api_v132_best_pick_cached','api_v131_best_pick_cached','api_v128_best_pick_cached']:
+            app.view_functions[ep]=api_v143_holdings_cached
+    for ep in ['api_v143_best_pick_cached','api_v131_best_pick_cached','api_v128_best_pick_cached']:
         if ep in app.view_functions:
-            app.view_functions[ep]=api_v135_best_pick_cached
-    for ep in ['api_v132_watch_candidates_cached','api_v131_watch_candidates_cached','api_v128_watch_candidates_cached']:
+            app.view_functions[ep]=api_v143_best_pick_cached
+    for ep in ['api_v143_watch_candidates_cached','api_v131_watch_candidates_cached','api_v128_watch_candidates_cached']:
         if ep in app.view_functions:
-            app.view_functions[ep]=api_v135_watch_candidates_cached
+            app.view_functions[ep]=api_v143_watch_candidates_cached
     if 'api_telegram_status' in app.view_functions:
-        app.view_functions['api_telegram_status']=api_telegram_status_v135
+        app.view_functions['api_telegram_status']=api_telegram_status_v143
     if 'api_telegram_test' in app.view_functions:
-        app.view_functions['api_telegram_test']=api_telegram_test_v135
+        app.view_functions['api_telegram_test']=api_telegram_test_v143
     if 'api_v109_holdings' in app.view_functions:
-        app.view_functions['api_v109_holdings']=lambda: jsonify(v135_force_sync_holdings(full_sync=True))
+        app.view_functions['api_v109_holdings']=lambda: jsonify(v143_force_sync_holdings(full_sync=True))
 except Exception as e:
-    print('v135 endpoint override warning:', e, flush=True)
+    print('v143 endpoint override warning:', e, flush=True)
 
 try:
     print('='*70, flush=True)
@@ -11227,13 +11227,13 @@ except Exception:
 
 
 # ============================================================
-# v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
+# v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
 # 목적:
-# - v136에서 버전 배지는 바뀌었지만 보유 카드 데이터에 AI 상향목표/트레일링 필드가
+# - v143에서 버전 배지는 바뀌었지만 보유 카드 데이터에 AI 상향목표/트레일링 필드가
 #   실제 연결되지 않는 문제를 강제 보정합니다.
-# - v135 캐시/키움 실보유 응답을 반환하기 직전에 모든 보유종목에 표시용 필드를 주입합니다.
+# - v143 캐시/키움 실보유 응답을 반환하기 직전에 모든 보유종목에 표시용 필드를 주입합니다.
 # ============================================================
-V137_VERSION = "v137 HOLDING_TRAILING_UI_FORCE_WIRE"
+V137_VERSION = "v143 HOLDING_TRAILING_UI_FORCE_WIRE"
 V137_ENGINE = "FORCE_DYNAMIC_TARGET_FIELDS_TO_HOLDING_CARD"
 
 try:
@@ -11245,7 +11245,7 @@ try:
 except Exception:
     pass
 
-def v137_enrich_trailing_ui_item(h):
+def v143_enrich_trailing_ui_item(h):
     """보유종목 카드 표시용 AI 목표가/트레일링 필드를 강제로 계산합니다."""
     try:
         h = dict(h or {})
@@ -11336,21 +11336,21 @@ def v137_enrich_trailing_ui_item(h):
         return h
     except Exception as e:
         try:
-            h["v137_error"] = str(e)[:200]
+            h["v143_error"] = str(e)[:200]
         except Exception:
             pass
         return h
 
-def v137_enrich_trailing_ui_list(items):
-    return [v137_enrich_trailing_ui_item(x) for x in (items or [])]
+def v143_enrich_trailing_ui_list(items):
+    return [v143_enrich_trailing_ui_item(x) for x in (items or [])]
 
-def v137_holdings_payload(start_sync=False, force=False):
-    """v135 보유 payload를 재사용하되 반환 직전 v137 UI 필드를 강제 주입합니다."""
+def v143_holdings_payload(start_sync=False, force=False):
+    """v143 보유 payload를 재사용하되 반환 직전 v143 UI 필드를 강제 주입합니다."""
     try:
-        base = v135_holdings_payload(start_sync=start_sync, force=force)
+        base = v143_holdings_payload(start_sync=start_sync, force=force)
     except Exception as e:
         try:
-            keep, src, upd = v135_load_last_valid_holdings()
+            keep, src, upd = v143_load_last_valid_holdings()
         except Exception:
             keep, src, upd = [], "NONE", ""
         base = {
@@ -11361,10 +11361,10 @@ def v137_holdings_payload(start_sync=False, force=False):
             "count": len(keep),
             "source": src,
             "cacheUpdatedAt": upd,
-            "message": "v137: 기존 보유 캐시를 표시합니다. " + str(e)[:200],
+            "message": "v143: 기존 보유 캐시를 표시합니다. " + str(e)[:200],
         }
 
-    items = v137_enrich_trailing_ui_list(base.get("holdings", []))
+    items = v143_enrich_trailing_ui_list(base.get("holdings", []))
     base["holdings"] = safe_json(items)
     base["count"] = len(items)
     base["version"] = V137_VERSION
@@ -11373,26 +11373,26 @@ def v137_holdings_payload(start_sync=False, force=False):
     return base
 
 try:
-    @app.route("/api/v138_holdings_cached")
-    def api_v137_holdings_cached():
+    @app.route("/api/v143_holdings_cached")
+    def api_v143_holdings_cached():
         start_sync = str(request.args.get("start_sync", "0")).lower() in ["1", "true", "yes"]
         force = str(request.args.get("force", "0")).lower() in ["1", "true", "yes"]
-        return jsonify(v137_holdings_payload(start_sync=start_sync, force=force))
+        return jsonify(v143_holdings_payload(start_sync=start_sync, force=force))
 
-    @app.route("/api/v137_refresh_trailing_fields")
-    def api_v137_refresh_trailing_fields():
-        items = v137_enrich_trailing_ui_list(read_holdings())
+    @app.route("/api/v143_refresh_trailing_fields")
+    def api_v143_refresh_trailing_fields():
+        items = v143_enrich_trailing_ui_list(read_holdings())
         if items:
             write_holdings(items)
-        return jsonify({"ok": True, "version": V137_VERSION, "holdings": safe_json(items), "message": "v137 AI 상향목표/트레일링 표시 필드 갱신 완료"})
+        return jsonify({"ok": True, "version": V137_VERSION, "holdings": safe_json(items), "message": "v143 AI 상향목표/트레일링 표시 필드 갱신 완료"})
 except Exception:
     pass
 
-# 기존 API 이름으로 호출해도 v137 보정 payload를 반환하도록 최종 override
+# 기존 API 이름으로 호출해도 v143 보정 payload를 반환하도록 최종 override
 try:
-    @app.route("/api/v136_refresh_trailing_fields_final")
-    def api_v136_refresh_trailing_fields_final():
-        return jsonify(v137_holdings_payload(start_sync=False, force=False))
+    @app.route("/api/v143_refresh_trailing_fields_final")
+    def api_v143_refresh_trailing_fields_final():
+        return jsonify(v143_holdings_payload(start_sync=False, force=False))
 except Exception:
     pass
 
@@ -11402,39 +11402,39 @@ if __name__ == '__main__':
 
 
 # ============================================================
-# v138 explicit diagnose/repair endpoints
+# v143 explicit diagnose/repair endpoints
 # ============================================================
-@app.route('/api/v138_repair_holdings_cache')
-def api_v138_repair_holdings_cache():
-    items, src = v132_get_best_cached_holdings()
+@app.route('/api/v143_repair_holdings_cache')
+def api_v143_repair_holdings_cache():
+    items, src = v143_get_best_cached_holdings()
     if items:
-        items = v138_enrich_holdings_for_ui(items)
+        items = v143_enrich_holdings_for_ui(items)
         v119_save_cache(items, source='V138_MANUAL_REPAIR_' + str(src))
-        return jsonify(safe_json({'ok': True, 'version': 'v138', 'count': len(items), 'source': src, 'holdings': items, 'message': f'이전 정상 보유 캐시 {len(items)}종목을 복구했습니다.'}))
-    return jsonify(safe_json({'ok': False, 'version': 'v138', 'count': 0, 'source': src, 'holdings': [], 'message': '복구 가능한 보유 캐시가 없습니다. 키움 인증 정상화 후 새로고침이 필요합니다.'}))
+        return jsonify(safe_json({'ok': True, 'version': 'v143', 'count': len(items), 'source': src, 'holdings': items, 'message': f'이전 정상 보유 캐시 {len(items)}종목을 복구했습니다.'}))
+    return jsonify(safe_json({'ok': False, 'version': 'v143', 'count': 0, 'source': src, 'holdings': [], 'message': '복구 가능한 보유 캐시가 없습니다. 키움 인증 정상화 후 새로고침이 필요합니다.'}))
 
-@app.route('/api/v138_diagnose')
-def api_v138_diagnose():
+@app.route('/api/v143_diagnose')
+def api_v143_diagnose():
     st = read_trade_state()
-    keep, src = v132_get_best_cached_holdings()
+    keep, src = v143_get_best_cached_holdings()
     kd = st.get('last_kiwoom_debug', {}) if isinstance(st, dict) else {}
     msg = kd.get('message') or st.get('last_order_message') or ''
     return jsonify(safe_json({
         'ok': True,
-        'version': 'v138',
+        'version': 'v143',
         'holding_count': len(keep),
         'holding_source': src,
         'kiwoom_ready_env': kiwoom_ready(),
         'kiwoom_stage': kd.get('stage',''),
-        'kiwoom_message_short': v138_short_kiwoom_reason(msg),
-        'auth_failure': v138_is_kiwoom_auth_failure_message(msg),
+        'kiwoom_message_short': v143_short_kiwoom_reason(msg),
+        'auth_failure': v143_is_kiwoom_auth_failure_message(msg),
         'message': '키움 인증 실패가 표시되면 코드 문제가 아니라 Render IP/App Key/지정단말기 인증 설정을 확인해야 합니다.'
     }))
 
 
-# v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
-@app.route('/api/v139_manual_sell_holding', methods=['POST'])
-def api_v139_manual_sell_holding():
+# v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX
+@app.route('/api/v143_manual_sell_holding', methods=['POST'])
+def api_v143_manual_sell_holding():
     """보유카드에서 수동 시장가 매도. 실제 키움 잔고/장중/인증 확인 후 주문합니다."""
     try:
         data = request.get_json(silent=True) or {}
@@ -11458,21 +11458,21 @@ def api_v139_manual_sell_holding():
         state = read_trade_state()
         msg = state.get('last_order_message') or '수동 시장가 매도 요청을 처리했습니다. 실제 체결 여부는 키움 MTS/HTS에서 확인하세요.'
         ok = False if '실패' in str(state.get('last_status','')) or '보류' in str(state.get('last_status','')) else True
-        return jsonify(safe_json({'ok': ok, 'version': 'v139', 'message': msg, 'result': res, 'priceSource': src, 'holdings': holdings}))
+        return jsonify(safe_json({'ok': ok, 'version': 'v143', 'message': msg, 'result': res, 'priceSource': src, 'holdings': holdings}))
     except Exception as e:
-        return jsonify(safe_json({'ok': False, 'version': 'v139', 'message': '수동 매도 처리 오류: '+str(e), 'holdings': read_holdings()}))
+        return jsonify(safe_json({'ok': False, 'version': 'v143', 'message': '수동 매도 처리 오류: '+str(e), 'holdings': read_holdings()}))
 
 
 # ============================================================
-# v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX SERVER PATCH
+# v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX SERVER PATCH
 # 목적:
 # - 키움 인증 실패(8050/지정단말기) 때 보유목록을 0개로 덮어쓰지 않고 마지막 정상 캐시를 표시
-# - v132/v138/v139 혼재 메시지를 v140으로 정리
+# - v143/v143/v143 혼재 메시지를 v143으로 정리
 # - 인증 실패 상태에서는 앱 시장가 매도 전송을 잠금
 # ============================================================
-V142_VERSION = "v140"
+V142_VERSION = "v143"
 V142_ENGINE = "AUTH_REPAIR_STABLE_UI"
-V142_LAST_VALID_FILE = str(BASE_DIR / "sungil_last_valid_holdings_v140.json")
+V142_LAST_VALID_FILE = str(BASE_DIR / "sungil_last_valid_holdings_v143.json")
 
 try:
     V119_VERSION = V142_VERSION
@@ -11488,21 +11488,21 @@ except Exception:
     pass
 
 
-def v142_clean_message(msg):
+def v143_clean_message(msg):
     s = str(msg or "")
-    for v in ["v132", "v133", "v134", "v135", "v136", "v137", "v138", "v139"]:
-        s = s.replace(v, "v140")
+    for v in ["v143", "v143", "v143", "v143", "v143", "v143", "v143", "v143"]:
+        s = s.replace(v, "v143")
     if any(x in s for x in ["8050", "지정단말", "인증에 실패", "토큰 발급 실패"]):
         return "키움 인증 실패입니다. 8050/지정단말기 오류 가능성이 높습니다. Render 서버 IP, App Key/Secret, 영웅문S# 지정단말기/추가인증을 확인하세요. 기존 보유 캐시는 삭제하지 않습니다."
     return s
 
 
-def v142_is_auth_failure(msg):
+def v143_is_auth_failure(msg):
     s = str(msg or "")
     return any(x in s for x in ["8050", "지정단말", "인증에 실패", "토큰 발급 실패", "token_fail", "token_exception"])
 
 
-def v142_valid_holding(h):
+def v143_valid_holding(h):
     try:
         if not isinstance(h, dict):
             return False
@@ -11514,12 +11514,12 @@ def v142_valid_holding(h):
         return False
 
 
-def v142_normalize_holdings(items):
+def v143_normalize_holdings(items):
     out = []
     if not isinstance(items, list):
         return out
     for h in items:
-        if not isinstance(h, dict) or not v142_valid_holding(h):
+        if not isinstance(h, dict) or not v143_valid_holding(h):
             continue
         hh = dict(h)
         code = str(hh.get("code") or hh.get("stk_cd") or hh.get("종목코드") or hh.get("pdno") or "").replace("A", "").strip().zfill(6)
@@ -11532,7 +11532,7 @@ def v142_normalize_holdings(items):
         if safe_float(hh.get("buyAmount", 0), 0) <= 0 and buy > 0 and hh["qty"] > 0:
             hh["buyAmount"] = int(buy * hh["qty"])
         try:
-            hh = v137_enrich_trailing_holding(hh) if "v137_enrich_trailing_holding" in globals() else hh
+            hh = v143_enrich_trailing_holding(hh) if "v143_enrich_trailing_holding" in globals() else hh
         except Exception:
             pass
         out.append(hh)
@@ -11543,7 +11543,7 @@ def v142_normalize_holdings(items):
     return list(dedup.values())
 
 
-def v142_scan_holdings_files():
+def v143_scan_holdings_files():
     candidates = []
     seen = set()
     dirs = [BASE_DIR, Path('/tmp'), Path('/var/data')]
@@ -11563,7 +11563,7 @@ def v142_scan_holdings_files():
                         items = data.get('holdings') or data.get('items') or data.get('data') or []
                     else:
                         items = []
-                    items = v142_normalize_holdings(items)
+                    items = v143_normalize_holdings(items)
                     if items:
                         candidates.append((p.stat().st_mtime, str(p), items))
                 except Exception:
@@ -11576,8 +11576,8 @@ def v142_scan_holdings_files():
     return candidates[0][2], candidates[0][1]
 
 
-def v142_save_last_valid(items, source='V142_LAST_VALID'):
-    items = v142_normalize_holdings(items)
+def v143_save_last_valid(items, source='V142_LAST_VALID'):
+    items = v143_normalize_holdings(items)
     if not items:
         return False
     payload = {'version': V142_VERSION, 'engine': V142_ENGINE, 'source': source, 'updatedAt': now_kst().strftime('%Y-%m-%d %H:%M:%S'), 'ts': time.time(), 'count': len(items), 'holdings': items}
@@ -11591,64 +11591,64 @@ def v142_save_last_valid(items, source='V142_LAST_VALID'):
         return False
 
 
-def v142_best_cached_holdings():
+def v143_best_cached_holdings():
     # 1) 현재 파일에 정상 보유가 있으면 우선 사용
     try:
-        cur = v142_normalize_holdings(read_holdings())
+        cur = v143_normalize_holdings(read_holdings())
         if cur:
-            v142_save_last_valid(cur, 'LOCAL_CURRENT')
+            v143_save_last_valid(cur, 'LOCAL_CURRENT')
             return cur, 'LOCAL_CURRENT'
     except Exception:
         pass
-    # 2) v142 마지막 정상
+    # 2) v143 마지막 정상
     try:
         if os.path.exists(V142_LAST_VALID_FILE):
             data = json.load(open(V142_LAST_VALID_FILE, 'r', encoding='utf-8'))
-            items = v142_normalize_holdings(data.get('holdings', []))
+            items = v143_normalize_holdings(data.get('holdings', []))
             if items:
                 return items, data.get('source', 'V142_LAST_VALID')
     except Exception:
         pass
     # 3) 기존 버전 스캔
-    items, src = v142_scan_holdings_files()
+    items, src = v143_scan_holdings_files()
     if items:
-        v142_save_last_valid(items, 'SCAN_' + str(src))
+        v143_save_last_valid(items, 'SCAN_' + str(src))
         return items, 'SCAN_' + str(src)
     return [], 'EMPTY'
 
 
-def v142_auth_status_from_state():
+def v143_auth_status_from_state():
     st = read_trade_state()
     kd = st.get('last_kiwoom_debug', {}) if isinstance(st, dict) else {}
     msg = (kd.get('message') or st.get('last_order_message') or '') if isinstance(kd, dict) else st.get('last_order_message', '')
     stage = kd.get('stage', '') if isinstance(kd, dict) else ''
-    auth = v142_is_auth_failure(msg) or v142_is_auth_failure(stage)
-    return auth, v142_clean_message(msg), kd
+    auth = v143_is_auth_failure(msg) or v143_is_auth_failure(stage)
+    return auth, v143_clean_message(msg), kd
 
 
-@app.route('/api/v142_holdings_cached', methods=['GET','POST'])
-def api_v142_holdings_cached():
+@app.route('/api/v143_holdings_cached', methods=['GET','POST'])
+def api_v143_holdings_cached():
     force = str(request.args.get('force', '0')).lower() in ['1','true','yes']
-    items, src = v142_best_cached_holdings()
-    auth_fail, auth_msg, kd = v142_auth_status_from_state()
+    items, src = v143_best_cached_holdings()
+    auth_fail, auth_msg, kd = v143_auth_status_from_state()
     res = None
     # 인증 실패가 이미 감지된 상태에서는 계속 키움 API를 두드리지 않습니다.
     if force and not auth_fail:
         try:
             res = v109_force_sync_holdings(full_sync=True)
-            new_items = v142_normalize_holdings(res.get('holdings', []) if isinstance(res, dict) else [])
+            new_items = v143_normalize_holdings(res.get('holdings', []) if isinstance(res, dict) else [])
             if new_items and (res.get('ok') or len(new_items) > 0):
                 items, src = new_items, res.get('source', 'KIWOOM_SYNC')
                 write_holdings(items)
-                v142_save_last_valid(items, src)
+                v143_save_last_valid(items, src)
             else:
                 msg = res.get('message', '') if isinstance(res, dict) else ''
-                if v142_is_auth_failure(msg):
+                if v143_is_auth_failure(msg):
                     auth_fail = True
-                    auth_msg = v142_clean_message(msg)
+                    auth_msg = v143_clean_message(msg)
         except Exception as e:
-            auth_msg = v142_clean_message(str(e))
-            auth_fail = v142_is_auth_failure(auth_msg)
+            auth_msg = v143_clean_message(str(e))
+            auth_fail = v143_is_auth_failure(auth_msg)
     msg = auth_msg if auth_fail else ('키움 실보유 캐시 표시' if items else '표시 가능한 보유 캐시가 없습니다. 키움 인증 정상화 후 새로고침하세요.')
     payload = {
         'ok': bool(items) and not auth_fail,
@@ -11667,87 +11667,87 @@ def api_v142_holdings_cached():
     return jsonify(safe_json(payload))
 
 
-@app.route('/api/v142_repair_holdings_cache')
-def api_v142_repair_holdings_cache():
-    items, src = v142_best_cached_holdings()
+@app.route('/api/v143_repair_holdings_cache')
+def api_v143_repair_holdings_cache():
+    items, src = v143_best_cached_holdings()
     ok = bool(items)
     if ok:
         write_holdings(items)
-        v142_save_last_valid(items, 'MANUAL_REPAIR_' + str(src))
-    auth_fail, auth_msg, kd = v142_auth_status_from_state()
+        v143_save_last_valid(items, 'MANUAL_REPAIR_' + str(src))
+    auth_fail, auth_msg, kd = v143_auth_status_from_state()
     return jsonify(safe_json({'ok': ok, 'version': V142_VERSION, 'engine': V142_ENGINE, 'holdings': items, 'count': len(items), 'source': src, 'auth_failure': auth_fail, 'message': ('보유 캐시 복구 완료' if ok else '복구 가능한 보유 캐시가 없습니다. 키움 인증 정상화가 필요합니다.') + (' / '+auth_msg if auth_fail else '')}))
 
 
-@app.route('/api/v142_auth_status')
-def api_v142_auth_status():
-    auth_fail, auth_msg, kd = v142_auth_status_from_state()
-    items, src = v142_best_cached_holdings()
+@app.route('/api/v143_auth_status')
+def api_v143_auth_status():
+    auth_fail, auth_msg, kd = v143_auth_status_from_state()
+    items, src = v143_best_cached_holdings()
     return jsonify(safe_json({'ok': not auth_fail, 'version': V142_VERSION, 'auth_failure': auth_fail, 'message': auth_msg or '키움 상태 확인 대기', 'holding_count': len(items), 'source': src, 'kiwoom_debug': kd}))
 
 
-@app.route('/api/v142_manual_sell_holding', methods=['POST'])
-def api_v142_manual_sell_holding():
-    auth_fail, auth_msg, kd = v142_auth_status_from_state()
+@app.route('/api/v143_manual_sell_holding', methods=['POST'])
+def api_v143_manual_sell_holding():
+    auth_fail, auth_msg, kd = v143_auth_status_from_state()
     if auth_fail:
-        items, src = v142_best_cached_holdings()
+        items, src = v143_best_cached_holdings()
         return jsonify(safe_json({'ok': False, 'version': V142_VERSION, 'auth_failure': True, 'message': '키움 인증 실패 상태라 앱 매도 전송을 차단했습니다. MTS/HTS에서 직접 확인하세요. ' + auth_msg, 'holdings': items, 'source': src}))
-    # 인증 실패가 아니면 기존 v139 매도 로직 사용
+    # 인증 실패가 아니면 기존 v143 매도 로직 사용
     try:
-        return api_v139_manual_sell_holding()
+        return api_v143_manual_sell_holding()
     except Exception as e:
-        items, src = v142_best_cached_holdings()
+        items, src = v143_best_cached_holdings()
         return jsonify(safe_json({'ok': False, 'version': V142_VERSION, 'message': '수동 매도 처리 오류: '+str(e), 'holdings': items, 'source': src}))
 
-# 구버전 호출도 가능한 범위에서 v142 함수로 우회합니다.
+# 구버전 호출도 가능한 범위에서 v143 함수로 우회합니다.
 try:
-    for ep in ['api_v132_holdings_cached','api_v131_holdings_cached','api_v128_holdings_cached','api_v135_holdings_cached','api_v137_holdings_cached']:
+    for ep in ['api_v143_holdings_cached','api_v131_holdings_cached','api_v128_holdings_cached','api_v143_holdings_cached','api_v143_holdings_cached']:
         if ep in app.view_functions:
-            app.view_functions[ep] = api_v142_holdings_cached
+            app.view_functions[ep] = api_v143_holdings_cached
 except Exception as e:
-    print('v142 endpoint override warning:', e, flush=True)
+    print('v143 endpoint override warning:', e, flush=True)
 
 
 # =====================================================================
-# v142 holdings manual display + auth diagnose final overlay
+# v143 holdings manual display + auth diagnose final overlay
 # =====================================================================
-V142_VERSION = "v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX"
+V142_VERSION = "v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX"
 
 try:
-    @app.route('/api/v142_best_pick_cached')
-    def api_v142_best_pick_cached():
+    @app.route('/api/v143_best_pick_cached')
+    def api_v143_best_pick_cached():
         try:
-            return api_v135_best_pick_cached()
+            return api_v143_best_pick_cached()
         except Exception as e:
             return jsonify({'ok': False, 'version': V142_VERSION, 'message': str(e), 'pick': None})
 except Exception:
     pass
 
 try:
-    @app.route('/api/v142_watch_candidates_cached')
-    def api_v142_watch_candidates_cached():
+    @app.route('/api/v143_watch_candidates_cached')
+    def api_v143_watch_candidates_cached():
         try:
-            return api_v135_watch_candidates_cached()
+            return api_v143_watch_candidates_cached()
         except Exception as e:
             return jsonify({'ok': False, 'version': V142_VERSION, 'message': str(e), 'items': []})
 except Exception:
     pass
 
 try:
-    @app.route('/api/v142_holdings_cached', methods=['GET','POST'])
-    def api_v142_holdings_cached():
-        # v142: 키움 인증 실패/timeout/빈응답이면 마지막 정상 캐시를 우선 반환.
+    @app.route('/api/v143_holdings_cached', methods=['GET','POST'])
+    def api_v143_holdings_cached():
+        # v143: 키움 인증 실패/timeout/빈응답이면 마지막 정상 캐시를 우선 반환.
         try:
-            data = v140_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
+            data = v143_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
         except Exception:
             try:
-                data = v138_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
+                data = v143_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
             except Exception as e:
                 data = {'ok': False, 'holdings': [], 'message': str(e)}
         try:
             hs = data.get('holdings') or []
             if not hs:
                 # 마지막 정상 캐시 재탐색
-                keep, src = v132_get_best_cached_holdings()
+                keep, src = v143_get_best_cached_holdings()
                 if keep:
                     data['holdings'] = keep
                     data['source'] = 'V142_RECOVER_' + str(src)
@@ -11758,60 +11758,60 @@ try:
         data['version'] = V142_VERSION
         return jsonify(data)
 except Exception as _e:
-    print('v142 holdings route overlay failed:', _e, flush=True)
+    print('v143 holdings route overlay failed:', _e, flush=True)
 
 try:
-    @app.route('/api/v142_repair_holdings_cache')
-    def api_v142_repair_holdings_cache():
+    @app.route('/api/v143_repair_holdings_cache')
+    def api_v143_repair_holdings_cache():
         try:
-            keep, src = v132_get_best_cached_holdings()
-            return jsonify({'ok': bool(keep), 'version': V142_VERSION, 'count': len(keep or []), 'source': src, 'holdings': keep or [], 'message': 'v142 보유 캐시 복구 확인'})
+            keep, src = v143_get_best_cached_holdings()
+            return jsonify({'ok': bool(keep), 'version': V142_VERSION, 'count': len(keep or []), 'source': src, 'holdings': keep or [], 'message': 'v143 보유 캐시 복구 확인'})
         except Exception as e:
             return jsonify({'ok': False, 'version': V142_VERSION, 'count': 0, 'holdings': [], 'message': str(e)})
 except Exception:
     pass
 
-# 기존 HTML URL이 남아있어도 v142 안정 로직으로 처리
+# 기존 HTML URL이 남아있어도 v143 안정 로직으로 처리
 try:
-    for rule_endpoint in ['api_v138_holdings_cached','api_v140_holdings_cached']:
+    for rule_endpoint in ['api_v143_holdings_cached','api_v143_holdings_cached']:
         if rule_endpoint in app.view_functions:
-            app.view_functions[rule_endpoint] = api_v142_holdings_cached
+            app.view_functions[rule_endpoint] = api_v143_holdings_cached
 except Exception as e:
-    print('v142 route alias warning:', e, flush=True)
+    print('v143 route alias warning:', e, flush=True)
 
 
 
-# v142 aliases: old HTML/JS URLs can still call latest stable holding payload.
+# v143 aliases: old HTML/JS URLs can still call latest stable holding payload.
 try:
-    V142_VERSION = "v142_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX"
+    V142_VERSION = "v143_HOLDINGS_MANUAL_DISPLAY_AUTH_DIAGNOSE_FIX"
 except Exception:
     pass
 
 try:
-    @app.route('/api/v142_holdings_cached', methods=['GET','POST'])
-    def api_v142_holdings_cached():
+    @app.route('/api/v143_holdings_cached', methods=['GET','POST'])
+    def api_v143_holdings_cached():
         try:
-            if 'api_v142_holdings_cached' in globals() and False:
+            if 'api_v143_holdings_cached' in globals() and False:
                 pass
         except Exception:
             pass
-        # Reuse v141 core logic if available, then normalize version/message.
+        # Reuse v143 core logic if available, then normalize version/message.
         try:
-            resp = api_v142_holdings_cached.__globals__.get('api_v142_holdings_cached')
+            resp = api_v143_holdings_cached.__globals__.get('api_v143_holdings_cached')
         except Exception:
             resp = None
         try:
             data = None
-            if 'v140_holdings_cached_payload' in globals():
-                data = v140_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
-            elif 'v138_holdings_cached_payload' in globals():
-                data = v138_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
+            if 'v143_holdings_cached_payload' in globals():
+                data = v143_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
+            elif 'v143_holdings_cached_payload' in globals():
+                data = v143_holdings_cached_payload(start_sync=str(request.args.get('start_sync','0')).lower() in ['1','true','yes'])
             else:
                 data = {'ok': False, 'holdings': read_holdings(), 'message': 'holding payload unavailable'}
             hs = data.get('holdings') or []
             if not hs:
                 try:
-                    keep, src = v132_get_best_cached_holdings()
+                    keep, src = v143_get_best_cached_holdings()
                     if keep:
                         data['holdings']=keep; data['source']='V142_RECOVER_'+str(src); data['message']='키움 인증/조회 지연으로 마지막 정상 보유 캐시를 표시합니다.'
                 except Exception:
@@ -11824,20 +11824,20 @@ try:
                 data['message']='키움 인증 실패로 실제 보유종목을 조회하지 못했습니다. Render IP/App Key/Secret/영웅문S# 지정단말기 인증을 확인하세요.'
             return jsonify(safe_json(data))
         except Exception as e:
-            return jsonify(safe_json({'ok': False, 'version': V142_VERSION, 'auth_failure': True, 'holdings': [], 'message': 'v142 보유 조회 오류: '+str(e)}))
+            return jsonify(safe_json({'ok': False, 'version': V142_VERSION, 'auth_failure': True, 'holdings': [], 'message': 'v143 보유 조회 오류: '+str(e)}))
 except Exception as e:
-    print('v142 holdings route failed:', e, flush=True)
+    print('v143 holdings route failed:', e, flush=True)
 
 try:
-    for ep in ['api_v141_holdings_cached','api_v140_holdings_cached','api_v138_holdings_cached']:
-        if ep in app.view_functions and 'api_v142_holdings_cached' in globals():
-            app.view_functions[ep] = api_v142_holdings_cached
+    for ep in ['api_v143_holdings_cached','api_v143_holdings_cached','api_v143_holdings_cached']:
+        if ep in app.view_functions and 'api_v143_holdings_cached' in globals():
+            app.view_functions[ep] = api_v143_holdings_cached
 except Exception as e:
-    print('v142 route alias warning:', e, flush=True)
+    print('v143 route alias warning:', e, flush=True)
 
 try:
-    @app.route('/api/v142_auth_diagnose')
-    def api_v142_auth_diagnose():
+    @app.route('/api/v143_auth_diagnose')
+    def api_v143_auth_diagnose():
         try:
             state = read_trade_state()
             kd = state.get('last_kiwoom_debug', {}) if isinstance(state, dict) else {}
@@ -11847,3 +11847,75 @@ try:
             return jsonify({'ok': False, 'version': V142_VERSION, 'message': str(e)})
 except Exception:
     pass
+
+
+# v143_AUTH_HOLDINGS_CLEAN_STABLE FINAL PATCH
+try:
+    V143_VERSION = "v143"
+except Exception:
+    pass
+
+@app.route('/api/v143_auth_status')
+def api_v143_auth_status():
+    msg = ''
+    ok = False
+    try:
+        if not kiwoom_ready():
+            return jsonify({'ok':False,'auth_ok':False,'reason':'KIWOOM_APP_KEY/KIWOOM_SECRET_KEY 환경변수 미설정','action':'Render 환경변수 확인 필요'})
+        try:
+            token = kiwoom_get_token()
+            ok = bool(token)
+            msg = '키움 토큰 발급 성공' if ok else '키움 토큰 없음'
+        except Exception as e:
+            msg = str(e)
+        auth_fail = ('8050' in msg) or ('지정단말기' in msg) or ('인증에 실패' in msg)
+        action = '정상' if ok else ('키움 REST API 허용 IP, App Key/Secret, 영웅문S# 지정단말기/추가인증 확인 필요' if auth_fail else '키움 API 설정 확인 필요')
+        return jsonify({'ok':ok,'auth_ok':ok,'auth_failure':auth_fail,'reason':msg[:700],'action':action})
+    except Exception as e:
+        return jsonify({'ok':False,'auth_ok':False,'reason':str(e),'action':'서버 진단 필요'})
+
+@app.route('/api/v143_holdings_safe')
+def api_v143_holdings_safe():
+    auth = {'auth_ok': False, 'reason': ''}
+    try:
+        auth = api_v143_auth_status().get_json() or auth
+    except Exception:
+        pass
+    items = []
+    source = 'EMPTY'
+    try:
+        if 'v143_best_cached_holdings' in globals():
+            items = v143_best_cached_holdings() or []
+            source = 'LAST_VALID_CACHE' if items else 'EMPTY'
+        elif 'v142_best_cached_holdings' in globals():
+            items = v142_best_cached_holdings() or []
+            source = 'LAST_VALID_CACHE' if items else 'EMPTY'
+        else:
+            items = read_holdings() or []
+            source = 'LOCAL_READ' if items else 'EMPTY'
+    except Exception:
+        items = []
+    if items:
+        message = f'보유종목 {len(items)}개를 마지막 정상 캐시 기준으로 표시합니다. 키움 인증이 정상화되면 최신 잔고로 갱신됩니다.'
+    else:
+        if auth.get('auth_failure') or not auth.get('auth_ok'):
+            message = '키움 인증 실패로 실보유를 조회하지 못했습니다. 실제 키움 계좌 보유종목이 0개라는 뜻은 아닙니다.'
+        else:
+            message = '표시 가능한 보유 캐시가 없습니다. 키움 실보유 새로고침 후 다시 확인하세요.'
+    return jsonify({'ok':bool(items),'holdings':items,'count':len(items),'source':source,'auth':auth,'message':message,'version':'v143'})
+
+@app.after_request
+def v143_inject_final_ui_patch(resp):
+    try:
+        if resp.content_type and 'text/html' in resp.content_type:
+            html = resp.get_data(as_text=True)
+            if 'V143_FINAL_UI_PATCH' not in html:
+                inject = '\n<style id="V143_FINAL_UI_PATCH">\n.pick .detailMore{display:none}.pick.open .detailMore{display:block}.pick.compact .grid .box:nth-child(n+5){display:none}.pick.compact .comment{font-size:0.82em;max-height:3.5em;overflow:hidden}.pick.compact{cursor:pointer}.holdingManualBox{display:none}.holdingManualBox.show{display:block}.softInfo{background:#fff7d9;border-radius:22px;padding:14px 18px;margin:12px 0}.mutedSmall{font-size:.82em;color:#7b8192}.manualToggleBtn{margin-top:10px;background:#eef7e8;color:#37633d;border:none;border-radius:18px;padding:12px 18px;font-weight:800}\n</style>\n<script id="V143_FINAL_UI_PATCH">\n(function(){\n  function cleanText(s){return String(s||\'\').replace(/v13[2-9]|v14[0-2]/g,\'v143\').replace(/KRX_FAST_CACHE/g,\'KRX 캐시\');}\n  function q(id){return document.getElementById(id)}\n  function compactPicks(){document.querySelectorAll(\'.pick\').forEach(function(card){if(card.dataset.v143Done)return;card.dataset.v143Done=\'1\';card.classList.add(\'compact\');card.querySelectorAll(\'.comment,.muted\').forEach(function(c){c.innerHTML=cleanText(c.innerHTML)});card.addEventListener(\'click\',function(e){if(e.target&&e.target.tagName===\'BUTTON\')return;card.classList.toggle(\'compact\');card.classList.toggle(\'open\');});});}\n  var oldRenderPick=window.renderPick;if(typeof oldRenderPick===\'function\'){window.renderPick=function(p){var h=oldRenderPick(p);h=cleanText(h);h=h.replace(/<div class="comment"/,\'<div class="comment detailMore"\');return h;}}\n  var oldRenderHoldings=window.renderHoldings;window.renderHoldings=function(list){list=Array.isArray(list)?list:[];if(list.length&&typeof oldRenderHoldings===\'function\'){oldRenderHoldings(list);return;}var box=q(\'holdingsBox\');if(!box)return;box.innerHTML=\'<div class="softInfo"><b>표시 가능한 보유 캐시가 없습니다.</b><br>키움 인증 오류가 있으면 실제 보유종목이 있어도 앱에는 안 보일 수 있습니다.<br><span class="mutedSmall">상태확인에서 8050/지정단말기 오류가 나오면 Render IP·App Key/Secret·영웅문S# 지정단말기를 먼저 해결해야 합니다.</span></div><button class="manualToggleBtn" onclick="v143ToggleManualBox()">🧪 화면 확인용 보유카드 수동 표시 열기</button><div id="v143ManualBox" class="holdingManualBox"><div class="softInfo"><b>화면 확인용입니다.</b><br>실제 키움 잔고는 바꾸지 않으며 인증 실패 시 매도 전송은 잠깁니다.<input id="v143_m_name" placeholder="종목명 예: 제주반도체"><input id="v143_m_code" placeholder="종목코드 예: 080220"><input id="v143_m_buy" placeholder="매수가 예: 109450"><input id="v143_m_qty" placeholder="수량 예: 2"><input id="v143_m_cur" placeholder="현재가 선택 입력"><button class="green" onclick="v143ManualAddHolding()">화면에 보유종목 표시</button><button class="light" onclick="v143ManualClearHolding()">수동표시 지우기</button></div></div>\';if(q(\'holdingStatus\'))q(\'holdingStatus\').innerHTML=\'표시 보유 0종목 · 원인: 키움 인증/캐시 없음\';}\n  window.v143ToggleManualBox=function(){var b=q(\'v143ManualBox\');if(b)b.classList.toggle(\'show\')}\n  window.v143ManualAddHolding=function(){var name=(q(\'v143_m_name\')||{}).value||\'\';var code=(q(\'v143_m_code\')||{}).value||\'\';var buy=Number(((q(\'v143_m_buy\')||{}).value||\'\').replace(/,/g,\'\'));var qty=Number(((q(\'v143_m_qty\')||{}).value||\'\').replace(/,/g,\'\'));var cur=Number(((q(\'v143_m_cur\')||{}).value||\'\').replace(/,/g,\'\'))||buy;if(!name||!code||!buy||!qty){alert(\'종목명/코드/매수가/수량을 입력하세요.\');return;}var item={id:\'manual_\'+code+\'_\'+Date.now(),name:name,code:String(code).padStart(6,\'0\'),buyPrice:buy,qty:qty,buyAmount:buy*qty,lastPrice:cur,target:Math.round(buy*1.035),stop:Math.round(buy*0.975),priceSource:\'MANUAL_DISPLAY\',manualDisplay:true,priceError:\'화면 확인용 수동 표시입니다. 실제 매도는 키움 인증 정상화 후 가능합니다.\'};localStorage.setItem(\'sungil_manual_display_holdings_v143\',JSON.stringify({time:new Date().toISOString(),items:[item]}));if(oldRenderHoldings)oldRenderHoldings([item]);}\n  window.v143ManualClearHolding=function(){localStorage.removeItem(\'sungil_manual_display_holdings_v143\');window.renderHoldings([]);}\n  window.v143RefreshHoldingsSafe=async function(){try{const d=await fetchJson(\'/api/v143_holdings_safe?ts=\'+Date.now(),{timeoutMs:5000});if(q(\'holdingStatus\'))q(\'holdingStatus\').innerHTML=cleanText(d.message||\'보유 상태 확인 완료\')+\'<br><span class="mutedSmall">출처 \'+(d.source||\'-\')+\' · 인증 \'+(d.auth&&d.auth.auth_ok?\'정상\':\'확인 필요\')+\'</span>\';if((d.holdings||[]).length){window.renderHoldings(d.holdings||[]);}else{var raw=localStorage.getItem(\'sungil_manual_display_holdings_v143\');if(raw){try{var obj=JSON.parse(raw);if(obj.items&&obj.items.length)return oldRenderHoldings(obj.items);}catch(e){}}window.renderHoldings([]);}}catch(e){if(q(\'holdingStatus\'))q(\'holdingStatus\').innerHTML=\'키움 보유 확인 지연. 화면은 유지합니다.\';}}\n  window.refreshHoldings=function(){return window.v143RefreshHoldingsSafe();}\n  setInterval(compactPicks,1200);setTimeout(compactPicks,500);\n})();\n</script>\n'
+                html = html.replace('</body>', inject+'</body>')
+                for vv in ['v132','v133','v134','v135','v136','v137','v138','v139','v140','v141','v142']:
+                    html=html.replace(vv,'v143')
+                resp.set_data(html)
+                resp.headers['Content-Length'] = str(len(resp.get_data()))
+    except Exception:
+        pass
+    return resp
