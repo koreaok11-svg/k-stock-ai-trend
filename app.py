@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v139_CANDIDATE_COLLAPSE_MANUAL_SELL_FIX
-파일명: app_kiwoom_real_auto_scalping_v139_candidate_collapse_manual_sell_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v140_AUTH_REPAIR_STABLE_UI
+파일명: app_kiwoom_real_auto_scalping_v140_auth_repair_stable_ui.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -3246,7 +3246,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v139</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v140</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3823,6 +3823,127 @@ async function startWatch(){const d=await fetchJson("/api/server_watch/start",{m
     autoTradeStatus = async function(){ if(userReading()) return; return preserveScrollRun(()=>oldAutoTradeStatus()); };
   }
 })();
+
+
+
+// ============================================================
+// v140_AUTH_REPAIR_STABLE_UI FRONT PATCH
+// - 키움 인증 실패 시 보유목록 0개로 오해하지 않도록 UI 보호
+// - v132/v138 혼재 메시지를 화면에서 정리
+// - 보유카드는 캐시를 우선 표시하고, 인증 실패 시 매도 버튼을 잠급니다.
+// ============================================================
+window.V140_HOLDINGS_DIAG = {auth_failure:false,message:'',source:'INIT',count:0};
+function v140CleanMsg(s){
+  s=String(s||'');
+  s=s.replace(/v132|v133|v134|v135|v136|v137|v138|v139/g,'v140');
+  if(s.includes('8050')||s.includes('지정단말')||s.includes('인증에 실패')){
+    return '🔴 키움 인증 실패(8050/지정단말기). Render IP, App Key/Secret, 영웅문S# 지정단말기/추가인증을 확인해야 합니다. 기존 보유 캐시는 지우지 않습니다.';
+  }
+  return s;
+}
+async function v140FetchHoldings(force=false){
+  const d=await fetchJson('/api/v140_holdings_cached?force='+(force?1:0)+'&ts='+Date.now(),{timeoutMs:6500});
+  window.V140_HOLDINGS_DIAG=d||{};
+  return d;
+}
+function v140HoldingStatusHtml(d){
+  d=d||window.V140_HOLDINGS_DIAG||{};
+  const msg=v140CleanMsg(d.message||'키움 실보유 캐시 표시');
+  const src=d.source||d.holdings_source||'-';
+  const count=(d.holdings||[]).length || d.count || 0;
+  if(d.auth_failure){
+    return `🔴 <b>키움 API 인증 확인 필요</b><br>${msg}<br><span class="muted">표시 보유 ${count}종목 · 출처 ${src}<br>실제 키움 계좌 보유가 없어진 것이 아니라, 앱이 현재 키움 API 인증 때문에 조회하지 못하는 상태입니다.</span>`;
+  }
+  if(d.protected){
+    return `🟡 <b>보유 캐시 보호모드</b><br>${msg}<br><span class="muted">표시 보유 ${count}종목 · 출처 ${src}</span>`;
+  }
+  return `${msg}<br><span class="muted">표시 보유 ${count}종목 · 출처 ${src} · 최근확인 ${d.updatedAt||d.cacheUpdatedAt||'-'}</span>`;
+}
+async function loadHoldings(autoRestore=true){
+  loadStorageStatus();
+  try{
+    const d=await v140FetchHoldings(false);
+    renderHoldings(d.holdings||[]);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+  }catch(e){
+    if($('holdingStatus')) $('holdingStatus').innerHTML='🟡 보유 캐시 확인 지연: '+e.message;
+  }
+}
+async function refreshHoldings(){
+  try{
+    const d=await v140FetchHoldings(true);
+    renderHoldings(d.holdings||[]);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+  }catch(e){
+    if($('holdingStatus')) $('holdingStatus').innerHTML='🟡 키움 실보유 새로고침 지연: '+e.message+'<br><span class="muted">화면 보유값은 마지막 정상 캐시를 유지합니다.</span>';
+  }
+}
+async function repairHoldingsCache(){
+  try{
+    const d=await fetchJson('/api/v140_repair_holdings_cache?ts='+Date.now(),{timeoutMs:4500});
+    window.V140_HOLDINGS_DIAG=d||{};
+    renderHoldings(d.holdings||[]);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+  }catch(e){
+    if($('holdingStatus')) $('holdingStatus').innerHTML='보유캐시 복구 실패: '+e.message;
+  }
+}
+function renderHoldings(list){
+  list=Array.isArray(list)?list:[];
+  const diag=window.V140_HOLDINGS_DIAG||{};
+  if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml({...diag,holdings:list,count:list.length});
+  if(!list.length){
+    const reason=diag.auth_failure?`<b>키움 API 인증 실패로 보유종목을 조회하지 못했습니다.</b><br>${v140CleanMsg(diag.message)}<br><span class="muted">MTS/HTS의 실제 보유종목은 그대로일 수 있습니다. 키움 인증 정상화 후 새로고침하세요.</span>`:`현재 앱에 표시할 보유 캐시가 없습니다. 자동매수 체결 또는 키움 인증 정상 조회 후 자동 등록됩니다.`;
+    $('holdingList').innerHTML=`<div class="empty">${reason}</div>`;
+    return;
+  }
+  $('holdingList').innerHTML=list.map(h=>{
+    const cur=Number(h.lastPrice||0), buy=Number(h.buyPrice||0), qty=Number(h.qty||0);
+    const buyAmount=Number(h.buyAmount||buy*qty||0);
+    const target=Number(h.target||0), stop=Number(h.stop||0);
+    const originalTarget=Number(h.originalTarget||h.baseTarget||h.base_target||target||0);
+    const aiDynamicTarget=Number(h.aiDynamicTarget||h.active_dynamic_target||h.dynamicTarget||h.ai_target||target||0);
+    const trailLine=Number(h.trailingTargetPrice||h.trailingProtectionPrice||h.trailing_stop_price||h.trailingStopPrice||h.trailingLine||0);
+    const highPrice=Number(h.highestPrice||h.highPrice||h.high_price||0);
+    const highRate=Number(h.highestProfitRate||h.highest_profit_pct||h.highestProfitPct||0);
+    const aiRaised=!!(h.aiTargetRaised||h.aiHoldMode||h.ai_hold_mode||h.trailingActive||(cur&&originalTarget&&cur>=originalTarget));
+    const displayTarget=aiRaised?Math.max(aiDynamicTarget,target,originalTarget,cur):target;
+    const pnl=(cur-buy)*qty;
+    const rate=buy?((cur-buy)/buy*100):0;
+    const targetGap=cur&&displayTarget?((displayTarget-cur)/cur*100):0;
+    const stopGap=cur&&stop?((cur-stop)/cur*100):0;
+    const status=cur<=stop&&stop?'손절가 이탈':aiRaised?'AI HOLD · 목표가 상향/트레일링':cur>=target&&target?'목표가 도달':cur?'감시중':'가격조회중';
+    const sellBtn=diag.auth_failure?`<button class="light" onclick="alert('키움 인증 실패 상태에서는 앱 매도 전송을 잠급니다. MTS/HTS에서 직접 확인하세요.')">매도잠김</button>`:`<button class="brown" onclick="manualSellHolding('${h.id||''}','${h.code}','${h.name}')">시장가 매도</button>`;
+    const aiTrailBox=aiRaised?`<div class="empty" style="margin-top:12px;border:2px solid #d7ead4;background:#eef8e9">⚡ <b>AI HOLD 상태</b><br>기본 목표가 <b>${fmt(originalTarget||target)}</b> 돌파 후 상승 강세로 즉시 매도하지 않고 목표가를 상향 감시합니다.<br>🔴 AI 상향 목표가: <b class="red">${fmt(displayTarget)}</b><br>🔵 트레일링 보호선: <b class="blue">${trailLine?fmt(trailLine):'계산중'}</b><br>🟢 최고가: <b>${highPrice?fmt(highPrice):'-'}</b> · 최고수익률 <b>${highRate?highRate.toFixed(2):rate.toFixed(2)}%</b><br><span class="muted">급락 시 보호선 기준으로 자동익절을 시도합니다.</span></div>`:'';
+    return `<div class="holding">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+        <div><b style="font-size:1.3em">${h.name||h.code} (${h.code})</b><br><small>상태: ${status} · 가격출처 ${h.priceSource||'-'} · 최근확인 ${h.lastCheckedAt||'-'}</small></div>
+        <div style="display:flex;flex-direction:column;gap:8px">${sellBtn}<button class="light" onclick="removeHolding('${h.id||''}','${h.code}')">삭제</button></div>
+      </div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="metric"><small>실제 매수가</small><b>${fmt(buy)}</b></div>
+        <div class="metric"><small>실시간 현재가</small><b>${cur?fmt(cur):'조회중'}</b></div>
+        <div class="metric"><small>기본 목표가</small><b class="red">${fmt(originalTarget||target)}</b><br><small>${cur&&originalTarget?`돌파 ${((cur-originalTarget)/cur*100).toFixed(2)}%`:''}</small></div>
+        <div class="metric"><small>${aiRaised?'AI 상향 목표가':'목표가'}</small><b class="red">${fmt(displayTarget)}</b><br><small>${targetGap?`남은거리 ${targetGap.toFixed(2)}%`:'상향 감시중'}</small></div>
+        <div class="metric"><small>손절가</small><b class="blue">${fmt(stop)}</b><br><small>${stopGap?`여유 ${stopGap.toFixed(2)}%`:''}</small></div>
+      </div>
+      <div class="empty" style="margin-top:12px">수량 <b>${qty.toLocaleString()}주</b> · 매수금액 <b>${buyAmount.toLocaleString()}원</b><br>평가손익 <b class="${pnl>=0?'red':'blue'}">${pnl.toLocaleString()}원</b> · 수익률 <b class="${rate>=0?'red':'blue'}">${rate.toFixed(2)}%</b></div>
+      ${aiTrailBox}
+      <div class="empty" style="margin-top:10px">AI 코멘트: ${aiCommentText(cur,buy,displayTarget,stop,qty,h)}</div>
+      ${h.priceError?`<div class="empty">⚠️ ${h.priceError}</div>`:''}
+    </div>`;
+  }).join('');
+}
+async function manualSellHolding(id,code,name){
+  if((window.V140_HOLDINGS_DIAG||{}).auth_failure){alert('키움 인증 실패 상태입니다. 앱 매도 전송은 잠그고 MTS/HTS 직접 확인을 권장합니다.');return;}
+  if(!confirm(`${name||code} 보유수량을 키움 시장가 매도로 전송할까요?\n실제 주문 전송 기능입니다. HTS/MTS에서도 반드시 확인하세요.`))return;
+  try{
+    const d=await fetchJson('/api/v140_manual_sell_holding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,code}),timeoutMs:10000});
+    alert(d.ok ? (d.message||'매도 요청 완료') : (d.message||'매도 요청 실패'));
+    if(d.holdings) renderHoldings(d.holdings);
+    if($('holdingStatus')) $('holdingStatus').innerHTML=v140HoldingStatusHtml(d);
+  }catch(e){alert('매도 요청 실패: '+e.message);}
+}
 
 </script></body></html>'''
 
@@ -9698,7 +9819,7 @@ def api_v131_status_light():
 
 
 # ============================================================
-# v139_CANDIDATE_COLLAPSE_MANUAL_SELL_FIX
+# v140_AUTH_REPAIR_STABLE_UI
 # - 장마감/키움 빈응답/timeout 때 실제 보유 캐시를 절대 0개로 덮어쓰지 않음
 # - 마지막 정상 보유종목 별도 백업 유지
 # - 화면용 캐시는 즉시 표시, 키움 직접 조회는 백그라운드에서만 갱신
@@ -9974,7 +10095,7 @@ def api_v132_holdings_guard_status():
 
 
 # ============================================================
-# v139_CANDIDATE_COLLAPSE_MANUAL_SELL_FIX
+# v140_AUTH_REPAIR_STABLE_UI
 # 1) watch thread/파일 I/O lock 단일화
 # 2) 오래된 후보 캐시 경고 플래그 추가
 # 3) MASTER/USER 비밀번호 기본값 제거: 환경변수 없으면 로그인 차단
@@ -11022,7 +11143,7 @@ except Exception:
 
 
 # ============================================================
-# v139_CANDIDATE_COLLAPSE_MANUAL_SELL_FIX
+# v140_AUTH_REPAIR_STABLE_UI
 # 목적:
 # - v136에서 버전 배지는 바뀌었지만 보유 카드 데이터에 AI 상향목표/트레일링 필드가
 #   실제 연결되지 않는 문제를 강제 보정합니다.
@@ -11227,7 +11348,7 @@ def api_v138_diagnose():
     }))
 
 
-# v139_CANDIDATE_COLLAPSE_MANUAL_SELL_FIX
+# v140_AUTH_REPAIR_STABLE_UI
 @app.route('/api/v139_manual_sell_holding', methods=['POST'])
 def api_v139_manual_sell_holding():
     """보유카드에서 수동 시장가 매도. 실제 키움 잔고/장중/인증 확인 후 주문합니다."""
@@ -11256,3 +11377,247 @@ def api_v139_manual_sell_holding():
         return jsonify(safe_json({'ok': ok, 'version': 'v139', 'message': msg, 'result': res, 'priceSource': src, 'holdings': holdings}))
     except Exception as e:
         return jsonify(safe_json({'ok': False, 'version': 'v139', 'message': '수동 매도 처리 오류: '+str(e), 'holdings': read_holdings()}))
+
+
+# ============================================================
+# v140_AUTH_REPAIR_STABLE_UI SERVER PATCH
+# 목적:
+# - 키움 인증 실패(8050/지정단말기) 때 보유목록을 0개로 덮어쓰지 않고 마지막 정상 캐시를 표시
+# - v132/v138/v139 혼재 메시지를 v140으로 정리
+# - 인증 실패 상태에서는 앱 시장가 매도 전송을 잠금
+# ============================================================
+V140_VERSION = "v140"
+V140_ENGINE = "AUTH_REPAIR_STABLE_UI"
+V140_LAST_VALID_FILE = str(BASE_DIR / "sungil_last_valid_holdings_v140.json")
+
+try:
+    V119_VERSION = V140_VERSION
+    V119_ENGINE = V140_ENGINE
+    V132_VERSION = V140_VERSION
+    V132_ENGINE = V140_ENGINE
+    V133_VERSION = V140_VERSION
+    V133_ENGINE = V140_ENGINE
+    V134_VERSION = V140_VERSION
+    V135_VERSION = V140_VERSION
+    V137_VERSION = V140_VERSION
+except Exception:
+    pass
+
+
+def v140_clean_message(msg):
+    s = str(msg or "")
+    for v in ["v132", "v133", "v134", "v135", "v136", "v137", "v138", "v139"]:
+        s = s.replace(v, "v140")
+    if any(x in s for x in ["8050", "지정단말", "인증에 실패", "토큰 발급 실패"]):
+        return "키움 인증 실패입니다. 8050/지정단말기 오류 가능성이 높습니다. Render 서버 IP, App Key/Secret, 영웅문S# 지정단말기/추가인증을 확인하세요. 기존 보유 캐시는 삭제하지 않습니다."
+    return s
+
+
+def v140_is_auth_failure(msg):
+    s = str(msg or "")
+    return any(x in s for x in ["8050", "지정단말", "인증에 실패", "토큰 발급 실패", "token_fail", "token_exception"])
+
+
+def v140_valid_holding(h):
+    try:
+        if not isinstance(h, dict):
+            return False
+        code = str(h.get("code") or h.get("stk_cd") or h.get("종목코드") or h.get("pdno") or "").replace("A", "").strip().zfill(6)
+        qty = safe_float(h.get("qty") or h.get("quantity") or h.get("보유수량") or h.get("rmnd_qty") or 0, 0)
+        name = str(h.get("name") or h.get("stk_nm") or h.get("종목명") or "").strip()
+        return code.isdigit() and code != "000000" and (qty > 0 or bool(name))
+    except Exception:
+        return False
+
+
+def v140_normalize_holdings(items):
+    out = []
+    if not isinstance(items, list):
+        return out
+    for h in items:
+        if not isinstance(h, dict) or not v140_valid_holding(h):
+            continue
+        hh = dict(h)
+        code = str(hh.get("code") or hh.get("stk_cd") or hh.get("종목코드") or hh.get("pdno") or "").replace("A", "").strip().zfill(6)
+        hh["code"] = code
+        hh["name"] = str(hh.get("name") or hh.get("stk_nm") or hh.get("종목명") or code)
+        hh["qty"] = safe_float(hh.get("qty") or hh.get("quantity") or hh.get("보유수량") or hh.get("rmnd_qty") or 0, 0)
+        buy = safe_float(hh.get("buyPrice") or hh.get("avgPrice") or hh.get("평균단가") or hh.get("pchs_avg_pric") or 0, 0)
+        if buy > 0:
+            hh["buyPrice"] = buy
+        if safe_float(hh.get("buyAmount", 0), 0) <= 0 and buy > 0 and hh["qty"] > 0:
+            hh["buyAmount"] = int(buy * hh["qty"])
+        try:
+            hh = v137_enrich_trailing_holding(hh) if "v137_enrich_trailing_holding" in globals() else hh
+        except Exception:
+            pass
+        out.append(hh)
+    # 중복코드 제거
+    dedup = {}
+    for h in out:
+        dedup[str(h.get("code", "")).zfill(6)] = h
+    return list(dedup.values())
+
+
+def v140_scan_holdings_files():
+    candidates = []
+    seen = set()
+    dirs = [BASE_DIR, Path('/tmp'), Path('/var/data')]
+    for d in dirs:
+        try:
+            if not d.exists() or str(d) in seen: continue
+            seen.add(str(d))
+            for p in d.glob('*.json'):
+                nm = p.name.lower()
+                if not any(k in nm for k in ['holding', 'holdings', 'sungil']):
+                    continue
+                try:
+                    data = json.loads(p.read_text(encoding='utf-8'))
+                    if isinstance(data, list):
+                        items = data
+                    elif isinstance(data, dict):
+                        items = data.get('holdings') or data.get('items') or data.get('data') or []
+                    else:
+                        items = []
+                    items = v140_normalize_holdings(items)
+                    if items:
+                        candidates.append((p.stat().st_mtime, str(p), items))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    if not candidates:
+        return [], 'EMPTY_SCAN'
+    candidates.sort(key=lambda x: (len(x[2]), x[0]), reverse=True)
+    return candidates[0][2], candidates[0][1]
+
+
+def v140_save_last_valid(items, source='V140_LAST_VALID'):
+    items = v140_normalize_holdings(items)
+    if not items:
+        return False
+    payload = {'version': V140_VERSION, 'engine': V140_ENGINE, 'source': source, 'updatedAt': now_kst().strftime('%Y-%m-%d %H:%M:%S'), 'ts': time.time(), 'count': len(items), 'holdings': items}
+    try:
+        tmp = V140_LAST_VALID_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, V140_LAST_VALID_FILE)
+        return True
+    except Exception:
+        return False
+
+
+def v140_best_cached_holdings():
+    # 1) 현재 파일에 정상 보유가 있으면 우선 사용
+    try:
+        cur = v140_normalize_holdings(read_holdings())
+        if cur:
+            v140_save_last_valid(cur, 'LOCAL_CURRENT')
+            return cur, 'LOCAL_CURRENT'
+    except Exception:
+        pass
+    # 2) v140 마지막 정상
+    try:
+        if os.path.exists(V140_LAST_VALID_FILE):
+            data = json.load(open(V140_LAST_VALID_FILE, 'r', encoding='utf-8'))
+            items = v140_normalize_holdings(data.get('holdings', []))
+            if items:
+                return items, data.get('source', 'V140_LAST_VALID')
+    except Exception:
+        pass
+    # 3) 기존 버전 스캔
+    items, src = v140_scan_holdings_files()
+    if items:
+        v140_save_last_valid(items, 'SCAN_' + str(src))
+        return items, 'SCAN_' + str(src)
+    return [], 'EMPTY'
+
+
+def v140_auth_status_from_state():
+    st = read_trade_state()
+    kd = st.get('last_kiwoom_debug', {}) if isinstance(st, dict) else {}
+    msg = (kd.get('message') or st.get('last_order_message') or '') if isinstance(kd, dict) else st.get('last_order_message', '')
+    stage = kd.get('stage', '') if isinstance(kd, dict) else ''
+    auth = v140_is_auth_failure(msg) or v140_is_auth_failure(stage)
+    return auth, v140_clean_message(msg), kd
+
+
+@app.route('/api/v140_holdings_cached', methods=['GET','POST'])
+def api_v140_holdings_cached():
+    force = str(request.args.get('force', '0')).lower() in ['1','true','yes']
+    items, src = v140_best_cached_holdings()
+    auth_fail, auth_msg, kd = v140_auth_status_from_state()
+    res = None
+    # 인증 실패가 이미 감지된 상태에서는 계속 키움 API를 두드리지 않습니다.
+    if force and not auth_fail:
+        try:
+            res = v109_force_sync_holdings(full_sync=True)
+            new_items = v140_normalize_holdings(res.get('holdings', []) if isinstance(res, dict) else [])
+            if new_items and (res.get('ok') or len(new_items) > 0):
+                items, src = new_items, res.get('source', 'KIWOOM_SYNC')
+                write_holdings(items)
+                v140_save_last_valid(items, src)
+            else:
+                msg = res.get('message', '') if isinstance(res, dict) else ''
+                if v140_is_auth_failure(msg):
+                    auth_fail = True
+                    auth_msg = v140_clean_message(msg)
+        except Exception as e:
+            auth_msg = v140_clean_message(str(e))
+            auth_fail = v140_is_auth_failure(auth_msg)
+    msg = auth_msg if auth_fail else ('키움 실보유 캐시 표시' if items else '표시 가능한 보유 캐시가 없습니다. 키움 인증 정상화 후 새로고침하세요.')
+    payload = {
+        'ok': bool(items) and not auth_fail,
+        'version': V140_VERSION,
+        'engine': V140_ENGINE,
+        'holdings': safe_json(items),
+        'count': len(items),
+        'source': src,
+        'auth_failure': bool(auth_fail),
+        'protected': bool(auth_fail or (res is not None and not getattr(res, 'get', lambda k,d=None: d)('ok', False))),
+        'message': msg,
+        'kiwoom_debug': kd,
+        'kiwoom_result': res,
+        'updatedAt': now_kst().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    return jsonify(safe_json(payload))
+
+
+@app.route('/api/v140_repair_holdings_cache')
+def api_v140_repair_holdings_cache():
+    items, src = v140_best_cached_holdings()
+    ok = bool(items)
+    if ok:
+        write_holdings(items)
+        v140_save_last_valid(items, 'MANUAL_REPAIR_' + str(src))
+    auth_fail, auth_msg, kd = v140_auth_status_from_state()
+    return jsonify(safe_json({'ok': ok, 'version': V140_VERSION, 'engine': V140_ENGINE, 'holdings': items, 'count': len(items), 'source': src, 'auth_failure': auth_fail, 'message': ('보유 캐시 복구 완료' if ok else '복구 가능한 보유 캐시가 없습니다. 키움 인증 정상화가 필요합니다.') + (' / '+auth_msg if auth_fail else '')}))
+
+
+@app.route('/api/v140_auth_status')
+def api_v140_auth_status():
+    auth_fail, auth_msg, kd = v140_auth_status_from_state()
+    items, src = v140_best_cached_holdings()
+    return jsonify(safe_json({'ok': not auth_fail, 'version': V140_VERSION, 'auth_failure': auth_fail, 'message': auth_msg or '키움 상태 확인 대기', 'holding_count': len(items), 'source': src, 'kiwoom_debug': kd}))
+
+
+@app.route('/api/v140_manual_sell_holding', methods=['POST'])
+def api_v140_manual_sell_holding():
+    auth_fail, auth_msg, kd = v140_auth_status_from_state()
+    if auth_fail:
+        items, src = v140_best_cached_holdings()
+        return jsonify(safe_json({'ok': False, 'version': V140_VERSION, 'auth_failure': True, 'message': '키움 인증 실패 상태라 앱 매도 전송을 차단했습니다. MTS/HTS에서 직접 확인하세요. ' + auth_msg, 'holdings': items, 'source': src}))
+    # 인증 실패가 아니면 기존 v139 매도 로직 사용
+    try:
+        return api_v139_manual_sell_holding()
+    except Exception as e:
+        items, src = v140_best_cached_holdings()
+        return jsonify(safe_json({'ok': False, 'version': V140_VERSION, 'message': '수동 매도 처리 오류: '+str(e), 'holdings': items, 'source': src}))
+
+# 구버전 호출도 가능한 범위에서 v140 함수로 우회합니다.
+try:
+    for ep in ['api_v132_holdings_cached','api_v131_holdings_cached','api_v128_holdings_cached','api_v135_holdings_cached','api_v137_holdings_cached']:
+        if ep in app.view_functions:
+            app.view_functions[ep] = api_v140_holdings_cached
+except Exception as e:
+    print('v140 endpoint override warning:', e, flush=True)
