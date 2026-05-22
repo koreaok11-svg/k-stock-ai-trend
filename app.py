@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v135_HOLDINGS_TELEGRAM_CANDIDATE_DIAGNOSE_FIX
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
 파일명: app_kiwoom_real_auto_scalping_v133_thread_cache_security_fix.py
 
 실전 운영용 경량화 버전입니다.
@@ -3246,7 +3246,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v135</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v136</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3409,11 +3409,19 @@ function renderHoldings(list){
     const cur=Number(h.lastPrice||0), buy=Number(h.buyPrice||0), qty=Number(h.qty||0);
     const buyAmount=Number(h.buyAmount||buy*qty||0);
     const target=Number(h.target||0), stop=Number(h.stop||0);
+    const originalTarget=Number(h.originalTarget||h.baseTarget||target||0);
+    const aiDynamicTarget=Number(h.aiDynamicTarget||target||0);
+    const trailLine=Number(h.trailingTargetPrice||h.trailingProtectionPrice||0);
+    const highPrice=Number(h.highestPrice||h.highPrice||0);
+    const highRate=Number(h.highestProfitRate||0);
+    const aiRaised=!!(h.aiTargetRaised||h.aiHoldMode||(cur&&originalTarget&&cur>=originalTarget&&aiDynamicTarget>originalTarget));
+    const displayTarget=aiRaised?Math.max(aiDynamicTarget,target,originalTarget):target;
     const pnl=(cur-buy)*qty;
     const rate=buy?((cur-buy)/buy*100):0;
-    const targetGap=cur&&target?((target-cur)/cur*100):0;
+    const targetGap=cur&&displayTarget?((displayTarget-cur)/cur*100):0;
     const stopGap=cur&&stop?((cur-stop)/cur*100):0;
-    const status=cur>=target&&target?"목표가 도달":cur<=stop&&stop?"손절가 이탈":cur?"감시중":"가격조회중";
+    const status=cur<=stop&&stop?"손절가 이탈":aiRaised?"AI HOLD · 목표가 상향/트레일링":cur>=target&&target?"목표가 도달":cur?"감시중":"가격조회중";
+    const aiTrailBox=aiRaised?`<div class="empty" style="margin-top:12px;border:2px solid #d7ead4;background:#eef8e9">⚡ <b>AI HOLD 상태</b><br>기본 목표가 <b>${fmt(originalTarget)}</b> 돌파 후 상승 강세로 즉시 매도하지 않고 목표가를 상향 감시합니다.<br>🔴 AI 상향 목표가: <b class="red">${fmt(displayTarget)}</b><br>🔵 트레일링 보호선: <b class="blue">${trailLine?fmt(trailLine):"계산중"}</b><br>🟢 최고가: <b>${highPrice?fmt(highPrice):"-"}</b> · 최고수익률 <b>${highRate?highRate.toFixed(2):rate.toFixed(2)}%</b><br><span class="muted">급락 시 보호선 기준으로 자동익절을 시도합니다.</span></div>`:"";
     return `<div class="holding">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
         <div>
@@ -3426,7 +3434,7 @@ function renderHoldings(list){
       <div class="grid2" style="margin-top:14px">
         <div class="metric"><small>실제 매수가</small><b>${fmt(buy)}</b></div>
         <div class="metric"><small>실시간 현재가</small><b>${cur?fmt(cur):"조회중"}</b></div>
-        <div class="metric"><small>목표가</small><b class="red">${fmt(target)}</b><br><small>${targetGap?`남은거리 ${targetGap.toFixed(2)}%`:""}</small></div>
+        <div class="metric"><small>${aiRaised?"AI 상향 목표가":"목표가"}</small><b class="red">${fmt(displayTarget)}</b><br><small>${targetGap?`남은거리 ${targetGap.toFixed(2)}%`:"상향 감시중"}</small></div>
         <div class="metric"><small>손절가</small><b class="blue">${fmt(stop)}</b><br><small>${stopGap?`여유 ${stopGap.toFixed(2)}%`:""}</small></div>
       </div>
 
@@ -3435,19 +3443,21 @@ function renderHoldings(list){
         평가손익 <b class="${pnl>=0?'red':'blue'}">${pnl.toLocaleString()}원</b> · 수익률 <b class="${rate>=0?'red':'blue'}">${rate.toFixed(2)}%</b>
       </div>
 
+      ${aiTrailBox}
       <div class="empty" style="margin-top:10px">
-        AI 코멘트: ${aiCommentText(cur,buy,target,stop,qty)}
+        AI 코멘트: ${aiCommentText(cur,buy,displayTarget,stop,qty,h)}
       </div>
 
       ${h.priceError?`<div class="empty">⚠️ ${h.priceError}</div>`:""}
     </div>`;
   }).join("");
 }
-function aiCommentText(cur,buy,target,stop,qty){
+function aiCommentText(cur,buy,target,stop,qty,h={}){
   if(!cur||!buy) return "현재가 확인 대기 중입니다.";
   const rate=(cur-buy)/buy*100;
   if(stop && cur<=stop) return `손절 기준 도달 구간입니다. 현재 ${rate.toFixed(2)}%로 리스크 차단이 우선입니다.`;
-  if(target && cur>=target) return `목표 수익 구간입니다. 현재 ${rate.toFixed(2)}%입니다. 자동 익절 조건을 확인합니다.`;
+  if(h.aiTargetRaised||h.aiHoldMode) return `AI가 상승 강세로 판단해 기본 목표가에서 즉시 매도하지 않고 목표가를 상향했습니다. 현재 ${rate.toFixed(2)}%이며 트레일링 보호선 이탈 시 자동익절을 시도합니다.`;
+  if(target && cur>=target) return `목표 수익 구간입니다. 현재 ${rate.toFixed(2)}%입니다. AI 상향 또는 자동 익절 조건을 확인합니다.`;
   if(rate>=1.2) return `수익 보호 구간입니다. 현재 ${rate.toFixed(2)}%로 2~5% 누적 스캘핑 전략에 적합합니다.`;
   if(rate>0) return `초기 수익 구간입니다. 거래량 유지 시 목표가까지 감시합니다.`;
   return `대기/약손실 구간입니다. 손절가 접근 여부를 감시합니다.`;
@@ -6154,6 +6164,52 @@ def v109_cached_trade_price(code, fallback=True, ttl=None, force=False):
     return get_trade_live_price(code, fallback=fallback)
 
 
+def v136_update_ai_target_display_fields(h, cur=0):
+    """
+    v136 UI/감시 보강:
+    - 기존 목표가(originalTarget)와 AI 상향 목표가(aiDynamicTarget)를 분리 표시
+    - 트레일링 보호선/최고가/최고수익률/AI HOLD 사유를 저장
+    - 현재가가 표시 목표가보다 높아도 UI가 오래된 목표가로 보이지 않도록 보정
+    """
+    try:
+        h = dict(h or {})
+        cur = safe_float(cur or h.get("lastPrice", 0), 0)
+        buy = safe_float(h.get("buyPrice", 0), 0)
+        target = safe_float(h.get("target", 0), 0)
+        original = safe_float(h.get("originalTarget", 0), 0)
+        if target and not original:
+            original = target
+            h["originalTarget"] = round(original)
+        highest = max(safe_float(h.get("highestPrice", 0), 0), safe_float(h.get("highPrice", 0), 0), cur, buy)
+        if highest:
+            h["highestPrice"] = round(highest)
+            h["highPrice"] = round(highest)
+        high_rate = ((highest - buy) / buy * 100) if buy > 0 and highest > 0 else 0
+        cur_rate = ((cur - buy) / buy * 100) if buy > 0 and cur > 0 else 0
+        h["highestProfitRate"] = round(high_rate, 2)
+        h["profitRate"] = round(cur_rate, 2)
+        trailing_stop_rate = normalize_rate_input(h.get("trailingStopRate", V109_TRAILING_STOP_RATE if 'V109_TRAILING_STOP_RATE' in globals() else 0.011), 0.011)
+        profit_guard_rate = normalize_rate_input(h.get("profitGuardRate", V109_PROFIT_GUARD_RATE if 'V109_PROFIT_GUARD_RATE' in globals() else 0.012), 0.012)
+        h["trailingStopRate"] = trailing_stop_rate
+        h["profitGuardRate"] = profit_guard_rate
+        trailing_line = highest * (1 - trailing_stop_rate) if highest and high_rate >= profit_guard_rate*100 else 0
+        h["trailingTargetPrice"] = round(trailing_line) if trailing_line else safe_int(h.get("trailingTargetPrice", 0), 0)
+        h["trailingActive"] = bool(high_rate >= profit_guard_rate*100)
+        # 현재가가 기존 목표가를 이미 넘었고 AI 상향 기능이 켜진 경우 UI용 동적 목표가를 보정
+        if target and cur >= target and globals().get("AI_TARGET_RAISE_ENABLED", True):
+            extra = AI_TARGET_RAISE_EXTRA_RATE if 'AI_TARGET_RAISE_EXTRA_RATE' in globals() else 0.008
+            dyn = max(target, cur * (1 + extra), highest * (1 + extra))
+            if dyn > target:
+                h["aiTargetRaised"] = True
+                h["aiDynamicTarget"] = round(dyn)
+                h["aiHoldMode"] = True
+                h["aiTargetRaiseReason"] = h.get("aiTargetRaiseReason") or f"기본 목표가 돌파 후 강세 유지로 AI가 목표가를 {round(dyn):,}원 부근까지 상향 감시합니다."
+        else:
+            h["aiDynamicTarget"] = round(max(target, safe_float(h.get("aiDynamicTarget", 0), 0))) if target else 0
+        return h
+    except Exception:
+        return h
+
 def check_one_holding(h):
     """
     v109 최종 보강:
@@ -6188,6 +6244,8 @@ def check_one_holding(h):
     buy_price = safe_float(h.get("buyPrice", 0), 0)
     target = safe_float(h.get("target", 0), 0)
     stop = safe_float(h.get("stop", 0), 0)
+    if target and not safe_float(h.get("originalTarget", 0), 0):
+        h["originalTarget"] = round(target)
 
     # 최고가 관리
     current_high = max(
@@ -6221,6 +6279,7 @@ def check_one_holding(h):
     h["trailingActive"] = bool(high_rate >= profit_guard_rate)
     h["trailingStopRate"] = trailing_stop_rate
     h["profitGuardRate"] = profit_guard_rate
+    h = v136_update_ai_target_display_fields(h, cur)
 
     # 매도 우선순위: 손절 -> 트레일링 -> 목표가
     if stop and cur <= stop:
@@ -6239,7 +6298,10 @@ def check_one_holding(h):
         if AI_TARGET_RAISE_ENABLED and strong_profit and near_high:
             new_target = round(max(target, cur * (1.0 + AI_TARGET_RAISE_EXTRA_RATE), current_high * (1.0 + AI_TARGET_RAISE_EXTRA_RATE)))
             h["aiTargetRaised"] = True
-            h["aiTargetRaiseReason"] = f"목표가 도달 후 강세 유지: 기존 목표 {target:,.0f}원 → AI 상향 {new_target:,.0f}원"
+            h["originalTarget"] = round(safe_float(h.get("originalTarget", target), target))
+            h["aiDynamicTarget"] = new_target
+            h["aiHoldMode"] = True
+            h["aiTargetRaiseReason"] = f"기본 목표가 {target:,.0f}원 돌파 후 강세 유지: AI 상향 목표 {new_target:,.0f}원, 트레일링 보호선 {safe_int(h.get('trailingTargetPrice',0),0):,.0f}원"
             h["target"] = new_target
             h["targetRaiseAt"] = now_kst().strftime("%Y-%m-%d %H:%M:%S")
         else:
@@ -9583,7 +9645,7 @@ def api_v131_status_light():
 
 
 # ============================================================
-# v135_HOLDINGS_TELEGRAM_CANDIDATE_DIAGNOSE_FIX
+# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
 # - 장마감/키움 빈응답/timeout 때 실제 보유 캐시를 절대 0개로 덮어쓰지 않음
 # - 마지막 정상 보유종목 별도 백업 유지
 # - 화면용 캐시는 즉시 표시, 키움 직접 조회는 백그라운드에서만 갱신
@@ -9851,7 +9913,7 @@ def api_v132_holdings_guard_status():
 
 
 # ============================================================
-# v135_HOLDINGS_TELEGRAM_CANDIDATE_DIAGNOSE_FIX
+# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
 # 1) watch thread/파일 I/O lock 단일화
 # 2) 오래된 후보 캐시 경고 플래그 추가
 # 3) MASTER/USER 비밀번호 기본값 제거: 환경변수 없으면 로그인 차단
@@ -10063,6 +10125,34 @@ try:
 except Exception:
     pass
 
+
+
+# ============================================================
+# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX PATCH
+# - 기존 목표가/AI 상향 목표가/트레일링 보호선 표시 보정
+# - 기존 보유 캐시도 즉시 UI용 필드 보강
+# ============================================================
+try:
+    @app.route("/api/v136_refresh_trailing_fields")
+    def api_v136_refresh_trailing_fields():
+        items = read_holdings()
+        out = []
+        for h in items or []:
+            cur = safe_float(h.get("lastPrice", 0), 0)
+            if cur <= 0:
+                code = v109_code(h.get("code", "")) if 'v109_code' in globals() else str(h.get("code", "")).zfill(6)
+                try:
+                    cur, _src = get_trade_live_price(code, fallback=True)
+                    if cur:
+                        h["lastPrice"] = cur
+                        h["priceSource"] = _src
+                except Exception:
+                    pass
+            out.append(v136_update_ai_target_display_fields(h, cur))
+        write_holdings(out)
+        return jsonify({"ok": True, "version": "v136", "holdings": out, "message": "AI 상향목표/트레일링 표시 필드 갱신 완료"})
+except Exception:
+    pass
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '10000'))
     app.run(host='0.0.0.0', port=port)
@@ -10070,7 +10160,7 @@ if __name__ == '__main__':
 
 
 # ============================================================
-# v135_HOLDINGS_TELEGRAM_CANDIDATE_DIAGNOSE_FIX
+# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
 # - 키움 거래중지/장마감/빈응답/timeout 때 보유탭이 0개로 보이지 않도록
 #   거래중지 직전 마지막 정상 보유 데이터를 영구 백업하고 화면에 유지합니다.
 # - 기존 버전별 cache/holdings 파일도 자동 스캔하여 마지막 정상값을 복구합니다.
@@ -10403,14 +10493,14 @@ except Exception:
 
 
 # =====================================================================
-# v135_HOLDINGS_TELEGRAM_CANDIDATE_DIAGNOSE_FIX
+# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
 # 목적:
 # 1) 키움 실보유가 장마감/조회지연/거래중지 때문에 비어 보이지 않도록 마지막 정상값 유지
 # 2) 화면에 왜 조회가 안 되는지 사유 표시
 # 3) 급등/단타 후보는 1개만 표시되지 않도록 KRX_FAST 다중 후보 fallback
 # 4) 텔레그램은 연결확인/테스트 결과를 실제 발송 결과로 보여줌
 # =====================================================================
-V135_VERSION = "v135 HOLDINGS_TELEGRAM_CANDIDATE_DIAGNOSE_FIX"
+V135_VERSION = "v136 AI_DYNAMIC_TARGET_TRAILING_UI_FIX"
 V135_ENGINE = "HOLDINGS_KEEP_REASON_TELEGRAM_DIRECT_KRX_MULTI"
 V135_LAST_VALID_FILE = str(BASE_DIR / "sungil_v135_last_valid_holdings.json")
 V135_SYNC_STATE = {"running": False, "last_result": None, "last_sync_ts": 0, "last_reason": ""}
