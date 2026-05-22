@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v148_CLEAN_INTEGRATED_STABLE
-파일명: app_kiwoom_real_auto_scalping_v148_clean_integrated_stable.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v149_COMPACT_UI_ERROR_CLEAN_FIX
+파일명: app_kiwoom_real_auto_scalping_v149_compact_ui_error_clean_fix.py
 
 클린 통합본 핵심:
 - 중복 route / 중복 inject / 누적 패치 제거
@@ -47,9 +47,9 @@ except Exception:
 
 from flask import Flask, jsonify, request, render_template_string, Response
 
-APP_VERSION = "v148"
+APP_VERSION = "v149"
 APP_NAME = "성일의 AI 주식바람"
-APP_BADGE = "KIWOOM REAL AUTO v148"
+APP_BADGE = "KIWOOM REAL AUTO v149"
 
 app = Flask(__name__)
 KST = timezone(timedelta(hours=9))
@@ -317,7 +317,7 @@ def scrub_sensitive(data):
 def kiwoom_help_message(msg):
     s = str(msg or "")
     if "8050" in s or "지정단말기" in s or "인증에 실패" in s:
-        return "키움 인증 실패(8050/지정단말기)입니다. Render IP 등록, App Key/Secret 재발급/입력, 영웅문S# 지정단말기/추가인증 상태를 확인하세요."
+        return "키움 인증 실패(8050)입니다. Render IP·App Key/Secret·영웅문S# 지정단말기/추가인증을 확인하세요."
     if "8001" in s or "8002" in s or "App Key" in s or "Secret" in s:
         return "키움 App Key/Secret 오류입니다. Render 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 값을 확인하세요."
     return s[:700]
@@ -950,7 +950,7 @@ def page_html():
         if last_items:
             holding_html = f"<div class='notice'>현재 키움 직접조회는 실패했지만 마지막 정상 보유캐시({upd})를 표시합니다.</div>" + "".join(render_holding_card(h, i) for i, h in enumerate(last_items))
         else:
-            holding_html = f"<div class='notice'>표시 가능한 보유 캐시가 없습니다. 키움 인증 정상화 후 새로고침하거나, 아래 수동 표시로 UI만 확인할 수 있습니다.</div>{manual_holding_form()}"
+            holding_html = "<div class='notice'>보유 캐시가 없습니다. 키움 인증 정상화 후 새로고침하면 실제 보유가 표시됩니다.<br><small>UI 확인이 필요하면 아래 '수동 보유카드 테스트'를 펼치세요.</small></div><details><summary>🧪 수동 보유카드 테스트</summary>" + manual_holding_form() + "</details>"
     cand_html = "".join(render_candidate_card(p, i) for i, p in enumerate(candidates)) or "<div class='notice'>후보가 없습니다. 필터를 낮추거나 잠시 후 새로고침하세요.</div>"
     logs_html = "".join(f"<div class='log'>{'✅' if x.get('ok') else '⚠️'} {x.get('time')} · {x.get('message')}</div>" for x in alert_logs[:5]) or "<div class='log'>최근 알림 없음</div>"
     auto_on = "ON" if state.get("auto_trade_enabled") else "OFF"
@@ -960,34 +960,39 @@ def page_html():
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{APP_NAME} {APP_VERSION}</title>
 <style>
-body{{margin:0;background:linear-gradient(120deg,#f6faef,#eef8ee);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#20372c}}
-.wrap{{max-width:880px;margin:0 auto;padding:34px 18px 80px}}
-.badge{{display:inline-block;background:#e4f3df;border-radius:999px;padding:10px 18px;font-weight:900;color:#426d49}}
-h1{{font-size:44px;line-height:1.1;margin:22px 0 10px}} h2{{font-size:34px;margin:18px 0}} h3{{font-size:30px;margin:8px 0 10px}}
-.card{{background:#fff;border-radius:28px;padding:28px;margin:26px 0;box-shadow:0 2px 14px rgba(60,80,50,.08)}}
-.nav{{position:sticky;top:0;background:rgba(245,250,238,.92);backdrop-filter:blur(8px);z-index:5;padding:12px 0;display:flex;gap:12px;overflow:auto}}
-.nav button,.btn{{border:0;border-radius:24px;padding:18px 24px;font-size:20px;font-weight:900;background:#eaf5e5;color:#2e5935}}
-.btn.primary{{background:#5c9868;color:#fff}} .btn.dark{{background:#2d465b;color:#fff}} .btn.brown{{background:#a66a28;color:#fff}} .danger{{background:#ffe3e3;color:#b42323;border:0;border-radius:18px;padding:14px 18px;font-weight:900}}
-input{{width:100%;box-sizing:border-box;border:1px solid #d8e5d0;border-radius:18px;padding:16px;font-size:20px;margin:8px 0 14px}}
-.notice{{background:#fff6d9;border-radius:22px;padding:20px;margin:14px 0;color:#6a5a36;font-size:20px;line-height:1.5}}
-.status-pill{{display:inline-block;border-radius:999px;padding:10px 16px;background:#f8d7da;color:#b42323;font-weight:900}}
-.grid2{{display:grid;grid-template-columns:1fr 1fr;gap:14px}} .grid2>div{{background:#fbf6e8;border-radius:20px;padding:18px;text-align:center}}
-.grid2 small{{display:block;color:#6d7489;font-size:15px}} .grid2 b{{display:block;font-size:22px;margin-top:8px}} .grid2 em{{display:block;color:#6d7489;font-style:normal;font-size:14px}}
-.compact b{{font-size:21px}} .red{{color:#d3272d}} .blue{{color:#2d6cdf}}
-.candidate-card,.holding-card{{background:#fffdf7;border:1px solid #e4e8d6;border-radius:26px;padding:22px;margin:18px 0}}
-.tags span{{display:inline-block;background:#e9f4df;border-radius:999px;padding:8px 12px;margin:4px;font-weight:800;color:#6b5d3d}}
-.hint,.comment{{background:#eaf8dd;border-radius:18px;padding:16px;margin-top:14px;font-weight:800;color:#416f45;line-height:1.5}}
-.detail{{background:#fff7df;border-radius:18px;padding:14px;margin-top:12px;line-height:1.5}} .hidden{{display:none}}
-.holding-head{{display:flex;justify-content:space-between;gap:10px;align-items:center}} .sub{{color:#687086;font-size:16px}}
-.log{{background:#fffdf7;border:1px solid #eadfbf;border-radius:14px;padding:12px;margin:8px 0}}
-details summary{{cursor:pointer;font-size:22px;font-weight:900;background:#eaf5e5;border-radius:18px;padding:18px}}
-@media(max-width:600px){{h1{{font-size:38px}}h2{{font-size:32px}}.grid2{{grid-template-columns:1fr 1fr}}.wrap{{padding:24px 14px}}.card{{padding:22px}}}}
+body{{margin:0;background:linear-gradient(135deg,#f8fbf2,#eef8ee);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#20372c;font-size:15px}}
+.wrap{{max-width:560px;margin:0 auto;padding:16px 10px 60px}}
+.badge{{display:inline-block;background:#e4f3df;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:900;color:#426d49}}
+h1{{font-size:28px;line-height:1.12;margin:12px 0 6px}} h2{{font-size:23px;margin:10px 0 12px}} h3{{font-size:20px;margin:6px 0 8px}}
+.card{{background:#fff;border-radius:22px;padding:16px;margin:14px 0;box-shadow:0 2px 10px rgba(60,80,50,.07)}}
+.nav{{position:sticky;top:0;background:rgba(245,250,238,.96);backdrop-filter:blur(8px);z-index:5;padding:8px 0;display:flex;gap:7px;overflow-x:auto;scrollbar-width:none}}
+.nav::-webkit-scrollbar{{display:none}}
+.nav button,.btn{{border:0;border-radius:16px;padding:11px 13px;font-size:14px;font-weight:900;background:#eaf5e5;color:#2e5935;white-space:nowrap;line-height:1.15}}
+.nav button{{min-width:72px;flex:0 0 auto}}
+.btn.primary{{background:#5c9868;color:#fff}} .btn.dark{{background:#2d465b;color:#fff}} .btn.brown{{background:#a66a28;color:#fff}} .danger{{background:#ffe3e3;color:#b42323;border:0;border-radius:14px;padding:10px 12px;font-weight:900;font-size:13px}}
+input{{width:100%;box-sizing:border-box;border:1px solid #d8e5d0;border-radius:14px;padding:12px;font-size:16px;margin:6px 0 10px}}
+.notice{{background:#fff6d9;border-radius:18px;padding:14px;margin:10px 0;color:#6a5a36;font-size:15px;line-height:1.45}}
+.status-pill{{display:inline-block;border-radius:999px;padding:7px 10px;background:#f8d7da;color:#b42323;font-size:14px;font-weight:900}}
+.grid2{{display:grid;grid-template-columns:1fr 1fr;gap:8px}} .grid2>div{{background:#fbf6e8;border-radius:16px;padding:12px;text-align:center;min-width:0}}
+.grid2 small{{display:block;color:#6d7489;font-size:12px}} .grid2 b{{display:block;font-size:16px;margin-top:5px;word-break:keep-all}} .grid2 em{{display:block;color:#6d7489;font-style:normal;font-size:11px;overflow:hidden;text-overflow:ellipsis}}
+.compact b{{font-size:16px}} .red{{color:#d3272d}} .blue{{color:#2d6cdf}}
+.candidate-card,.holding-card{{background:#fffdf7;border:1px solid #e4e8d6;border-radius:20px;padding:14px;margin:12px 0;overflow:hidden}}
+.tags span{{display:inline-block;background:#e9f4df;border-radius:999px;padding:6px 9px;margin:3px;font-size:12px;font-weight:800;color:#6b5d3d}}
+.hint,.comment{{background:#eaf8dd;border-radius:15px;padding:12px;margin-top:10px;font-size:14px;font-weight:800;color:#416f45;line-height:1.45}}
+.detail{{background:#fff7df;border-radius:15px;padding:12px;margin-top:10px;font-size:14px;line-height:1.45;max-height:320px;overflow:auto}} .hidden{{display:none}}
+.holding-head{{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}} .sub{{color:#687086;font-size:12px;line-height:1.35}}
+.log{{background:#fffdf7;border:1px solid #eadfbf;border-radius:12px;padding:10px;margin:6px 0;font-size:14px}}
+details summary{{cursor:pointer;font-size:16px;font-weight:900;background:#eaf5e5;border-radius:15px;padding:13px}}
+.header-desc{{font-size:15px!important;color:#697287;line-height:1.45}}
+.btn-row{{display:flex;flex-wrap:wrap;gap:8px}}
+.btn-row .btn{{margin:0}}
+@media(max-width:600px){{.wrap{{padding:14px 10px 54px}}h1{{font-size:27px}}h2{{font-size:22px}}.card{{padding:15px;margin:12px 0}}.grid2{{grid-template-columns:1fr 1fr}}}}
 </style></head><body><div class="wrap">
 <div class="badge">🌿 {APP_BADGE}</div>
 <h1>{APP_NAME}</h1>
-<p style="font-size:22px;color:#697287">키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 알림</p>
+<p class="header-desc">키움 REST API 연동 · AI 자동매수 · 목표/손절/트레일링 · 텔레그램 알림</p>
 <div class="nav">
-<button onclick="location.hash='setting'">⚙️ 설정</button><button onclick="location.hash='candidate'">⚡ 단타AI</button><button onclick="location.hash='holdings'">💼 보유</button><button onclick="location.hash='auto'">🤖 자동</button><button onclick="location.hash='alert'">📨 알림</button>
+<button onclick="location.hash='setting'">⚙️ 설정</button><button onclick="location.hash='candidate'">⚡ 단타</button><button onclick="location.hash='holdings'">💼 보유</button><button onclick="location.hash='auto'">🤖 자동</button><button onclick="location.hash='alert'">📨 알림</button>
 </div>
 
 <section id="setting" class="card">
@@ -998,9 +1003,7 @@ details summary{{cursor:pointer;font-size:22px;font-weight:900;background:#eaf5e
 <label>최대 당일 등락률(%)</label><input id="maxChange" value="12">
 <label>최소 거래대금(원)</label><input id="minAmount" value="3000000000">
 </details>
-<button class="btn primary" onclick="refreshCandidates()">필터 적용/새로고침</button>
-<button class="btn dark" onclick="nextCandidate()">다음 단타 후보 보기</button>
-<button class="btn brown" onclick="testTelegram()">텔레그램 테스트 알림</button>
+<div class="btn-row"><button class="btn primary" onclick="refreshCandidates()">필터 적용</button><button class="btn dark" onclick="nextCandidate()">다음 후보</button><button class="btn brown" onclick="testTelegram()">알림 테스트</button></div>
 </section>
 
 <section id="candidate" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="candidateBox">{cand_html}</div></section>
@@ -1008,9 +1011,7 @@ details summary{{cursor:pointer;font-size:22px;font-weight:900;background:#eaf5e
 <section id="holdings" class="card">
 <h2>💼 키움 실보유 자동 동기화</h2>
 <p style="font-size:21px;color:#697287">키움 실제 잔고 기준으로 표시합니다. 인증 실패 시 마지막 정상 캐시를 유지합니다.</p>
-<button class="btn primary" onclick="syncHoldings()">키움 실보유 새로고침</button>
-<button class="btn dark" onclick="diagnose()">API 직접 확인</button>
-<button class="btn" onclick="clearScreen()">화면만 초기화</button>
+<div class="btn-row"><button class="btn primary" onclick="syncHoldings()">실보유 새로고침</button><button class="btn dark" onclick="diagnose()">API 확인</button><button class="btn" onclick="clearScreen()">화면초기화</button></div>
 <div id="holdingStatus" class="notice">표시 보유 {len(holdings)}종목 · 최근확인 {fmt_time()}</div>
 <div id="holdingBox">{holding_html}</div>
 </section>
@@ -1018,10 +1019,7 @@ details summary{{cursor:pointer;font-size:22px;font-weight:900;background:#eaf5e
 <section id="auto" class="card">
 <h2>🤖 키움 실전 자동매매</h2>
 <div class="notice">상태: <b>{auto_on}</b> · <span class="status-pill">{status_color} {auth['label']}</span><br>키움 주문가능금액은 실제 주문 직전에 다시 확인합니다.<br>{auth['message']}</div>
-<button class="btn primary" onclick="setAuto(1)">실전 자동매매 ON</button>
-<button class="btn" onclick="setAuto(0)">자동매매 OFF</button>
-<button class="btn brown" onclick="buyBest()">AI 최종 1종목 즉시매수</button>
-<button class="btn dark" onclick="panic()">긴급정지</button>
+<div class="btn-row"><button class="btn primary" onclick="setAuto(1)">자동매매 ON</button><button class="btn" onclick="setAuto(0)">OFF</button><button class="btn brown" onclick="buyBest()">AI 즉시매수</button><button class="btn dark" onclick="panic()">긴급정지</button></div>
 <div id="autoStatus" class="notice">최근: {state.get('last_status')} · {state.get('last_status_time')}<br>{state.get('last_order_message')}</div>
 <details><summary>🔎 상세 진행내용 보기 / 숨기기</summary>
 <div class="notice">
@@ -1035,9 +1033,7 @@ details summary{{cursor:pointer;font-size:22px;font-weight:900;background:#eaf5e
 <section id="alert" class="card">
 <h2>📨 실전 알림센터</h2>
 <div class="notice"><b>이 기능은 무엇인가요?</b><br>매수·매도·손절·목표가 도달·키움 API 오류 발생 시 텔레그램으로 바로 알려주는 실전 모니터링 알림 기능입니다.</div>
-<button class="btn primary" onclick="checkTelegram()">연결확인</button>
-<button class="btn brown" onclick="testTelegram()">테스트알림</button>
-<button class="btn dark" onclick="ensureWatch()">실전감시 ON</button>
+<div class="btn-row"><button class="btn primary" onclick="checkTelegram()">연결확인</button><button class="btn brown" onclick="testTelegram()">테스트알림</button><button class="btn dark" onclick="ensureWatch()">감시 ON</button></div>
 <div id="telegramStatus" class="notice">{logs_html}</div>
 </section>
 </div>
@@ -1064,8 +1060,7 @@ async function ensureWatch(){{let d=await fetchJson('/api/watch/start');q('teleg
 def manual_holding_form():
     return """
     <div class="notice" style="border:2px dashed #cfe2c8">
-    <b>🧪 보유카드/매도버튼 화면 확인용 수동 표시</b><br>
-    실제 키움 잔고를 바꾸지 않습니다. 키움 인증 실패 시 매도 전송은 잠깁니다.
+    <b>🧪 화면 확인용 수동 표시</b><br>실제 키움 잔고는 변경되지 않습니다.
     <input id="mhName" placeholder="종목명 예: 제주반도체">
     <input id="mhCode" placeholder="종목코드 예: 080220">
     <input id="mhQty" placeholder="수량 예: 2">
