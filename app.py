@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
-파일명: app_kiwoom_real_auto_scalping_v133_thread_cache_security_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v137_HOLDING_TRAILING_UI_FORCE_WIRE
+파일명: app_kiwoom_real_auto_scalping_v137_holding_trailing_ui_force_wire.py
 
 실전 운영용 경량화 버전입니다.
 
@@ -3246,7 +3246,7 @@ input[placeholder*="손절가 자동"] { display:none !important; }
   setTimeout(killSplash,5000);
 })();
 </script>
-<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v136</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
+<main class="app"><section class="hero"><div class="badge">🌿 KIWOOM REAL AUTO v137</div><h1>성일의 AI 주식바람</h1><p>키움 REST API 연동 · AI 최종 1종목 자동매수 · 목표/손절 자동매도 · 텔레그램 주문 알림</p></section><div class="tabs"><div class="tab active" onclick="go('filter')">⚙️ 설정</div><div class="tab" onclick="go('best')">⚡ 단타AI</div><div class="tab" onclick="go('watch')">👀 후보</div><div class="tab" onclick="go('holdings')">💼 보유</div><div class="tab" onclick="go('autotrade')">🤖 자동</div><div class="tab" onclick="go('telegram')">✉️ 알림</div></div><section id="filter" class="card"><h2>⚙️ 단타AI 필터 설정</h2><details class="guideDetails" id="filterDetail"><summary>🔎 필터 조건 보기 / 접기</summary><div class="guideBody"><p class="muted">후보 조회 속도를 높이기 위해 이 화면은 <b>KRX 캐시 기준 빠른 조회</b>로 먼저 보여줍니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p><label>종목 가격 구간</label><select id="priceRanges" multiple size="4"><option value="1000-5000">1천~5천원</option><option value="5000-20000" selected>5천~2만원</option><option value="20000-50000" selected>2만~5만원</option><option value="50000-200000" selected>5만~20만원</option></select><div class="fieldHint">너무 저가주는 급등락이 크고, 너무 고가주는 보유수량이 적어질 수 있어 원하는 가격대를 선택합니다.</div><div class="grid"><div><label>내 투자금</label><input id="cash" value="500000"><div class="fieldHint">후보 수량 계산용 참고 금액입니다. 실제 매수금은 키움 주문가능금액으로 최종 계산됩니다.</div></div><div class="quick-money">
 <button type="button" onclick="setMoneyFast(1000)">1천원</button>
 <button type="button" onclick="setMoneyFast(10000)">1만원</button>
 <button type="button" onclick="setMoneyFast(100000)">10만원</button>
@@ -3346,7 +3346,7 @@ function clearMoneyFast(){
   const el=$(activeMoneyInputId||"atTotal");
   if(el){el.value="";el.dispatchEvent(new Event("input"));}
 }
-function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function v133StaleWarning(d){try{if(d&&d.is_stale_data){return `<div class='empty' style='border:2px solid #f59e0b;background:#fff3cd'>🔴 후보 데이터가 오래되었습니다. 최근 갱신 ${d.cache_age_sec||0}초 전 · 실제 매수 전에는 키움 현재가를 다시 확인합니다.</div>`} if(d&&d.cache_age_sec>60){return `<div class='empty'>🟡 후보 캐시 ${d.cache_age_sec}초 전 기준입니다.</div>`}}catch(e){}return ''}function renderPick(p){if(!p)return"<div class='empty'>현재 강한 단타 후보가 부족합니다. 조건 자동완화 캐시를 갱신 중이며, 실제 매수 전에는 키움 현재가로 재검증합니다.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v135_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>🟡 후보 캐시 준비중입니다. 화면은 유지됩니다. 5초 후 상태 확인을 눌러주세요.</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v135_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>현재 감시 후보가 부족합니다. 장중 변동성 또는 조건 자동완화 결과를 기다립니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>🟡 급등 후보 캐시 준비중입니다. 서버가 계산을 마치면 자동 표시됩니다.</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v135_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`🟡 키움 조회는 백그라운드 진행중입니다. 현재 화면은 마지막 정상 보유값을 유지합니다.`;}}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
+function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}function getParams(){return new URLSearchParams({priceRanges:[...$("priceRanges").selectedOptions].map(o=>o.value).join(","),cash:num($("cash").value),minQty:num($("minQty").value),maxChange:num($("maxChange").value),minAmount:num($("minAmount").value),minScore:num($("minScore").value),fast:1})}async function fetchJson(url,opts={}){const c=new AbortController(),timeoutMs=Number(opts.timeoutMs||120000),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...opts,cache:"no-store",headers:{Accept:"application/json",...(opts.headers||{})},signal:c.signal});const txt=await r.text();if(!r.ok){throw new Error(`서버 오류 ${r.status}: ${txt.slice(0,160)}`)}try{return JSON.parse(txt)}catch(e){throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.")}}catch(e){if(e.name==="AbortError") throw new Error("서버 응답 대기 시간이 길어졌습니다. 화면 반영은 유지하고, 5초 후 상태 확인을 눌러 저장 여부를 확인하세요.");throw e}finally{clearTimeout(t)}}function v133StaleWarning(d){try{if(d&&d.is_stale_data){return `<div class='empty' style='border:2px solid #f59e0b;background:#fff3cd'>🔴 후보 데이터가 오래되었습니다. 최근 갱신 ${d.cache_age_sec||0}초 전 · 실제 매수 전에는 키움 현재가를 다시 확인합니다.</div>`} if(d&&d.cache_age_sec>60){return `<div class='empty'>🟡 후보 캐시 ${d.cache_age_sec}초 전 기준입니다.</div>`}}catch(e){}return ''}function renderPick(p){if(!p)return"<div class='empty'>현재 강한 단타 후보가 부족합니다. 조건 자동완화 캐시를 갱신 중이며, 실제 매수 전에는 키움 현재가로 재검증합니다.</div>";return`<div class="pick"><div class="meta"><span>${p.market}</span><span>${p.code}</span><span>${p.theme}</span><span>AI ${p.score}</span></div><h2>${p.name}</h2><div class="metrics"><div class="metric"><small>현재가</small><b>${fmt(p.price)}</b><br><small>${p.priceSource||"-"}</small></div><div class="metric"><small>당일 흐름</small><b>${p.dayChange}%</b></div><div class="metric"><small>거래대금</small><b>${(p.amount/100000000).toFixed(1)}억</b></div><div class="metric"><small>매수관찰</small><b>${fmt(p.buyZone)}</b></div><div class="metric"><small>목표가</small><b class="red">${fmt(p.target)}</b></div><div class="metric"><small>손절가</small><b class="blue">${fmt(p.stop)}</b></div></div><div class="comment">AI 코멘트: ${p.comment}</div></div>`}async function loadBest(){$("bestBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v135_best_pick_cached?"+getParams().toString(),{timeoutMs:4500});$("bestBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 후보 갱신중... 마지막 정상 후보를 표시합니다.</div>":"")+renderPick(d.pick)}catch(e){$("bestBox").innerHTML="<div class='empty'>🟡 후보 캐시 준비중입니다. 화면은 유지됩니다. 5초 후 상태 확인을 눌러주세요.</div>"}}async function loadWatch(){$("watchBox").innerHTML="조회중...";try{const d=await fetchJson("/api/v135_watch_candidates_cached?"+getParams().toString(),{timeoutMs:4500});$("watchBox").innerHTML=(d.refreshing?"<div class='empty'>🟡 최신 후보 갱신중... 마지막 정상 후보를 유지합니다.</div>":"")+((d.items||[]).map(renderPick).join("")||"<div class='empty'>현재 감시 후보가 부족합니다. 장중 변동성 또는 조건 자동완화 결과를 기다립니다.</div>")}catch(e){$("watchBox").innerHTML="<div class='empty'>🟡 급등 후보 캐시 준비중입니다. 서버가 계산을 마치면 자동 표시됩니다.</div>"}}async function testBetterAlert(){const d=await fetchJson("/api/best_pick/test_alert?"+getParams().toString());alert(d.ok?"텔레그램 후보 알림 발송 완료":(d.message||"발송 실패"))}async function findCode(){const name=$("hName").value.trim();if(!name||$("hCode").value.trim())return;try{const d=await fetchJson("/api/find_stock?q="+encodeURIComponent(name));if(d.ok){$("hCode").value=d.code;if(!$("hBuy").value&&d.price)$("hBuy").value=Math.round(d.price);calcHolding()}}catch(e){}}function calcHolding(){const buy=num($("hBuy").value),amount=num($("hAmount").value);if(buy&&amount&&!$("hQty").value)$("hQty").value=Math.floor(amount/buy);if(buy&&!$("hTarget").value)$("hTarget").value=Math.round(buy*1.035);if(buy&&!$("hStop").value)$("hStop").value=Math.round(buy*.975)}async function addHolding(){await findCode();calcHolding();const item={name:$("hName").value.trim(),code:$("hCode").value.trim(),buyPrice:num($("hBuy").value),buyAmount:num($("hAmount").value),qty:num($("hQty").value),target:num($("hTarget").value),stop:num($("hStop").value)};if(!item.name||!item.code||!item.buyPrice){alert("종목명, 종목코드, 매수가는 필수입니다.");return}await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"add",item})});await refreshHoldings()}async function refreshHoldings(){try{const d=await fetchJson("/api/v137_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});renderHoldings(d.holdings||[]);if($("holdingStatus")){$("holdingStatus").innerHTML=`${d.message||"키움 실보유 캐시 표시"}<br><span class="muted">최근 정상 동기화: ${d.cacheUpdatedAt||"확인중"} · 백그라운드 갱신 ${d.sync&&d.sync.running?"진행중":"대기"}</span>`;}}catch(e){$("holdingStatus").innerHTML=`🟡 키움 조회는 백그라운드 진행중입니다. 현재 화면은 마지막 정상 보유값을 유지합니다.`;}}async function clearHoldings(){if(!confirm("보유종목을 모두 삭제할까요?"))return;const d=await fetchJson("/api/v119_holdings_fast",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"clear"})});renderHoldings(d.holdings||[])}async function loadHoldings(autoRestore=true){
   // v109 FETCH FIX
   // 초기 화면에서 키움 실보유 동기화(sync=1)와 현재가 갱신(refresh=1)을 동시에 호출하면
   // 모바일/Render 환경에서 20초 이상 걸려 Fetch is aborted가 발생할 수 있습니다.
@@ -3355,7 +3355,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
 
   let d={holdings:[]};
   try{
-    d=await fetchJson("/api/v135_holdings_cached?start_sync=1",{timeoutMs:4500});
+    d=await fetchJson("/api/v137_holdings_cached?start_sync=1",{timeoutMs:4500});
   }catch(e){
     $("holdingStatus").innerHTML=`⚠️ 보유종목 조회 실패: ${e.message}`;
     return;
@@ -3373,7 +3373,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
           body:JSON.stringify({holdings:backup}),
           timeoutMs:60000
         });
-        d=await fetchJson("/api/v135_holdings_cached?start_sync=1",{timeoutMs:4500});
+        d=await fetchJson("/api/v137_holdings_cached?start_sync=1",{timeoutMs:4500});
         list=d.holdings||[];
       }catch(e){
         $("holdingStatus").innerHTML=`⚠️ 브라우저 백업 복구 실패: ${e.message}`;
@@ -3388,7 +3388,7 @@ function go(id){document.getElementById(id).scrollIntoView({behavior:"smooth"})}
   if(list.length){
     setTimeout(async()=>{
       try{
-        const rd=await fetchJson("/api/v135_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});
+        const rd=await fetchJson("/api/v137_holdings_cached?start_sync=1&ts="+Date.now(),{timeoutMs:4500});
         if(rd.holdings){
           renderHoldings(rd.holdings);
         }
@@ -3409,19 +3409,19 @@ function renderHoldings(list){
     const cur=Number(h.lastPrice||0), buy=Number(h.buyPrice||0), qty=Number(h.qty||0);
     const buyAmount=Number(h.buyAmount||buy*qty||0);
     const target=Number(h.target||0), stop=Number(h.stop||0);
-    const originalTarget=Number(h.originalTarget||h.baseTarget||target||0);
-    const aiDynamicTarget=Number(h.aiDynamicTarget||target||0);
-    const trailLine=Number(h.trailingTargetPrice||h.trailingProtectionPrice||0);
-    const highPrice=Number(h.highestPrice||h.highPrice||0);
-    const highRate=Number(h.highestProfitRate||0);
-    const aiRaised=!!(h.aiTargetRaised||h.aiHoldMode||(cur&&originalTarget&&cur>=originalTarget&&aiDynamicTarget>originalTarget));
-    const displayTarget=aiRaised?Math.max(aiDynamicTarget,target,originalTarget):target;
+    const originalTarget=Number(h.originalTarget||h.baseTarget||h.base_target||target||0);
+    const aiDynamicTarget=Number(h.aiDynamicTarget||h.active_dynamic_target||h.dynamicTarget||h.ai_target||target||0);
+    const trailLine=Number(h.trailingTargetPrice||h.trailingProtectionPrice||h.trailing_stop_price||h.trailingStopPrice||h.trailingLine||0);
+    const highPrice=Number(h.highestPrice||h.highPrice||h.high_price||0);
+    const highRate=Number(h.highestProfitRate||h.highest_profit_pct||h.highestProfitPct||0);
+    const aiRaised=!!(h.aiTargetRaised||h.aiHoldMode||h.ai_hold_mode||h.trailingActive||(cur&&originalTarget&&cur>=originalTarget));
+    const displayTarget=aiRaised?Math.max(aiDynamicTarget,target,originalTarget,cur):target;
     const pnl=(cur-buy)*qty;
     const rate=buy?((cur-buy)/buy*100):0;
     const targetGap=cur&&displayTarget?((displayTarget-cur)/cur*100):0;
     const stopGap=cur&&stop?((cur-stop)/cur*100):0;
     const status=cur<=stop&&stop?"손절가 이탈":aiRaised?"AI HOLD · 목표가 상향/트레일링":cur>=target&&target?"목표가 도달":cur?"감시중":"가격조회중";
-    const aiTrailBox=aiRaised?`<div class="empty" style="margin-top:12px;border:2px solid #d7ead4;background:#eef8e9">⚡ <b>AI HOLD 상태</b><br>기본 목표가 <b>${fmt(originalTarget)}</b> 돌파 후 상승 강세로 즉시 매도하지 않고 목표가를 상향 감시합니다.<br>🔴 AI 상향 목표가: <b class="red">${fmt(displayTarget)}</b><br>🔵 트레일링 보호선: <b class="blue">${trailLine?fmt(trailLine):"계산중"}</b><br>🟢 최고가: <b>${highPrice?fmt(highPrice):"-"}</b> · 최고수익률 <b>${highRate?highRate.toFixed(2):rate.toFixed(2)}%</b><br><span class="muted">급락 시 보호선 기준으로 자동익절을 시도합니다.</span></div>`:"";
+    const aiTrailBox=aiRaised?`<div class="empty" style="margin-top:12px;border:2px solid #d7ead4;background:#eef8e9">⚡ <b>AI HOLD 상태</b><br>기본 목표가 <b>${fmt(originalTarget||target)}</b> 돌파 후 상승 강세로 즉시 매도하지 않고 목표가를 상향 감시합니다.<br>🔴 AI 상향 목표가: <b class="red">${fmt(displayTarget)}</b><br>🔵 트레일링 보호선: <b class="blue">${trailLine?fmt(trailLine):"계산중"}</b><br>🟢 최고가: <b>${highPrice?fmt(highPrice):"-"}</b> · 최고수익률 <b>${highRate?highRate.toFixed(2):rate.toFixed(2)}%</b><br>📌 보유이유: <b>목표가 돌파 후 상승 추세 유지</b><br><span class="muted">급락 시 보호선 기준으로 자동익절을 시도합니다.</span></div>`:"";
     return `<div class="holding">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
         <div>
@@ -3434,6 +3434,7 @@ function renderHoldings(list){
       <div class="grid2" style="margin-top:14px">
         <div class="metric"><small>실제 매수가</small><b>${fmt(buy)}</b></div>
         <div class="metric"><small>실시간 현재가</small><b>${cur?fmt(cur):"조회중"}</b></div>
+        <div class="metric"><small>기본 목표가</small><b class="red">${fmt(originalTarget||target)}</b><br><small>${cur&&originalTarget?`돌파 ${((cur-originalTarget)/cur*100).toFixed(2)}%`:""}</small></div>
         <div class="metric"><small>${aiRaised?"AI 상향 목표가":"목표가"}</small><b class="red">${fmt(displayTarget)}</b><br><small>${targetGap?`남은거리 ${targetGap.toFixed(2)}%`:"상향 감시중"}</small></div>
         <div class="metric"><small>손절가</small><b class="blue">${fmt(stop)}</b><br><small>${stopGap?`여유 ${stopGap.toFixed(2)}%`:""}</small></div>
       </div>
@@ -9634,7 +9635,7 @@ def api_v131_best_pick_cached():
 def api_v131_watch_candidates_cached():
     return api_v128_watch_candidates_cached()
 
-@app.route('/api/v135_holdings_cached', methods=['GET','POST'])
+@app.route('/api/v137_holdings_cached', methods=['GET','POST'])
 def api_v131_holdings_cached():
     return api_v128_holdings_cached()
 
@@ -9645,7 +9646,7 @@ def api_v131_status_light():
 
 
 # ============================================================
-# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
+# v137_HOLDING_TRAILING_UI_FORCE_WIRE
 # - 장마감/키움 빈응답/timeout 때 실제 보유 캐시를 절대 0개로 덮어쓰지 않음
 # - 마지막 정상 보유종목 별도 백업 유지
 # - 화면용 캐시는 즉시 표시, 키움 직접 조회는 백그라운드에서만 갱신
@@ -9873,7 +9874,7 @@ def sync_kiwoom_holdings_to_local():
     return keep
 
 
-@app.route('/api/v135_holdings_cached', methods=['GET','POST'])
+@app.route('/api/v137_holdings_cached', methods=['GET','POST'])
 def api_v132_holdings_cached():
     # 기존 v128 화면 캐시 로직을 쓰되, 전역 보유 동기화 함수는 v132 보호버전으로 교체되어 있습니다.
     return api_v128_holdings_cached()
@@ -9913,7 +9914,7 @@ def api_v132_holdings_guard_status():
 
 
 # ============================================================
-# v136_AI_DYNAMIC_TARGET_TRAILING_UI_FIX
+# v137_HOLDING_TRAILING_UI_FORCE_WIRE
 # 1) watch thread/파일 I/O lock 단일화
 # 2) 오래된 후보 캐시 경고 플래그 추가
 # 3) MASTER/USER 비밀번호 기본값 제거: 환경변수 없으면 로그인 차단
@@ -10153,10 +10154,6 @@ try:
         return jsonify({"ok": True, "version": "v136", "holdings": out, "message": "AI 상향목표/트레일링 표시 필드 갱신 완료"})
 except Exception:
     pass
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', '10000'))
-    app.run(host='0.0.0.0', port=port)
-
 
 
 # ============================================================
@@ -10874,7 +10871,7 @@ def v135_candidates_payload(watch=False):
 
 
 # ---- v135 API routes ----
-@app.route('/api/v135_holdings_cached', methods=['GET','POST'])
+@app.route('/api/v137_holdings_cached', methods=['GET','POST'])
 def api_v135_holdings_cached():
     start_sync = str(request.args.get('start_sync','0')).lower() in ['1','true','yes']
     force = str(request.args.get('force','0')).lower() in ['1','true','yes']
@@ -10962,3 +10959,178 @@ try:
     print('='*70, flush=True)
 except Exception:
     pass
+
+
+# ============================================================
+# v137_HOLDING_TRAILING_UI_FORCE_WIRE
+# 목적:
+# - v136에서 버전 배지는 바뀌었지만 보유 카드 데이터에 AI 상향목표/트레일링 필드가
+#   실제 연결되지 않는 문제를 강제 보정합니다.
+# - v135 캐시/키움 실보유 응답을 반환하기 직전에 모든 보유종목에 표시용 필드를 주입합니다.
+# ============================================================
+V137_VERSION = "v137 HOLDING_TRAILING_UI_FORCE_WIRE"
+V137_ENGINE = "FORCE_DYNAMIC_TARGET_FIELDS_TO_HOLDING_CARD"
+
+try:
+    V135_VERSION = V137_VERSION
+    V134_VERSION = V137_VERSION
+    V133_VERSION = V137_VERSION
+    V132_VERSION = V137_VERSION
+    V119_VERSION = V137_VERSION
+except Exception:
+    pass
+
+def v137_enrich_trailing_ui_item(h):
+    """보유종목 카드 표시용 AI 목표가/트레일링 필드를 강제로 계산합니다."""
+    try:
+        h = dict(h or {})
+        cur = safe_float(h.get("lastPrice", h.get("price", 0)), 0)
+        buy = safe_float(h.get("buyPrice", h.get("avgPrice", 0)), 0)
+        qty = safe_float(h.get("qty", 0), 0)
+        target = safe_float(h.get("target", 0), 0)
+        stop = safe_float(h.get("stop", 0), 0)
+
+        if buy > 0 and target <= 0:
+            target = round(buy * (1 + safe_float(read_trade_state().get("target_rate", 0.025), 0.025)))
+            h["target"] = target
+        if buy > 0 and stop <= 0:
+            stop = round(buy * (1 + safe_float(read_trade_state().get("stop_rate", -0.018), -0.018)))
+            h["stop"] = stop
+
+        original = safe_float(h.get("originalTarget", h.get("baseTarget", 0)), 0)
+        if target > 0 and original <= 0:
+            original = target
+            h["originalTarget"] = round(original)
+
+        # 최고가/최고수익률
+        highest = max(
+            safe_float(h.get("highestPrice", 0), 0),
+            safe_float(h.get("highPrice", 0), 0),
+            cur,
+            buy
+        )
+        if highest > 0:
+            h["highestPrice"] = round(highest)
+            h["highPrice"] = round(highest)
+
+        cur_rate = ((cur - buy) / buy * 100) if buy > 0 and cur > 0 else 0
+        high_rate = ((highest - buy) / buy * 100) if buy > 0 and highest > 0 else cur_rate
+        h["profitRate"] = round(cur_rate, 2)
+        h["highestProfitRate"] = round(high_rate, 2)
+        h["highest_profit_pct"] = round(high_rate, 2)
+
+        # 목표가 돌파 시 AI HOLD/동적 목표가
+        target_crossed = bool(cur > 0 and original > 0 and cur >= original)
+        trailing_stop_rate = normalize_rate_input(h.get("trailingStopRate", read_trade_state().get("trailing_stop_rate", 0.011)), 0.011)
+        profit_guard_rate = normalize_rate_input(h.get("profitGuardRate", read_trade_state().get("profit_guard_rate", 0.012)), 0.012)
+        h["trailingStopRate"] = trailing_stop_rate
+        h["profitGuardRate"] = profit_guard_rate
+
+        if target_crossed:
+            extra = safe_float(os.getenv("AI_TARGET_RAISE_EXTRA_RATE", "0.008"), 0.008)
+            dyn = max(
+                safe_float(h.get("aiDynamicTarget", 0), 0),
+                safe_float(h.get("active_dynamic_target", 0), 0),
+                original,
+                target,
+                cur * (1 + extra),
+                highest * (1 + extra)
+            )
+            h["aiTargetRaised"] = True
+            h["aiHoldMode"] = True
+            h["ai_hold_mode"] = True
+            h["aiDynamicTarget"] = round(dyn)
+            h["active_dynamic_target"] = round(dyn)
+            h["dynamicTarget"] = round(dyn)
+            h["aiTargetRaiseReason"] = h.get("aiTargetRaiseReason") or "기본 목표가를 돌파했지만 상승 추세가 유지되어 AI가 즉시 매도하지 않고 목표가를 상향 감시합니다."
+
+        # 트레일링 보호선은 목표가 돌파 또는 수익보호구간 진입 시 표시
+        if highest > 0 and (target_crossed or high_rate >= profit_guard_rate * 100):
+            trail = highest * (1 - trailing_stop_rate)
+            h["trailingTargetPrice"] = round(trail)
+            h["trailingProtectionPrice"] = round(trail)
+            h["trailing_stop_price"] = round(trail)
+            h["trailingStopPrice"] = round(trail)
+            h["trailingActive"] = True
+        else:
+            h["trailingActive"] = False
+
+        # 카드 상태용
+        if cur > 0 and stop > 0 and cur <= stop:
+            h["aiDisplayStatus"] = "손절가 이탈"
+        elif h.get("aiHoldMode"):
+            h["aiDisplayStatus"] = "AI HOLD · 목표가 상향/트레일링"
+        elif cur > 0 and target > 0 and cur >= target:
+            h["aiDisplayStatus"] = "목표가 도달"
+        else:
+            h["aiDisplayStatus"] = "감시중"
+
+        if buy > 0 and qty > 0:
+            h["buyAmount"] = round(buy * qty)
+
+        return h
+    except Exception as e:
+        try:
+            h["v137_error"] = str(e)[:200]
+        except Exception:
+            pass
+        return h
+
+def v137_enrich_trailing_ui_list(items):
+    return [v137_enrich_trailing_ui_item(x) for x in (items or [])]
+
+def v137_holdings_payload(start_sync=False, force=False):
+    """v135 보유 payload를 재사용하되 반환 직전 v137 UI 필드를 강제 주입합니다."""
+    try:
+        base = v135_holdings_payload(start_sync=start_sync, force=force)
+    except Exception as e:
+        try:
+            keep, src, upd = v135_load_last_valid_holdings()
+        except Exception:
+            keep, src, upd = [], "NONE", ""
+        base = {
+            "ok": bool(keep),
+            "version": V137_VERSION,
+            "engine": V137_ENGINE,
+            "holdings": keep,
+            "count": len(keep),
+            "source": src,
+            "cacheUpdatedAt": upd,
+            "message": "v137: 기존 보유 캐시를 표시합니다. " + str(e)[:200],
+        }
+
+    items = v137_enrich_trailing_ui_list(base.get("holdings", []))
+    base["holdings"] = safe_json(items)
+    base["count"] = len(items)
+    base["version"] = V137_VERSION
+    base["engine"] = V137_ENGINE
+    base["message"] = (base.get("message") or "") + " · AI 상향목표/트레일링 표시필드 적용"
+    return base
+
+try:
+    @app.route("/api/v137_holdings_cached")
+    def api_v137_holdings_cached():
+        start_sync = str(request.args.get("start_sync", "0")).lower() in ["1", "true", "yes"]
+        force = str(request.args.get("force", "0")).lower() in ["1", "true", "yes"]
+        return jsonify(v137_holdings_payload(start_sync=start_sync, force=force))
+
+    @app.route("/api/v137_refresh_trailing_fields")
+    def api_v137_refresh_trailing_fields():
+        items = v137_enrich_trailing_ui_list(read_holdings())
+        if items:
+            write_holdings(items)
+        return jsonify({"ok": True, "version": V137_VERSION, "holdings": safe_json(items), "message": "v137 AI 상향목표/트레일링 표시 필드 갱신 완료"})
+except Exception:
+    pass
+
+# 기존 API 이름으로 호출해도 v137 보정 payload를 반환하도록 최종 override
+try:
+    @app.route("/api/v136_refresh_trailing_fields_final")
+    def api_v136_refresh_trailing_fields_final():
+        return jsonify(v137_holdings_payload(start_sync=False, force=False))
+except Exception:
+    pass
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', '10000'))
+    app.run(host='0.0.0.0', port=port)
