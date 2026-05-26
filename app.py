@@ -41,7 +41,7 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v153"
+APP_VERSION = "v154"
 APP_NAME = "성일의 AI 주식바람"
 KST = timezone(timedelta(hours=9))
 app = Flask(__name__)
@@ -90,6 +90,14 @@ DEFAULT_STATE = {
     "stop_rate": -0.018,
     "profit_guard_rate": 0.012,
     "trailing_stop_rate": 0.011,
+    "dynamic_target_enabled": True,
+    "dynamic_target_boost_rate": 0.012,
+    "dynamic_target_min_profit_rate": 0.027,
+    "dynamic_target_min_ai_score": 85,
+    "candidate_scan_interval": 30,
+    "last_candidate_scan_time": "",
+    "last_candidate_scan_count": 0,
+    "last_candidate_symbols": "",
     "max_positions": 3,
     "min_order_cash": 50000,
     "min_ai_score": 60,
@@ -494,11 +502,17 @@ def normalize_holding(h):
     high = max(safe_float(h.get("highestPrice"), 0), cur, buy)
     base_target = safe_float(h.get("baseTarget"), target)
     dynamic_target = safe_float(h.get("activeDynamicTarget"), 0)
-    if cur > base_target:
-        dynamic_target = max(dynamic_target, cur * 1.012)
+    state_for_dynamic = read_state()
+    profit_rate_decimal = ((cur - buy) / buy) if buy else 0
+    dynamic_on = bool(state_for_dynamic.get("dynamic_target_enabled", True))
+    boost_rate = safe_float(state_for_dynamic.get("dynamic_target_boost_rate", 0.012), 0.012)
+    min_profit = safe_float(state_for_dynamic.get("dynamic_target_min_profit_rate", 0.027), 0.027)
+    # 급등/강세 수익 구간에서는 기존 목표가에서 즉시 매도하지 않고 AI 상향목표와 트레일링 보호선을 올립니다.
+    if dynamic_on and buy and (cur >= base_target or profit_rate_decimal >= min_profit):
+        dynamic_target = max(dynamic_target, cur * (1 + boost_rate), base_target * (1 + boost_rate))
     trail = safe_float(h.get("trailingStopPrice"), 0)
-    if high > base_target:
-        trail = max(trail, high * (1 - safe_float(read_state().get("trailing_stop_rate", 0.011), 0.011)))
+    if dynamic_on and high >= base_target:
+        trail = max(trail, high * (1 - safe_float(state_for_dynamic.get("trailing_stop_rate", 0.011), 0.011)))
 
     h.update({
         "code": str(h.get("code", "")).zfill(6),
@@ -745,8 +759,15 @@ def get_market_candidates(limit=8, min_score=None):
         c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
         enriched.append(c)
     candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
-    state = read_state(); state['index_risk_mode']=idx_risk.get('mode','UNKNOWN'); state['recommended_strategy'] = candidates[0].get('strategy','AI후보형') if candidates else state.get('recommended_strategy','AI후보형'); write_state(state)
-    write_json(CANDIDATE_FILE, {"time": now_text(), "items": candidates, "indexRisk": idx_risk})
+    scan_time = now_text()
+    state = read_state()
+    state['index_risk_mode']=idx_risk.get('mode','UNKNOWN')
+    state['recommended_strategy'] = candidates[0].get('strategy','AI후보형') if candidates else state.get('recommended_strategy','AI후보형')
+    state['last_candidate_scan_time'] = scan_time
+    state['last_candidate_scan_count'] = len(candidates)
+    state['last_candidate_symbols'] = ' / '.join([str(x.get('name') or x.get('code')) for x in candidates[:3]])
+    write_state(state)
+    write_json(CANDIDATE_FILE, {"time": scan_time, "items": candidates, "indexRisk": idx_risk, "scanInterval": safe_int(state.get('candidate_scan_interval',30),30)})
     return candidates
 
 
@@ -813,10 +834,13 @@ def watch_loop():
                 h = normalize_holding(h)
                 if h["activeDynamicTarget"] and h["lastPrice"] >= h["baseTarget"]:
                     h["aiHoldMode"] = True
+                    h["aiTargetReason"] = "목표 도달 후 강세로 판단되어 AI 상향익절/트레일링 감시 중"
                 if h["trailingStopPrice"] and h["lastPrice"] <= h["trailingStopPrice"]:
                     auto_sell_holding("trailing_stop", h, h["lastPrice"])
                 elif h["lastPrice"] <= h["stop"]:
                     auto_sell_holding("stop", h, h["lastPrice"])
+                elif (not read_state().get("dynamic_target_enabled", True)) and h["lastPrice"] >= h["baseTarget"]:
+                    auto_sell_holding("target", h, h["lastPrice"])
                 updated.append(h)
             if updated:
                 write_holdings(updated)
@@ -824,7 +848,7 @@ def watch_loop():
             get_market_candidates(limit=8, min_score=60)
         except Exception as e:
             WATCH_STATE["last_message"] = str(e)[:200]
-        time.sleep(20)
+        time.sleep(max(10, safe_int(read_state().get("candidate_scan_interval", 30), 30)))
 
 
 def ensure_watch():
@@ -911,15 +935,30 @@ def render_candidate_card(c, idx):
 
 
 def render_candidates():
-    picks = cached_candidates()[:8]
+    data = read_json(CANDIDATE_FILE, {})
+    picks = (data.get("items") if isinstance(data, dict) else None) or cached_candidates()[:8]
+    state = read_state()
+    scan_time = data.get("time") if isinstance(data, dict) else state.get("last_candidate_scan_time", "")
+    scan_interval = safe_int(state.get("candidate_scan_interval", 30), 30)
+    scan_count = len(picks)
+    symbols = " / ".join([str(x.get("name") or x.get("code")) for x in picks[:3]]) if picks else "대기중"
     cards = "".join(render_candidate_card(c, i) for i, c in enumerate(picks))
     return f"""
     <section class="card" id="picks">
       <h2>🤖 AI후보</h2>
       <p class="muted">AI가 감시하는 후보입니다. 종목을 누르면 거래대금·시장역행·위험감점 상세정보가 펼쳐집니다.</p>
+      <div class="scan-status">
+        <div><b>🔎 AI 분석 상태</b></div>
+        <div>TOP 후보 분석 완료: <b>{scan_count}</b>개</div>
+        <div>현재 감시 후보: <b>{html_escape(symbols)}</b></div>
+        <div>최근 스캔: <b>{html_escape(scan_time or '-')}</b> · 다음 재스캔: <b id="scanCountdown">{scan_interval}</b>초 후</div>
+      </div>
+      <div class="btn-row">
+        <button onclick="location.href='/api/refresh_candidates'">후보 즉시검색</button>
+        <button class="brown" onclick="location.href='/api/buy_best'">최우선 후보 매수</button>
+      </div>
       {cards}
     </section>"""
-
 
 def render_trade_section():
     state = read_state()
@@ -965,6 +1004,7 @@ def render_conditions_section():
       <p class="muted">자동매매가 실제로 참고하는 조건입니다. 평소에는 요약만 보고, 수정이 필요할 때만 펼쳐서 저장하세요.</p>
       <div class="summary-grid">
         <div><span>익절 / 손절</span><b>+{safe_float(state.get('target_rate'),0.027)*100:.2f}% / {safe_float(state.get('stop_rate'),-0.018)*100:.2f}%</b></div>
+        <div><span>AI 상향익절</span><b>{'ON' if state.get('dynamic_target_enabled', True) else 'OFF'} · +{safe_float(state.get('dynamic_target_boost_rate'),0.012)*100:.2f}%</b></div>
         <div><span>최소 AI 점수</span><b>{safe_float(state.get('min_ai_score'),60):.1f}</b></div>
         <div><span>최소 거래대금</span><b>{safe_int(state.get('min_amount'),3000000000)/100000000:.0f}억</b></div>
         <div><span>재매수 제한</span><b>{safe_float(state.get('rebuy_cooldown_minutes'),30):.0f}분</b></div>
@@ -977,6 +1017,9 @@ def render_conditions_section():
             <label>손절률(%)<input name="stop_rate" value="{safe_float(state.get('stop_rate'),-0.018)*100:.2f}"><small>예: -1.80 = -1.8%</small></label>
             <label>수익보호 되돌림(%)<input name="profit_guard_rate" value="{safe_float(state.get('profit_guard_rate'),0.012)*100:.2f}"></label>
             <label>트레일링 되돌림(%)<input name="trailing_stop_rate" value="{safe_float(state.get('trailing_stop_rate'),0.011)*100:.2f}"></label>
+            <label>AI 상향익절 추가 목표(%)<input name="dynamic_target_boost_rate" value="{safe_float(state.get('dynamic_target_boost_rate'),0.012)*100:.2f}"><small>예: 1.20 = 목표 도달 후 현재가 대비 +1.2% 상향</small></label>
+            <label>상향익절 시작 수익률(%)<input name="dynamic_target_min_profit_rate" value="{safe_float(state.get('dynamic_target_min_profit_rate'),0.027)*100:.2f}"><small>이 수익률 이상이면 AI가 목표가를 끌어올릴 수 있습니다.</small></label>
+            <label>AI후보 자동갱신 주기(초)<input name="candidate_scan_interval" value="{safe_int(state.get('candidate_scan_interval'),30)}"><small>예: 30 = 30초마다 후보 재스캔</small></label>
             <label>최소 AI 점수<input name="min_ai_score" value="{safe_float(state.get('min_ai_score'),60):.1f}"></label>
             <label>최대 당일 등락률(%)<input name="max_day_change" value="{safe_float(state.get('max_day_change'),12):.1f}"></label>
             <label>최소 거래대금(원)<input name="min_amount" value="{safe_int(state.get('min_amount'),3000000000)}"></label>
@@ -986,6 +1029,7 @@ def render_conditions_section():
             <label>거래대금/거래량 유지율<input name="volume_keep_filter" value="{safe_float(state.get('volume_keep_filter'),0.55):.2f}"></label>
             <label>지수 약세 신규매수 비중<input name="index_weak_buy_scale" value="{safe_float(state.get('index_weak_buy_scale'),0.5):.2f}"></label>
           </div>
+          <label class="check"><input type="checkbox" name="dynamic_target_enabled" {'checked' if state.get('dynamic_target_enabled', True) else ''}> 급등/강세 종목 AI 상향익절 허용</label>
           <label class="check"><input type="checkbox" name="switch_buy_enabled" {switch_on}> 전환매수 허용</label>
           <div class="btn-row"><button type="submit">매매조건 저장</button><a class="button dark" href="/api/reset_conditions">기본조건 복원</a></div>
         </form>
@@ -993,6 +1037,7 @@ def render_conditions_section():
       <details><summary>조건 설명 보기 / 접기</summary><div class="notice small">
         최소 AI 점수와 최소 거래대금이 높을수록 후보가 줄고 안정성이 올라갑니다.<br>
         최대 당일 등락률은 과열/추격매수 방지용입니다.<br>
+        AI 상향익절은 목표가 도달 후에도 시장역행점수·거래대금·상승흐름이 좋으면 목표가를 더 올리고 트레일링으로 보호합니다.<br>
         전환매수는 기본 OFF이며, 허용 시에도 매도 후 재매수 제한과 지수 위험도를 함께 확인합니다.
       </div></details>
     </section>"""
@@ -1024,7 +1069,9 @@ def build_ai_condition_report():
     if win_rate >= 60 and avg_pnl > 0 and len(sells) >= 10:
         recommended['target_rate'] = min(0.04, safe_float(state.get('target_rate'),0.027) + 0.003)
         recommended['profit_guard_rate'] = max(0.01, safe_float(state.get('profit_guard_rate'),0.012))
-        reasons.append('승률과 평균손익이 양호해 익절 목표를 소폭 상향할 수 있습니다.')
+        recommended['dynamic_target_enabled'] = True
+        recommended['dynamic_target_boost_rate'] = min(0.018, max(safe_float(state.get('dynamic_target_boost_rate'),0.012), 0.012))
+        reasons.append('승률과 평균손익이 양호해 기본 익절 목표와 AI 상향익절을 함께 사용할 수 있습니다.')
     if not reasons:
         reasons.append('현재 조건을 유지하되, 시장역행 점수·슬리피지 감점·재매수 제한을 계속 관찰합니다.')
     current_score = round(25 + min(40, win_rate*0.4) + (10 if avg_pnl > 0 else 0) + min(20, len(sells)*1.5), 1)
@@ -1152,6 +1199,7 @@ TEMPLATE = """
 .chips{display:flex;flex-wrap:wrap;gap:7px}.chips span{background:var(--pale);border-radius:999px;padding:6px 10px;font-size:13px;font-weight:800}.pick h3{font-size:28px;margin:12px 0}.detail{display:none;background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}.detail.open{display:block}
 details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding:14px;font-weight:900}.alerts{margin:8px 0 0;padding-left:20px;color:#5b513d}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
+.scan-status{background:#f4f8ff;border:1px dashed #bfd3ef;border-radius:20px;padding:15px;margin:12px 0;color:#334155;font-weight:700}.scan-status b{color:#0f172a}
 .summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.summary-grid div{background:#f8fbff;border:1px solid #e3ebf4;border-radius:16px;padding:12px}.summary-grid span{display:block;color:var(--muted);font-size:12px}.summary-grid b{font-size:20px}.upgrade-box{border:1px solid #dce8dc;border-radius:22px;padding:16px;margin:12px 0;background:#fbfffb}.strategy-card{border:1px solid #dfe8f2;border-radius:20px;padding:14px;margin:10px 0;background:#fff}.strategy-card.best{border-color:#9bd4ad;background:#f4fff6}.strategy-card .tag{float:right;border-radius:999px;background:#eaf2ff;color:#2d6cdf;padding:5px 10px;font-weight:900;font-size:12px}.reason-list{color:#667085}.reason-list li{margin:6px 0}.pill-warn{display:inline-block;border-radius:999px;background:#fff4d5;color:#8a5a00;padding:6px 10px;font-weight:900}.pill-ok{display:inline-block;border-radius:999px;background:#e8fff0;color:#10803d;padding:6px 10px;font-weight:900}
 @media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.nav a{font-size:14px;padding:9px 12px}}
 </style>
@@ -1165,6 +1213,12 @@ async function manualSell(code){
 async function callAndReload(url){
  const r=await fetch(url); const j=await r.json().catch(()=>({message:'완료'})); alert(j.message||JSON.stringify(j)); location.reload();
 }
+function startScanCountdown(){
+ const el=document.getElementById('scanCountdown'); if(!el) return;
+ let n=parseInt(el.textContent||'30');
+ setInterval(()=>{ n=Math.max(0,n-1); el.textContent=n; if(n<=0){ el.textContent='갱신대기'; } },1000);
+}
+document.addEventListener('DOMContentLoaded',startScanCountdown);
 </script>
 </head><body>
 <div class="wrap">
@@ -1211,6 +1265,13 @@ def api_refresh_holdings():
 def api_holdings():
     res = fetch_kiwoom_holdings()
     return jsonify(res)
+
+
+@app.route("/api/refresh_candidates")
+def api_refresh_candidates():
+    items = get_market_candidates(limit=8)
+    set_status("AI후보 즉시검색", f"AI후보 {len(items)}개를 즉시 검색했습니다.")
+    return render_page()
 
 
 @app.route("/api/candidates")
@@ -1337,6 +1398,9 @@ def api_update_conditions():
     state["stop_rate"] = pct_to_rate("stop_rate", -0.018)
     state["profit_guard_rate"] = pct_to_rate("profit_guard_rate", 0.012)
     state["trailing_stop_rate"] = pct_to_rate("trailing_stop_rate", 0.011)
+    state["dynamic_target_boost_rate"] = pct_to_rate("dynamic_target_boost_rate", 0.012)
+    state["dynamic_target_min_profit_rate"] = pct_to_rate("dynamic_target_min_profit_rate", 0.027)
+    state["candidate_scan_interval"] = max(10, safe_int(request.form.get("candidate_scan_interval"), 30))
     state["min_ai_score"] = safe_float(request.form.get("min_ai_score"), 60)
     state["max_day_change"] = safe_float(request.form.get("max_day_change"), 12)
     state["min_amount"] = safe_int(request.form.get("min_amount"), 3000000000)
@@ -1345,18 +1409,19 @@ def api_update_conditions():
     state["rebuy_cooldown_minutes"] = safe_float(request.form.get("rebuy_cooldown_minutes"), 30)
     state["volume_keep_filter"] = safe_float(request.form.get("volume_keep_filter"), 0.55)
     state["index_weak_buy_scale"] = safe_float(request.form.get("index_weak_buy_scale"), 0.5)
+    state["dynamic_target_enabled"] = bool(request.form.get("dynamic_target_enabled"))
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
     write_state(state)
-    set_status("매매조건 저장", "v153 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
+    set_status("매매조건 저장", "v154 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
     return render_page()
 
 @app.route("/api/reset_conditions")
 def api_reset_conditions():
     state = read_state()
-    for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
+    for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
-    set_status("기본조건 복원", "매매조건을 v153 기본값으로 복원했습니다.")
+    set_status("기본조건 복원", "매매조건을 v154 기본값으로 복원했습니다.")
     return render_page()
 
 
@@ -1371,7 +1436,7 @@ def api_apply_ai_recommended_conditions():
     report = build_ai_condition_report()
     state = read_state()
     rec = report.get('recommended', {})
-    keys = ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]
+    keys = ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]
     for k in keys:
         if k in rec:
             state[k] = rec[k]
