@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v152 AI CANDIDATE CONDITIONS UPGRADE
-파일명: app_kiwoom_real_auto_scalping_v152_ai_candidate_conditions_upgrade.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v153 AI CANDIDATE CONDITIONS TABS FINAL
+파일명: app_kiwoom_real_auto_scalping_v153_ai_candidate_conditions_tabs_final.py
 
 목표:
 - 누적 패치/중복 route/inject 제거
@@ -12,7 +12,7 @@
 - 보유카드 직접 시장가 매도 버튼
 - AI후보 축소 카드 + 터치 상세 펼침
 
-v152 보강:
+v153 보강:
 - AI 전략별 성과 누적 저장
 - 실체결 기준 손익 계산용 매매 원장
 - 1일/1주/1개월 전략 랭킹
@@ -41,7 +41,7 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v152"
+APP_VERSION = "v153"
 APP_NAME = "성일의 AI 주식바람"
 KST = timezone(timedelta(hours=9))
 app = Flask(__name__)
@@ -915,8 +915,8 @@ def render_candidates():
     cards = "".join(render_candidate_card(c, i) for i, c in enumerate(picks))
     return f"""
     <section class="card" id="picks">
-      <h2>👀 AI 추천 감시 후보</h2>
-      <p class="muted">후보는 축소 표시됩니다. 종목을 누르면 상세정보가 펼쳐집니다.</p>
+      <h2>🤖 AI후보</h2>
+      <p class="muted">AI가 감시하는 후보입니다. 종목을 누르면 거래대금·시장역행·위험감점 상세정보가 펼쳐집니다.</p>
       {cards}
     </section>"""
 
@@ -938,7 +938,7 @@ def render_trade_section():
       <div class="btn-row">
         <button onclick="location.href='/api/auto_on'">자동매매 ON</button>
         <button onclick="location.href='/api/auto_off'">OFF</button>
-        <button class="brown" onclick="location.href='/api/buy_best'">AI 즉시매수</button>
+        <button class="brown" onclick="location.href='/api/buy_best'">AI후보 즉시매수</button>
         <button class="dark" onclick="location.href='/api/panic_stop'">긴급정지</button>
       </div>
       <details>
@@ -958,36 +958,128 @@ def render_trade_section():
 
 def render_conditions_section():
     state = read_state()
-    def val(k, default=''):
-        return html_escape(state.get(k, default))
     switch_on = 'checked' if state.get('switch_buy_enabled') else ''
     return f"""
     <section class="card" id="conditions">
       <h2>🧭 매매조건</h2>
-      <p class="muted">현재 자동매매가 사용하는 조건입니다. 값 수정 후 저장하면 다음 AI후보 검색과 매수 판단부터 반영됩니다.</p>
-      <form method="post" action="/api/update_conditions">
-        <div class="form-grid">
-          <label>기본 익절률(%)<input name="target_rate" value="{safe_float(state.get('target_rate'),0.027)*100:.2f}"></label>
-          <label>손절률(%)<input name="stop_rate" value="{safe_float(state.get('stop_rate'),-0.018)*100:.2f}"></label>
-          <label>수익보호 되돌림(%)<input name="profit_guard_rate" value="{safe_float(state.get('profit_guard_rate'),0.012)*100:.2f}"></label>
-          <label>트레일링 되돌림(%)<input name="trailing_stop_rate" value="{safe_float(state.get('trailing_stop_rate'),0.011)*100:.2f}"></label>
-          <label>최소 AI 점수<input name="min_ai_score" value="{safe_float(state.get('min_ai_score'),60):.1f}"></label>
-          <label>최대 당일 등락률(%)<input name="max_day_change" value="{safe_float(state.get('max_day_change'),12):.1f}"></label>
-          <label>최소 거래대금(원)<input name="min_amount" value="{safe_int(state.get('min_amount'),3000000000)}"></label>
-          <label>최소 주문금액(원)<input name="min_order_cash" value="{safe_int(state.get('min_order_cash'),50000)}"></label>
-          <label>최대 보유종목<input name="max_positions" value="{safe_int(state.get('max_positions'),3)}"></label>
-          <label>매도 후 재매수 제한(분)<input name="rebuy_cooldown_minutes" value="{safe_float(state.get('rebuy_cooldown_minutes'),30):.0f}"></label>
-          <label>거래대금/거래량 유지율<input name="volume_keep_filter" value="{safe_float(state.get('volume_keep_filter'),0.55):.2f}"></label>
-          <label>지수 약세 신규매수 비중<input name="index_weak_buy_scale" value="{safe_float(state.get('index_weak_buy_scale'),0.5):.2f}"></label>
-        </div>
-        <label class="check"><input type="checkbox" name="switch_buy_enabled" {switch_on}> 전환매수 허용</label>
-        <div class="btn-row"><button type="submit">매매조건 저장</button><a class="button dark" href="/api/reset_conditions">기본조건 복원</a></div>
-      </form>
+      <p class="muted">자동매매가 실제로 참고하는 조건입니다. 평소에는 요약만 보고, 수정이 필요할 때만 펼쳐서 저장하세요.</p>
+      <div class="summary-grid">
+        <div><span>익절 / 손절</span><b>+{safe_float(state.get('target_rate'),0.027)*100:.2f}% / {safe_float(state.get('stop_rate'),-0.018)*100:.2f}%</b></div>
+        <div><span>최소 AI 점수</span><b>{safe_float(state.get('min_ai_score'),60):.1f}</b></div>
+        <div><span>최소 거래대금</span><b>{safe_int(state.get('min_amount'),3000000000)/100000000:.0f}억</b></div>
+        <div><span>재매수 제한</span><b>{safe_float(state.get('rebuy_cooldown_minutes'),30):.0f}분</b></div>
+      </div>
+      <details>
+        <summary>✍️ 매매조건 수정하기 / 접기</summary>
+        <form method="post" action="/api/update_conditions">
+          <div class="form-grid">
+            <label>기본 익절률(%)<input name="target_rate" value="{safe_float(state.get('target_rate'),0.027)*100:.2f}"><small>예: 2.70 = +2.7%</small></label>
+            <label>손절률(%)<input name="stop_rate" value="{safe_float(state.get('stop_rate'),-0.018)*100:.2f}"><small>예: -1.80 = -1.8%</small></label>
+            <label>수익보호 되돌림(%)<input name="profit_guard_rate" value="{safe_float(state.get('profit_guard_rate'),0.012)*100:.2f}"></label>
+            <label>트레일링 되돌림(%)<input name="trailing_stop_rate" value="{safe_float(state.get('trailing_stop_rate'),0.011)*100:.2f}"></label>
+            <label>최소 AI 점수<input name="min_ai_score" value="{safe_float(state.get('min_ai_score'),60):.1f}"></label>
+            <label>최대 당일 등락률(%)<input name="max_day_change" value="{safe_float(state.get('max_day_change'),12):.1f}"></label>
+            <label>최소 거래대금(원)<input name="min_amount" value="{safe_int(state.get('min_amount'),3000000000)}"></label>
+            <label>최소 주문금액(원)<input name="min_order_cash" value="{safe_int(state.get('min_order_cash'),50000)}"></label>
+            <label>최대 보유종목<input name="max_positions" value="{safe_int(state.get('max_positions'),3)}"></label>
+            <label>매도 후 재매수 제한(분)<input name="rebuy_cooldown_minutes" value="{safe_float(state.get('rebuy_cooldown_minutes'),30):.0f}"></label>
+            <label>거래대금/거래량 유지율<input name="volume_keep_filter" value="{safe_float(state.get('volume_keep_filter'),0.55):.2f}"></label>
+            <label>지수 약세 신규매수 비중<input name="index_weak_buy_scale" value="{safe_float(state.get('index_weak_buy_scale'),0.5):.2f}"></label>
+          </div>
+          <label class="check"><input type="checkbox" name="switch_buy_enabled" {switch_on}> 전환매수 허용</label>
+          <div class="btn-row"><button type="submit">매매조건 저장</button><a class="button dark" href="/api/reset_conditions">기본조건 복원</a></div>
+        </form>
+      </details>
       <details><summary>조건 설명 보기 / 접기</summary><div class="notice small">
-        최소 AI 점수와 최소 거래대금이 높을수록 후보가 줄고, 낮을수록 후보가 많아집니다.<br>
-        과열/추격매수 방지는 최대 당일 등락률과 슬리피지 감점으로 적용됩니다.<br>
-        전환매수는 기본 OFF이며, 사용자가 허용한 경우에만 기존 보유보다 강한 후보로 갈아타는 판단을 합니다.
+        최소 AI 점수와 최소 거래대금이 높을수록 후보가 줄고 안정성이 올라갑니다.<br>
+        최대 당일 등락률은 과열/추격매수 방지용입니다.<br>
+        전환매수는 기본 OFF이며, 허용 시에도 매도 후 재매수 제한과 지수 위험도를 함께 확인합니다.
       </div></details>
+    </section>"""
+
+
+def build_ai_condition_report():
+    """최근 매매 원장과 전략 성과를 바탕으로 추천 조건을 만듭니다. 자동 적용하지 않습니다."""
+    state = read_state()
+    ledger = read_ledger()
+    sells = [x for x in ledger if str(x.get('side','')).lower() == 'sell']
+    wins = [x for x in sells if safe_float(x.get('pnl'), 0) > 0]
+    losses = [x for x in sells if safe_float(x.get('pnl'), 0) <= 0]
+    win_rate = round(len(wins) / max(1, len(sells)) * 100, 1)
+    avg_pnl = int(sum(safe_float(x.get('pnl'),0) for x in sells) / max(1, len(sells)))
+    recommended = dict(state)
+    confidence = '낮음' if len(sells) < 5 else ('보통' if len(sells) < 20 else '높음')
+    mode = '관찰 유지' if len(sells) < 5 else '조건 개선'
+    reasons = []
+    if len(sells) < 5:
+        reasons.append('아직 매도 완료 표본이 5건 미만이라 조건을 크게 바꾸면 과최적화 위험이 큽니다.')
+    if win_rate < 45 and len(sells) >= 5:
+        recommended['min_ai_score'] = min(95, max(safe_float(state.get('min_ai_score'),60), 70))
+        recommended['max_day_change'] = min(safe_float(state.get('max_day_change'),12), 8)
+        reasons.append('승률이 낮아 최소 AI점수와 과열 제한을 보수적으로 조정합니다.')
+    if losses and abs(sum(safe_float(x.get('pnl'),0) for x in losses)) > sum(safe_float(x.get('pnl'),0) for x in wins):
+        recommended['stop_rate'] = max(safe_float(state.get('stop_rate'),-0.018), -0.015)
+        recommended['rebuy_cooldown_minutes'] = max(safe_float(state.get('rebuy_cooldown_minutes'),30), 40)
+        reasons.append('손실 합계가 커서 손절폭과 재매수 제한을 강화합니다.')
+    if win_rate >= 60 and avg_pnl > 0 and len(sells) >= 10:
+        recommended['target_rate'] = min(0.04, safe_float(state.get('target_rate'),0.027) + 0.003)
+        recommended['profit_guard_rate'] = max(0.01, safe_float(state.get('profit_guard_rate'),0.012))
+        reasons.append('승률과 평균손익이 양호해 익절 목표를 소폭 상향할 수 있습니다.')
+    if not reasons:
+        reasons.append('현재 조건을 유지하되, 시장역행 점수·슬리피지 감점·재매수 제한을 계속 관찰합니다.')
+    current_score = round(25 + min(40, win_rate*0.4) + (10 if avg_pnl > 0 else 0) + min(20, len(sells)*1.5), 1)
+    rec_score = round(current_score + (4 if recommended != state else 0), 1)
+    return {
+        'reviewed_at': now_text(), 'confidence': confidence, 'mode': mode,
+        'sell_count': len(sells), 'win_rate': win_rate, 'avg_pnl': avg_pnl,
+        'current': state, 'recommended': recommended, 'current_score': current_score,
+        'recommended_score': rec_score, 'reasons': reasons,
+        'best_strategy': (strategy_rankings(7)[0]['strategy'] if strategy_rankings(7) else state.get('current_strategy','AI후보형')),
+    }
+
+
+def render_ai_upgrade_section():
+    report = build_ai_condition_report()
+    st = report['current']; rc = report['recommended']
+    def rate(v): return f"{safe_float(v,0)*100:.2f}%"
+    rows = [
+        ('기본 익절률', rate(st.get('target_rate')), rate(rc.get('target_rate'))),
+        ('손절률', rate(st.get('stop_rate')), rate(rc.get('stop_rate'))),
+        ('최소 AI 점수', f"{safe_float(st.get('min_ai_score'),0):.1f}", f"{safe_float(rc.get('min_ai_score'),0):.1f}"),
+        ('수익보호 되돌림', rate(st.get('profit_guard_rate')), rate(rc.get('profit_guard_rate'))),
+        ('재매수 제한', f"{safe_float(st.get('rebuy_cooldown_minutes'),0):.0f}분", f"{safe_float(rc.get('rebuy_cooldown_minutes'),0):.0f}분"),
+        ('전환매수', 'ON' if st.get('switch_buy_enabled') else 'OFF', 'ON' if rc.get('switch_buy_enabled') else 'OFF'),
+    ]
+    cards = ''.join(f"<div><span>{html_escape(a)}</span><b>{html_escape(b)} → {html_escape(c)}</b></div>" for a,b,c in rows)
+    reasons = ''.join(f"<li>{html_escape(x)}</li>" for x in report['reasons'])
+    return f"""
+    <section class="card" id="ai-upgrade">
+      <h2>🧠 AI 조건 업그레이드</h2>
+      <details open>
+        <summary>AI 조건 추천구조 설명 보기</summary>
+        <div class="notice small">
+          최근 실제 매수/매도 원장과 전략성과를 기준으로 승률, 평균손익, 손실패턴, 재매수 제한, 지수 위험을 확인합니다.<br>
+          AI는 조건을 자동으로 바꾸지 않고 추천만 만듭니다. <b>추천조건 적용</b>을 눌러야 매매조건에 반영됩니다.
+        </div>
+      </details>
+      <div class="upgrade-box">
+        <div><span class="pill-warn">신뢰도 {html_escape(report['confidence'])}</span> <span class="pill-ok">추천전략 {html_escape(report['best_strategy'])}</span></div>
+        <div class="summary-grid">
+          <div><span>분석모드</span><b>{html_escape(report['mode'])}</b></div>
+          <div><span>매도완료</span><b>{report['sell_count']}건</b></div>
+          <div><span>승률</span><b>{report['win_rate']}%</b></div>
+          <div><span>평균손익</span><b>{money(report['avg_pnl'])}</b></div>
+        </div>
+        <h3>AI 추천 조건</h3>
+        <div class="summary-grid">{cards}</div>
+        <h3>적용 이유</h3><ul class="reason-list">{reasons}</ul>
+        <div class="btn-row">
+          <button type="button" onclick="callAndReload('/api/ai_reanalyze_conditions')">AI 재분석</button>
+          <button type="button" onclick="callAndReload('/api/apply_ai_recommended_conditions')">추천조건 적용</button>
+          <button class="dark" type="button" onclick="callAndReload('/api/keep_conditions')">기존조건 유지</button>
+        </div>
+        <p class="muted">안전장치: 자동 적용은 하지 않습니다. 사용자가 승인 버튼을 눌렀을 때만 실전 조건이 바뀝니다.</p>
+      </div>
     </section>"""
 
 def render_performance_section():
@@ -1037,6 +1129,7 @@ def render_page():
         candidates=render_candidates(),
         conditions=render_conditions_section(),
         performance=render_performance_section(),
+        ai_upgrade=render_ai_upgrade_section(),
         alerts=render_alert_center(),
         auto_on=state.get("auto_trade_enabled"),
     )
@@ -1059,6 +1152,7 @@ TEMPLATE = """
 .chips{display:flex;flex-wrap:wrap;gap:7px}.chips span{background:var(--pale);border-radius:999px;padding:6px 10px;font-size:13px;font-weight:800}.pick h3{font-size:28px;margin:12px 0}.detail{display:none;background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}.detail.open{display:block}
 details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding:14px;font-weight:900}.alerts{margin:8px 0 0;padding-left:20px;color:#5b513d}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.summary-grid div{background:#f8fbff;border:1px solid #e3ebf4;border-radius:16px;padding:12px}.summary-grid span{display:block;color:var(--muted);font-size:12px}.summary-grid b{font-size:20px}.upgrade-box{border:1px solid #dce8dc;border-radius:22px;padding:16px;margin:12px 0;background:#fbfffb}.strategy-card{border:1px solid #dfe8f2;border-radius:20px;padding:14px;margin:10px 0;background:#fff}.strategy-card.best{border-color:#9bd4ad;background:#f4fff6}.strategy-card .tag{float:right;border-radius:999px;background:#eaf2ff;color:#2d6cdf;padding:5px 10px;font-weight:900;font-size:12px}.reason-list{color:#667085}.reason-list li{margin:6px 0}.pill-warn{display:inline-block;border-radius:999px;background:#fff4d5;color:#8a5a00;padding:6px 10px;font-weight:900}.pill-ok{display:inline-block;border-radius:999px;background:#e8fff0;color:#10803d;padding:6px 10px;font-weight:900}
 @media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.nav a{font-size:14px;padding:9px 12px}}
 </style>
 <script>
@@ -1067,6 +1161,9 @@ async function manualSell(code){
  if(!confirm(code+' 시장가 매도를 요청할까요? 실제 주문 전 키움 인증 상태를 확인합니다.')) return;
  const r=await fetch('/api/manual_sell?code='+encodeURIComponent(code));
  const j=await r.json(); alert(j.message||JSON.stringify(j)); location.reload();
+}
+async function callAndReload(url){
+ const r=await fetch(url); const j=await r.json().catch(()=>({message:'완료'})); alert(j.message||JSON.stringify(j)); location.reload();
 }
 </script>
 </head><body>
@@ -1077,10 +1174,11 @@ async function manualSell(code){
     <p>키움 REST API 연동 · AI후보 감시 · 실보유 동기화 · 목표/손절/트레일링 · 전략성과 학습</p>
   </div>
   <div class="nav">
-    <a href="#picks">🤖 AI후보</a><a href="#conditions">🧭 매매조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
+    <a href="#picks">🤖 AI후보</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
   </div>
   {{candidates|safe}}
   {{conditions|safe}}
+  {{ai_upgrade|safe}}
   {{holdings|safe}}
   {{trade|safe}}
   {{performance|safe}}
@@ -1249,7 +1347,7 @@ def api_update_conditions():
     state["index_weak_buy_scale"] = safe_float(request.form.get("index_weak_buy_scale"), 0.5)
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
     write_state(state)
-    set_status("매매조건 저장", "AI후보 검색과 주문 판단 조건을 업데이트했습니다.")
+    set_status("매매조건 저장", "v153 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
     return render_page()
 
 @app.route("/api/reset_conditions")
@@ -1258,8 +1356,39 @@ def api_reset_conditions():
     for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
-    set_status("기본조건 복원", "매매조건을 v152 기본값으로 복원했습니다.")
+    set_status("기본조건 복원", "매매조건을 v153 기본값으로 복원했습니다.")
     return render_page()
+
+
+@app.route("/api/ai_reanalyze_conditions")
+def api_ai_reanalyze_conditions():
+    report = build_ai_condition_report()
+    set_status("AI 조건 재분석", f"신뢰도 {report['confidence']} · 추천전략 {report['best_strategy']}")
+    return jsonify({"ok": True, "message": "AI 조건 재분석 완료", "report": report})
+
+@app.route("/api/apply_ai_recommended_conditions")
+def api_apply_ai_recommended_conditions():
+    report = build_ai_condition_report()
+    state = read_state()
+    rec = report.get('recommended', {})
+    keys = ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]
+    for k in keys:
+        if k in rec:
+            state[k] = rec[k]
+    state['current_strategy'] = report.get('best_strategy') or state.get('current_strategy','AI후보형')
+    state['last_ai_condition_report'] = report
+    write_state(state)
+    set_status("AI 추천조건 적용", "사용자 승인으로 AI 추천 매매조건을 적용했습니다.")
+    return jsonify({"ok": True, "message": "AI 추천조건 적용 완료", "applied_strategy": state.get('current_strategy')})
+
+@app.route("/api/keep_conditions")
+def api_keep_conditions():
+    report = build_ai_condition_report()
+    state = read_state()
+    state['last_ai_condition_report'] = report
+    write_state(state)
+    set_status("기존조건 유지", "AI 추천은 참고만 하고 기존 매매조건을 유지했습니다.")
+    return jsonify({"ok": True, "message": "기존조건 유지 완료"})
 
 @app.route("/api/telegram_test")
 def api_telegram_test():
