@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v151 STRATEGY PERFORMANCE RISK AI
-파일명: app_kiwoom_real_auto_scalping_v151_strategy_performance_risk_ai.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v152 AI CANDIDATE CONDITIONS UPGRADE
+파일명: app_kiwoom_real_auto_scalping_v152_ai_candidate_conditions_upgrade.py
 
 목표:
 - 누적 패치/중복 route/inject 제거
@@ -10,9 +10,9 @@
 - 화면확인용 수동 보유표시 제거
 - 실제 보유는 키움 REST 잔고 또는 마지막 정상 캐시만 표시
 - 보유카드 직접 시장가 매도 버튼
-- 급등후보 축소 카드 + 터치 상세 펼침
+- AI후보 축소 카드 + 터치 상세 펼침
 
-v151 보강:
+v152 보강:
 - AI 전략별 성과 누적 저장
 - 실체결 기준 손익 계산용 매매 원장
 - 1일/1주/1개월 전략 랭킹
@@ -41,7 +41,7 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v151"
+APP_VERSION = "v152"
 APP_NAME = "성일의 AI 주식바람"
 KST = timezone(timedelta(hours=9))
 app = Flask(__name__)
@@ -49,13 +49,13 @@ app = Flask(__name__)
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-STATE_FILE = BASE_DIR / "sungil_trade_state_v151.json"
-HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v151.json"
-HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v151.json"
-CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v151.json"
-PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v151.json"
-TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v151.json"
-BACKUP_DIR = BASE_DIR / "sungil_backups_v151"
+STATE_FILE = BASE_DIR / "sungil_trade_state_v152.json"
+HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v152.json"
+HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v152.json"
+CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v152.json"
+PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v152.json"
+TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v152.json"
+BACKUP_DIR = BASE_DIR / "sungil_backups_v152"
 try:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
@@ -92,6 +92,11 @@ DEFAULT_STATE = {
     "trailing_stop_rate": 0.011,
     "max_positions": 3,
     "min_order_cash": 50000,
+    "min_ai_score": 60,
+    "max_day_change": 12,
+    "min_amount": 3000000000,
+    "volume_keep_filter": 0.55,
+    "index_weak_buy_scale": 0.5,
     "daily_max_loss": -30000,
     "last_status": "대기중",
     "last_status_time": "",
@@ -99,8 +104,8 @@ DEFAULT_STATE = {
     "last_kiwoom_debug": {},
     "last_telegram_status": "",
     "recent_alerts": [],
-    "current_strategy": "단타형",
-    "recommended_strategy": "단타형",
+    "current_strategy": "AI후보형",
+    "recommended_strategy": "AI후보형",
     "switch_buy_enabled": False,
     "rebuy_cooldown_minutes": 30,
     "last_sell_times": {},
@@ -547,7 +552,7 @@ def send_telegram(text):
 
 
 
-STRATEGIES = ["단타형", "안정형", "테마추종형", "가치형", "공격형"]
+STRATEGIES = ["AI후보형", "안정형", "테마추종형", "가치형", "공격형"]
 
 def strategy_from_candidate(c):
     score = safe_float(c.get('score'), 0)
@@ -562,7 +567,7 @@ def strategy_from_candidate(c):
         return "안정형"
     if day <= 2.0 and amt >= 50_000_000_000:
         return "가치형"
-    return "단타형"
+    return "AI후보형"
 
 def read_ledger():
     data = read_json(TRADE_LEDGER_FILE, [])
@@ -594,7 +599,7 @@ def write_performance(data):
     backup_json_file(PERFORMANCE_FILE, 'performance')
 
 def record_strategy_result(strategy, pnl, buy_value=0, reason='sell', code='', name=''):
-    strategy = strategy if strategy in STRATEGIES else '단타형'
+    strategy = strategy if strategy in STRATEGIES else 'AI후보형'
     pnl = safe_float(pnl,0); buy_value=safe_float(buy_value,0)
     ret = (pnl / buy_value * 100) if buy_value else 0
     perf = read_performance(); row = perf[strategy]
@@ -683,7 +688,12 @@ def classify_theme(name):
     return "기타/개별이슈"
 
 
-def get_market_candidates(limit=8, min_score=60):
+def get_market_candidates(limit=8, min_score=None):
+    state_for_filter = read_state()
+    if min_score is None:
+        min_score = safe_float(state_for_filter.get("min_ai_score", 60), 60)
+    max_day_change = safe_float(state_for_filter.get("max_day_change", 12), 12)
+    min_amount = safe_float(state_for_filter.get("min_amount", 3_000_000_000), 3_000_000_000)
     candidates = []
     if fdr and pd:
         try:
@@ -697,7 +707,7 @@ def get_market_candidates(limit=8, min_score=60):
             df["Name"] = df["Name"].astype(str)
             bad = ["ETF", "ETN", "스팩", "SPAC", "KODEX", "TIGER", "인버스", "레버리지"]
             df = df[~df["Name"].str.upper().apply(lambda n: any(x.upper() in n for x in bad))]
-            df = df[(df["Close"] >= 1000) & (df["Amount"] >= 3_000_000_000) & (df["dayChange"] >= 0.2) & (df["dayChange"] <= 12)].copy()
+            df = df[(df["Close"] >= 1000) & (df["Amount"] >= min_amount) & (df["dayChange"] >= 0.2) & (df["dayChange"] <= max_day_change)].copy()
             if not df.empty:
                 df["theme"] = df["Name"].apply(classify_theme)
                 df["amountRank"] = df["Amount"].rank(pct=True) * 100
@@ -735,7 +745,7 @@ def get_market_candidates(limit=8, min_score=60):
         c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
         enriched.append(c)
     candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
-    state = read_state(); state['index_risk_mode']=idx_risk.get('mode','UNKNOWN'); state['recommended_strategy'] = candidates[0].get('strategy','단타형') if candidates else state.get('recommended_strategy','단타형'); write_state(state)
+    state = read_state(); state['index_risk_mode']=idx_risk.get('mode','UNKNOWN'); state['recommended_strategy'] = candidates[0].get('strategy','AI후보형') if candidates else state.get('recommended_strategy','AI후보형'); write_state(state)
     write_json(CANDIDATE_FILE, {"time": now_text(), "items": candidates, "indexRisk": idx_risk})
     return candidates
 
@@ -764,7 +774,7 @@ def auto_sell_holding(reason, holding, cur_price=None):
     sell_price = safe_float(cur_price or h.get('lastPrice') or h.get('buyPrice'), 0)
     buy_value = safe_float(h.get('buyPrice'),0) * qty
     pnl = (sell_price - safe_float(h.get('buyPrice'),0)) * qty
-    strategy = h.get('strategy') or read_state().get('current_strategy','단타형')
+    strategy = h.get('strategy') or read_state().get('current_strategy','AI후보형')
     if KIWOOM_DRY_RUN:
         event = append_trade_event({'side':'sell','dry_run':True,'code':code,'name':h.get('name'), 'qty':qty,'fill_price':sell_price,'buy_price':h.get('buyPrice'), 'pnl':int(pnl),'return_pct':round((pnl/buy_value*100) if buy_value else 0,2),'strategy':strategy,'reason':reason})
         record_strategy_result(strategy, pnl, buy_value, reason, code, h.get('name'))
@@ -884,7 +894,7 @@ def render_holdings_section():
 def render_candidate_card(c, idx):
     return f"""
     <div class="pick compact" onclick="toggleDetail('pick{idx}')">
-      <div class="chips"><span>{html_escape(c.get('market',''))}</span><span>{c.get('code')}</span><span>{html_escape(c.get('theme',''))}</span><span>AI {safe_float(c.get('riskAdjustedScore', c.get('score'))):.1f}</span><span>역행 {safe_float(c.get('marketReverseScore')):.0f}</span><span>{html_escape(c.get('strategy','단타형'))}</span></div>
+      <div class="chips"><span>{html_escape(c.get('market',''))}</span><span>{c.get('code')}</span><span>{html_escape(c.get('theme',''))}</span><span>AI {safe_float(c.get('riskAdjustedScore', c.get('score'))):.1f}</span><span>역행 {safe_float(c.get('marketReverseScore')):.0f}</span><span>{html_escape(c.get('strategy','AI후보형'))}</span></div>
       <h3>{html_escape(c.get('name'))}</h3>
       <div class="grid2">
         <div><label>현재가</label><b>{money(c.get('price'))}</b><small>{html_escape(c.get('source','KRX_FAST_CACHE'))}</small></div>
@@ -905,7 +915,7 @@ def render_candidates():
     cards = "".join(render_candidate_card(c, i) for i, c in enumerate(picks))
     return f"""
     <section class="card" id="picks">
-      <h2>👀 급등 예상 감시 후보</h2>
+      <h2>👀 AI 추천 감시 후보</h2>
       <p class="muted">후보는 축소 표시됩니다. 종목을 누르면 상세정보가 펼쳐집니다.</p>
       {cards}
     </section>"""
@@ -924,7 +934,7 @@ def render_trade_section():
         상태: <b>{'ON' if state.get('auto_trade_enabled') else 'OFF'}</b> · <span class="badge">{status_badge}</span><br>
         키움 주문가능금액은 실제 주문 직전에 다시 확인합니다.
       </div>
-      <div class="comment">현재전략: <b>{html_escape(state.get('current_strategy','단타형'))}</b> · 추천전략: <b>{html_escape(state.get('recommended_strategy','단타형'))}</b> · 지수위험: <b>{html_escape(state.get('index_risk_mode','UNKNOWN'))}</b></div>
+      <div class="comment">현재전략: <b>{html_escape(state.get('current_strategy','AI후보형'))}</b> · 추천전략: <b>{html_escape(state.get('recommended_strategy','AI후보형'))}</b> · 지수위험: <b>{html_escape(state.get('index_risk_mode','UNKNOWN'))}</b></div>
       <div class="btn-row">
         <button onclick="location.href='/api/auto_on'">자동매매 ON</button>
         <button onclick="location.href='/api/auto_off'">OFF</button>
@@ -943,6 +953,42 @@ def render_trade_section():
 
 
 
+
+
+
+def render_conditions_section():
+    state = read_state()
+    def val(k, default=''):
+        return html_escape(state.get(k, default))
+    switch_on = 'checked' if state.get('switch_buy_enabled') else ''
+    return f"""
+    <section class="card" id="conditions">
+      <h2>🧭 매매조건</h2>
+      <p class="muted">현재 자동매매가 사용하는 조건입니다. 값 수정 후 저장하면 다음 AI후보 검색과 매수 판단부터 반영됩니다.</p>
+      <form method="post" action="/api/update_conditions">
+        <div class="form-grid">
+          <label>기본 익절률(%)<input name="target_rate" value="{safe_float(state.get('target_rate'),0.027)*100:.2f}"></label>
+          <label>손절률(%)<input name="stop_rate" value="{safe_float(state.get('stop_rate'),-0.018)*100:.2f}"></label>
+          <label>수익보호 되돌림(%)<input name="profit_guard_rate" value="{safe_float(state.get('profit_guard_rate'),0.012)*100:.2f}"></label>
+          <label>트레일링 되돌림(%)<input name="trailing_stop_rate" value="{safe_float(state.get('trailing_stop_rate'),0.011)*100:.2f}"></label>
+          <label>최소 AI 점수<input name="min_ai_score" value="{safe_float(state.get('min_ai_score'),60):.1f}"></label>
+          <label>최대 당일 등락률(%)<input name="max_day_change" value="{safe_float(state.get('max_day_change'),12):.1f}"></label>
+          <label>최소 거래대금(원)<input name="min_amount" value="{safe_int(state.get('min_amount'),3000000000)}"></label>
+          <label>최소 주문금액(원)<input name="min_order_cash" value="{safe_int(state.get('min_order_cash'),50000)}"></label>
+          <label>최대 보유종목<input name="max_positions" value="{safe_int(state.get('max_positions'),3)}"></label>
+          <label>매도 후 재매수 제한(분)<input name="rebuy_cooldown_minutes" value="{safe_float(state.get('rebuy_cooldown_minutes'),30):.0f}"></label>
+          <label>거래대금/거래량 유지율<input name="volume_keep_filter" value="{safe_float(state.get('volume_keep_filter'),0.55):.2f}"></label>
+          <label>지수 약세 신규매수 비중<input name="index_weak_buy_scale" value="{safe_float(state.get('index_weak_buy_scale'),0.5):.2f}"></label>
+        </div>
+        <label class="check"><input type="checkbox" name="switch_buy_enabled" {switch_on}> 전환매수 허용</label>
+        <div class="btn-row"><button type="submit">매매조건 저장</button><a class="button dark" href="/api/reset_conditions">기본조건 복원</a></div>
+      </form>
+      <details><summary>조건 설명 보기 / 접기</summary><div class="notice small">
+        최소 AI 점수와 최소 거래대금이 높을수록 후보가 줄고, 낮을수록 후보가 많아집니다.<br>
+        과열/추격매수 방지는 최대 당일 등락률과 슬리피지 감점으로 적용됩니다.<br>
+        전환매수는 기본 OFF이며, 사용자가 허용한 경우에만 기존 보유보다 강한 후보로 갈아타는 판단을 합니다.
+      </div></details>
+    </section>"""
 
 def render_performance_section():
     r1=strategy_rankings(1); r7=strategy_rankings(7); r30=strategy_rankings(30)
@@ -989,6 +1035,7 @@ def render_page():
         holdings=render_holdings_section(),
         trade=render_trade_section(),
         candidates=render_candidates(),
+        conditions=render_conditions_section(),
         performance=render_performance_section(),
         alerts=render_alert_center(),
         auto_on=state.get("auto_trade_enabled"),
@@ -1011,7 +1058,8 @@ TEMPLATE = """
 .holding-card,.pick{border:1px solid #e2ead9;border-radius:22px;padding:16px;margin:12px 0;background:#fffef8}.topline{display:flex;justify-content:space-between;gap:8px;font-size:22px}.topline span{font-size:14px;background:var(--pale);border-radius:999px;padding:6px 10px}.comment{background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}
 .chips{display:flex;flex-wrap:wrap;gap:7px}.chips span{background:var(--pale);border-radius:999px;padding:6px 10px;font-size:13px;font-weight:800}.pick h3{font-size:28px;margin:12px 0}.detail{display:none;background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}.detail.open{display:block}
 details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding:14px;font-weight:900}.alerts{margin:8px 0 0;padding-left:20px;color:#5b513d}
-@media(max-width:430px){body{font-size:15px}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.nav a{font-size:14px;padding:9px 12px}}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
+@media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.nav a{font-size:14px;padding:9px 12px}}
 </style>
 <script>
 function toggleDetail(id){const el=document.getElementById(id); if(el){el.classList.toggle('open')}}
@@ -1026,12 +1074,13 @@ async function manualSell(code){
   <div class="hero">
     <span class="badge">🌿 KIWOOM REAL AUTO {{version}}</span>
     <h1>{{app_name}}</h1>
-    <p>키움 REST API 연동 · AI 단타 후보 · 실보유 감시 · 목표/손절/트레일링 · 텔레그램 알림</p>
+    <p>키움 REST API 연동 · AI후보 감시 · 실보유 동기화 · 목표/손절/트레일링 · 전략성과 학습</p>
   </div>
   <div class="nav">
-    <a href="#picks">⚡ 단타</a><a href="#holdings">💼 보유</a><a href="#trade">🤖 자동</a><a href="#performance">📊 성과</a><a href="#alerts">📨 알림</a>
+    <a href="#picks">🤖 AI후보</a><a href="#conditions">🧭 매매조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
   </div>
   {{candidates|safe}}
+  {{conditions|safe}}
   {{holdings|safe}}
   {{trade|safe}}
   {{performance|safe}}
@@ -1141,13 +1190,13 @@ def api_buy_best():
         return jsonify({"ok": False, "message": msg})
     if not KIWOOM_REAL_TRADING or KIWOOM_DRY_RUN:
         msg = f"DRY/RUN 또는 실전주문 비활성: {pick['name']} {qty}주 주문 전송 안 함"
-        append_trade_event({'side':'buy','dry_run':True,'code':pick['code'],'name':pick['name'],'qty':qty,'fill_price':int(cur),'strategy':pick.get('strategy','단타형'),'candidate_score':pick.get('riskAdjustedScore',pick.get('score'))})
-        set_status("매수 테스트", msg, {"last_candidate": pick, "current_strategy": pick.get('strategy','단타형')})
+        append_trade_event({'side':'buy','dry_run':True,'code':pick['code'],'name':pick['name'],'qty':qty,'fill_price':int(cur),'strategy':pick.get('strategy','AI후보형'),'candidate_score':pick.get('riskAdjustedScore',pick.get('score'))})
+        set_status("매수 테스트", msg, {"last_candidate": pick, "current_strategy": pick.get('strategy','AI후보형')})
         return jsonify({"ok": True, "dry_run": True, "message": msg})
     res = kiwoom_order("buy", pick["code"], qty)
     if res.get('ok'):
-        append_trade_event({'side':'buy','code':pick['code'],'name':pick['name'],'qty':qty,'fill_price':int(cur),'strategy':pick.get('strategy','단타형'),'candidate_score':pick.get('riskAdjustedScore',pick.get('score')),'order_response':res})
-    set_status("매수 요청", str(res)[:400], {"last_candidate": pick, "current_strategy": pick.get('strategy','단타형')})
+        append_trade_event({'side':'buy','code':pick['code'],'name':pick['name'],'qty':qty,'fill_price':int(cur),'strategy':pick.get('strategy','AI후보형'),'candidate_score':pick.get('riskAdjustedScore',pick.get('score')),'order_response':res})
+    set_status("매수 요청", str(res)[:400], {"last_candidate": pick, "current_strategy": pick.get('strategy','AI후보형')})
     return jsonify(res)
 
 
@@ -1178,6 +1227,39 @@ def api_ai_review():
     ledger = read_ledger()[:20]
     return jsonify({"ok": True, "reviews": [{"event": e, "review": ai_loss_review(e)} for e in ledger]})
 
+
+
+
+@app.route("/api/update_conditions", methods=["POST"])
+def api_update_conditions():
+    state = read_state()
+    def pct_to_rate(name, default):
+        return safe_float(request.form.get(name), default*100) / 100
+    state["target_rate"] = pct_to_rate("target_rate", 0.027)
+    state["stop_rate"] = pct_to_rate("stop_rate", -0.018)
+    state["profit_guard_rate"] = pct_to_rate("profit_guard_rate", 0.012)
+    state["trailing_stop_rate"] = pct_to_rate("trailing_stop_rate", 0.011)
+    state["min_ai_score"] = safe_float(request.form.get("min_ai_score"), 60)
+    state["max_day_change"] = safe_float(request.form.get("max_day_change"), 12)
+    state["min_amount"] = safe_int(request.form.get("min_amount"), 3000000000)
+    state["min_order_cash"] = safe_int(request.form.get("min_order_cash"), 50000)
+    state["max_positions"] = safe_int(request.form.get("max_positions"), 3)
+    state["rebuy_cooldown_minutes"] = safe_float(request.form.get("rebuy_cooldown_minutes"), 30)
+    state["volume_keep_filter"] = safe_float(request.form.get("volume_keep_filter"), 0.55)
+    state["index_weak_buy_scale"] = safe_float(request.form.get("index_weak_buy_scale"), 0.5)
+    state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
+    write_state(state)
+    set_status("매매조건 저장", "AI후보 검색과 주문 판단 조건을 업데이트했습니다.")
+    return render_page()
+
+@app.route("/api/reset_conditions")
+def api_reset_conditions():
+    state = read_state()
+    for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
+        state[k] = DEFAULT_STATE[k]
+    write_state(state)
+    set_status("기본조건 복원", "매매조건을 v152 기본값으로 복원했습니다.")
+    return render_page()
 
 @app.route("/api/telegram_test")
 def api_telegram_test():
