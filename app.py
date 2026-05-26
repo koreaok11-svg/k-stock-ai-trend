@@ -1,34 +1,34 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v149_COMPACT_UI_ERROR_CLEAN_FIX
-파일명: app_kiwoom_real_auto_scalping_v149_compact_ui_error_clean_fix.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v151 STRATEGY PERFORMANCE RISK AI
+파일명: app_kiwoom_real_auto_scalping_v151_strategy_performance_risk_ai.py
 
-클린 통합본 핵심:
-- 중복 route / 중복 inject / 누적 패치 제거
-- Render 기동 안정화: FinanceDataReader, pandas, numpy 없어도 실행
-- 키움 인증 실패 시 보유종목 0개로 덮어쓰기 금지
-- 마지막 정상 보유 캐시 유지
-- 급등 후보 카드 기본 축소, 클릭 시 상세 펼침
-- 보유종목 카드에 AI 상향 목표가 / 트레일링 보호선 / 최고수익률 표시
-- 인증 정상일 때만 실제 매수/매도 전송
-- 텔레그램 연결확인/테스트/비동기 알림 큐
+목표:
+- 누적 패치/중복 route/inject 제거
+- 모바일 보기 좋은 컴팩트 UI
+- 키움 인증 실패 메시지 1개만 표시
+- 화면확인용 수동 보유표시 제거
+- 실제 보유는 키움 REST 잔고 또는 마지막 정상 캐시만 표시
+- 보유카드 직접 시장가 매도 버튼
+- 급등후보 축소 카드 + 터치 상세 펼침
+
+v151 보강:
+- AI 전략별 성과 누적 저장
+- 실체결 기준 손익 계산용 매매 원장
+- 1일/1주/1개월 전략 랭킹
+- 시장역행 강세 점수
+- 과열/추격매수/슬리피지 위험 감점
+- 최소 주문금액/예수금 방어 강화
+- 상태/보유/전략성과/매매로그 자동 백업
 """
 
-import os
-import re
-import json
-import time
-import math
-import queue
-import secrets
-import threading
+import os, re, json, time, math, threading
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote_plus
 
-try:
-    import requests
-except Exception as e:
-    raise RuntimeError("requests 패키지가 필요합니다. requirements.txt에 requests를 추가하세요.") from e
+import requests
+from flask import Flask, jsonify, request, render_template_string
 
 try:
     import pandas as pd
@@ -36,40 +36,33 @@ except Exception:
     pd = None
 
 try:
-    import numpy as np
-except Exception:
-    np = None
-
-try:
     import FinanceDataReader as fdr
 except Exception:
     fdr = None
 
-from flask import Flask, jsonify, request, render_template_string, Response
 
-APP_VERSION = "v149"
+APP_VERSION = "v151"
 APP_NAME = "성일의 AI 주식바람"
-APP_BADGE = "KIWOOM REAL AUTO v149"
-
-app = Flask(__name__)
 KST = timezone(timedelta(hours=9))
+app = Flask(__name__)
 
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
+BASE_DIR.mkdir(parents=True, exist_ok=True)
+
+STATE_FILE = BASE_DIR / "sungil_trade_state_v151.json"
+HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v151.json"
+HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v151.json"
+CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v151.json"
+PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v151.json"
+TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v151.json"
+BACKUP_DIR = BASE_DIR / "sungil_backups_v151"
 try:
-    BASE_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
-    BASE_DIR = Path("/tmp")
+    pass
 
-HOLDINGS_FILE = Path(os.getenv("SERVER_HOLDINGS_FILE", str(BASE_DIR / "sungil_holdings_clean.json")))
-HOLDINGS_BACKUP_FILE = Path(os.getenv("SERVER_HOLDINGS_BACKUP_FILE", str(BASE_DIR / "sungil_holdings_last_good.json")))
-TRADE_STATE_FILE = Path(os.getenv("TRADE_STATE_FILE", str(BASE_DIR / "sungil_trade_state_clean.json")))
-CANDIDATE_CACHE_FILE = Path(os.getenv("CANDIDATE_CACHE_FILE", str(BASE_DIR / "sungil_candidates_cache.json")))
-ALERT_LOG_FILE = Path(os.getenv("ALERT_LOG_FILE", str(BASE_DIR / "sungil_alert_log.json")))
-
-FILE_LOCK = threading.RLock()
+DATA_LOCK = threading.RLock()
 WATCH_LOCK = threading.RLock()
-ORDER_LOCK = threading.RLock()
-TELEGRAM_Q = queue.Queue(maxsize=200)
 
 KIWOOM_BASE_URL = os.getenv("KIWOOM_BASE_URL", "https://api.kiwoom.com").rstrip("/")
 KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "").strip()
@@ -80,69 +73,61 @@ KIWOOM_SECRET_KEY = (
 ).strip()
 KIWOOM_REAL_TRADING = os.getenv("KIWOOM_REAL_TRADING", "false").lower() == "true"
 KIWOOM_DRY_RUN = os.getenv("KIWOOM_DRY_RUN", "true").lower() == "true"
-KIWOOM_PRICE_REQUIRED = os.getenv("KIWOOM_PRICE_REQUIRED", "true").lower() == "true"
-ORDER_CASH_SAFETY_RATE = float(os.getenv("ORDER_CASH_SAFETY_RATE", "0.96") or "0.96")
-PRICE_DIFF_LIMIT = float(os.getenv("PRICE_DIFF_LIMIT", "0.015") or "0.015")
-WATCH_INTERVAL = int(os.getenv("SERVER_WATCH_INTERVAL", "15") or "15")
-CANDIDATE_REFRESH_SEC = int(os.getenv("CANDIDATE_REFRESH_SEC", "45") or "45")
-CACHE_STALE_SEC = int(os.getenv("CACHE_STALE_SEC", "120") or "120")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
 TOKEN_CACHE = {"token": "", "expires": 0, "last_error": ""}
+WATCH_STATE = {"running": False, "thread": None, "last_check": "", "last_message": ""}
+
+DEFAULT_STATE = {
+    "auto_trade_enabled": False,
+    "panic_stop": False,
+    "daily_realized_pnl": 0,
+    "trade_count_today": 0,
+    "last_trade_date": "",
+    "target_rate": 0.027,
+    "stop_rate": -0.018,
+    "profit_guard_rate": 0.012,
+    "trailing_stop_rate": 0.011,
+    "max_positions": 3,
+    "min_order_cash": 50000,
+    "daily_max_loss": -30000,
+    "last_status": "대기중",
+    "last_status_time": "",
+    "last_message": "",
+    "last_kiwoom_debug": {},
+    "last_telegram_status": "",
+    "recent_alerts": [],
+    "current_strategy": "단타형",
+    "recommended_strategy": "단타형",
+    "switch_buy_enabled": False,
+    "rebuy_cooldown_minutes": 30,
+    "last_sell_times": {},
+    "index_risk_mode": "NORMAL",
+}
+
 
 THEME_MAP = {
-    "삼성전자": "AI반도체/HBM", "SK하이닉스": "AI반도체/HBM", "한미반도체": "AI반도체/HBM",
-    "제주반도체": "AI반도체/HBM", "SFA반도체": "AI반도체/HBM", "하나마이크론": "AI반도체/HBM",
-    "대한전선": "전력설비/데이터센터", "HD현대일렉트릭": "전력설비/데이터센터",
-    "효성중공업": "전력설비/데이터센터", "LS ELECTRIC": "전력설비/데이터센터", "삼성전기": "전력설비/데이터센터",
-    "이수페타시스": "AI서버/PCB", "대덕전자": "AI서버/PCB", "심텍": "AI서버/PCB",
-    "오이솔루션": "광통신/CPO", "라이트론": "광통신/CPO", "쏠리드": "광통신/CPO",
-    "레인보우로보틱스": "로봇/피지컬AI", "두산로보틱스": "로봇/피지컬AI", "휴림로봇": "로봇/피지컬AI",
-    "NAVER": "인터넷/플랫폼", "카카오": "인터넷/플랫폼", "삼성중공업": "조선/방산",
-    "현대로템": "방산/우주항공", "한화에어로스페이스": "방산/우주항공", "대한항공": "항공/물류",
+    "제주반도체": "AI반도체/HBM", "삼성전자": "AI반도체/HBM", "SK하이닉스": "AI반도체/HBM",
+    "한미반도체": "AI반도체/HBM", "SFA반도체": "AI반도체/HBM", "하나마이크론": "AI반도체/HBM",
+    "대한광통신": "광통신/CPO", "오이솔루션": "광통신/CPO", "쏠리드": "광통신/CPO",
+    "대한전선": "전력설비/데이터센터", "효성중공업": "전력설비/데이터센터",
+    "HD현대일렉트릭": "전력설비/데이터센터", "LS ELECTRIC": "전력설비/데이터센터",
+    "삼성전기": "전력설비/데이터센터", "이수페타시스": "AI서버/PCB",
 }
-KEYWORD_THEMES = {
-    "AI반도체/HBM": ["반도체", "하이닉스", "HBM", "마이크론", "리노", "ISC"],
-    "전력설비/데이터센터": ["전력", "전기", "일렉트릭", "변압기", "전선", "중공업", "데이터센터"],
-    "AI서버/PCB": ["PCB", "기판", "페타시스", "대덕", "심텍"],
-    "광통신/CPO": ["광", "통신", "네트웍스", "오이솔루션", "쏠리드"],
-    "로봇/피지컬AI": ["로봇", "로보", "휴림", "뉴로메카", "레인보우"],
-    "방산/우주항공": ["방산", "우주", "항공", "로템", "한화"],
-    "조선/방산": ["조선", "중공업", "선박"],
-}
-THEME_WEIGHT = {
-    "AI반도체/HBM": 1.35, "전력설비/데이터센터": 1.30, "AI서버/PCB": 1.20,
-    "광통신/CPO": 1.18, "로봇/피지컬AI": 1.15, "방산/우주항공": 1.14,
-    "조선/방산": 1.08, "인터넷/플랫폼": 1.03, "기타/개별이슈": 0.96,
-}
-FALLBACK_STOCKS = [
-    {"Code": "080220", "Name": "제주반도체", "Market": "KOSDAQ", "Close": 122800, "ChagesRatio": 4.24, "Amount": 93040000000, "Volume": 7800000, "Marcap": 420000000000},
-    {"Code": "010140", "Name": "삼성중공업", "Market": "KOSPI", "Close": 29550, "ChagesRatio": 2.7, "Amount": 245450000000, "Volume": 12000000, "Marcap": 25000000000000},
-    {"Code": "009150", "Name": "삼성전기", "Market": "KOSPI", "Close": 1262000, "ChagesRatio": 4.82, "Amount": 180000000000, "Volume": 140000, "Marcap": 9000000000000},
-    {"Code": "001120", "Name": "LX인터내셔널", "Market": "KOSPI", "Close": 34400, "ChagesRatio": 3.2, "Amount": 56000000000, "Volume": 1550000, "Marcap": 1300000000000},
-    {"Code": "000660", "Name": "SK하이닉스", "Market": "KOSPI", "Close": 226000, "ChagesRatio": 1.8, "Amount": 500000000000, "Volume": 2500000, "Marcap": 160000000000000},
-    {"Code": "005930", "Name": "삼성전자", "Market": "KOSPI", "Close": 77000, "ChagesRatio": 1.2, "Amount": 800000000000, "Volume": 11000000, "Marcap": 460000000000000},
-    {"Code": "298040", "Name": "효성중공업", "Market": "KOSPI", "Close": 415000, "ChagesRatio": 5.1, "Amount": 110000000000, "Volume": 300000, "Marcap": 3900000000000},
-    {"Code": "001440", "Name": "대한전선", "Market": "KOSPI", "Close": 16500, "ChagesRatio": 3.8, "Amount": 92000000000, "Volume": 6000000, "Marcap": 2500000000000},
+FALLBACK_CANDIDATES = [
+    {"market": "KOSDAQ", "code": "080220", "name": "제주반도체", "theme": "AI반도체/HBM", "price": 122800, "dayChange": 4.24, "amount": 93040000000, "score": 92.5},
+    {"market": "KOSPI", "code": "010140", "name": "삼성중공업", "theme": "조선/방산", "price": 29550, "dayChange": 2.73, "amount": 110870000000, "score": 88.3},
+    {"market": "KOSPI", "code": "009150", "name": "삼성전기", "theme": "전력설비/데이터센터", "price": 126200, "dayChange": 4.82, "amount": 245450000000, "score": 86.7},
 ]
-
-WATCH_STATE = {
-    "running": False,
-    "thread": None,
-    "last_check": "",
-    "best_code": "",
-    "best_score": 0,
-    "last_alerts": {},
-}
 
 
 def now_kst():
     return datetime.now(KST)
 
 
-def fmt_time():
+def now_text():
     return now_kst().strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -151,8 +136,8 @@ def safe_float(v, default=0.0):
         if v is None:
             return default
         if isinstance(v, str):
-            v = v.replace(",", "").replace("+", "").strip()
-            if v == "":
+            v = v.replace(",", "").strip()
+            if not v:
                 return default
         f = float(v)
         if math.isnan(f) or math.isinf(f):
@@ -170,178 +155,124 @@ def safe_int(v, default=0):
 
 
 def money(v):
-    try:
-        return f"{int(round(safe_float(v, 0))):,}원"
-    except Exception:
-        return "0원"
+    return f"{int(round(safe_float(v, 0))):,}원"
 
 
 def pct(v):
-    try:
-        return f"{safe_float(v, 0):.2f}%"
-    except Exception:
-        return "0.00%"
+    return f"{safe_float(v, 0):.2f}%"
 
 
-def atomic_write_json(path, data):
-    with FILE_LOCK:
+def read_json(path, default):
+    with DATA_LOCK:
+        try:
+            if Path(path).exists():
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        return default
+
+
+def write_json(path, data):
+    with DATA_LOCK:
         path = Path(path)
         tmp = path.with_suffix(path.suffix + ".tmp")
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         os.replace(tmp, path)
-    return True
 
 
-def read_json(path, default):
+
+
+def backup_json_file(path, label):
+    """상태/보유/성과 파일을 자동 백업합니다. 최근 30개만 유지합니다."""
     try:
-        with FILE_LOCK:
-            path = Path(path)
-            if not path.exists():
-                return default
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return data
+        path = Path(path)
+        if not path.exists():
+            return False
+        ts = now_kst().strftime("%Y%m%d_%H%M%S")
+        dst = BACKUP_DIR / f"{label}_{ts}.json"
+        dst.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        old = sorted(BACKUP_DIR.glob(f"{label}_*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
+        for x in old[30:]:
+            try: x.unlink()
+            except Exception: pass
+        return True
     except Exception:
-        return default
+        return False
 
 
-def read_holdings():
-    data = read_json(HOLDINGS_FILE, [])
-    return data if isinstance(data, list) else []
+def auto_backup_all():
+    try:
+        for p,label in [(STATE_FILE,'state'),(HOLDINGS_FILE,'holdings'),(HOLDINGS_BACKUP_FILE,'holdings_last_good'),(PERFORMANCE_FILE,'performance'),(TRADE_LEDGER_FILE,'trade_ledger')]:
+            backup_json_file(p,label)
+        return True
+    except Exception:
+        return False
 
-
-def write_holdings(items, backup_if_nonempty=True):
-    items = items if isinstance(items, list) else []
-    atomic_write_json(HOLDINGS_FILE, items)
-    if backup_if_nonempty and items:
-        atomic_write_json(HOLDINGS_BACKUP_FILE, {"items": items, "updated_at": fmt_time(), "source": "LAST_GOOD"})
-    return True
-
-
-def read_last_good_holdings():
-    data = read_json(HOLDINGS_BACKUP_FILE, {})
-    if isinstance(data, dict) and isinstance(data.get("items"), list):
-        return data.get("items"), data.get("updated_at", "")
-    if isinstance(data, list):
-        return data, ""
-    return [], ""
-
-
-def write_alert_log(msg, ok=True):
-    logs = read_json(ALERT_LOG_FILE, [])
-    if not isinstance(logs, list):
-        logs = []
-    logs.insert(0, {"time": fmt_time(), "ok": bool(ok), "message": str(msg)[:500]})
-    logs = logs[:50]
-    atomic_write_json(ALERT_LOG_FILE, logs)
-
-
-TRADE_DEFAULTS = {
-    "auto_trade_enabled": False,
-    "panic_stop": False,
-    "daily_realized_pnl": 0,
-    "trade_count_today": 0,
-    "last_trade_date": "",
-    "last_status": "대기중",
-    "last_status_time": "",
-    "last_order_message": "",
-    "last_candidate": None,
-    "last_kiwoom_debug": {},
-    "max_positions": 3,
-    "min_order_cash": 50000,
-    "daily_max_loss": -30000,
-    "target_rate": 0.027,
-    "stop_rate": -0.018,
-    "profit_guard_rate": 0.012,
-    "trailing_stop_rate": 0.011,
-    "force_exit_time": "15:15",
-    "max_trades_per_day": 10,
-    "trade_log": [],
-}
-
-
-def read_trade_state():
-    data = read_json(TRADE_STATE_FILE, {})
-    state = dict(TRADE_DEFAULTS)
-    if isinstance(data, dict):
-        state.update(data)
+def read_state():
+    state = dict(DEFAULT_STATE)
+    saved = read_json(STATE_FILE, {})
+    if isinstance(saved, dict):
+        state.update(saved)
     return state
 
 
-def write_trade_state(state):
-    merged = dict(TRADE_DEFAULTS)
-    if isinstance(state, dict):
-        merged.update(state)
-    atomic_write_json(TRADE_STATE_FILE, merged)
-    return True
+def write_state(state):
+    write_json(STATE_FILE, state)
 
 
-def update_status(status, message="", candidate=None, extra=None):
-    state = read_trade_state()
-    state["last_status"] = str(status)
-    state["last_status_time"] = fmt_time()
-    state["last_order_message"] = str(message)[:800]
-    if candidate is not None:
-        state["last_candidate"] = candidate
+def set_status(status, message="", extra=None):
+    state = read_state()
+    state["last_status"] = status
+    state["last_status_time"] = now_text()
+    state["last_message"] = str(message or "")[:800]
     if extra:
         state.update(extra)
-    write_trade_state(state)
+    write_state(state)
     return state
 
 
-def update_kiwoom_debug(stage, message="", code="", status=0, data=None):
-    state = read_trade_state()
-    state["last_kiwoom_debug"] = {
-        "time": fmt_time(),
-        "stage": str(stage),
-        "code": str(code),
-        "http_status": status,
-        "message": kiwoom_help_message(message),
-        "data": scrub_sensitive(data),
-    }
-    write_trade_state(state)
+def add_alert(text):
+    state = read_state()
+    alerts = state.get("recent_alerts", [])
+    alerts.insert(0, {"time": now_kst().strftime("%H:%M:%S"), "text": str(text)[:200]})
+    state["recent_alerts"] = alerts[:5]
+    write_state(state)
 
 
-def scrub_sensitive(data):
-    if not isinstance(data, dict):
-        return str(data)[:500] if data is not None else None
-    out = {}
-    for k, v in list(data.items())[:30]:
-        if str(k).lower() in ["token", "authorization", "appkey", "secretkey", "secret"]:
-            continue
-        out[str(k)] = str(v)[:300] if not isinstance(v, (dict, list)) else "..."
-    return out
-
-
-def kiwoom_help_message(msg):
+def auth_message(msg):
     s = str(msg or "")
     if "8050" in s or "지정단말기" in s or "인증에 실패" in s:
-        return "키움 인증 실패(8050)입니다. Render IP·App Key/Secret·영웅문S# 지정단말기/추가인증을 확인하세요."
-    if "8001" in s or "8002" in s or "App Key" in s or "Secret" in s:
-        return "키움 App Key/Secret 오류입니다. Render 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 값을 확인하세요."
-    return s[:700]
+        return "키움 인증 실패(8050/지정단말기)입니다. Render IP 등록, App Key/Secret 재발급·입력, 영웅문S# 지정단말기/추가인증 상태를 확인하세요."
+    if "App Key" in s or "Secret" in s or "8001" in s or "8002" in s:
+        return "키움 App Key/Secret 확인이 필요합니다. Render 환경변수를 다시 확인하세요."
+    if not KIWOOM_APP_KEY or not KIWOOM_SECRET_KEY:
+        return "키움 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY가 필요합니다."
+    return s or "키움 API 미확인"
 
 
-def market_is_open():
-    n = now_kst()
-    if n.weekday() >= 5:
-        return False
-    hm = n.hour * 100 + n.minute
-    return 900 <= hm <= 1520
+def update_kiwoom_debug(stage, message="", http_status=0):
+    state = read_state()
+    state["last_kiwoom_debug"] = {
+        "time": now_text(),
+        "stage": stage,
+        "http_status": http_status,
+        "message": auth_message(message),
+    }
+    write_state(state)
 
 
 def kiwoom_ready():
     return bool(KIWOOM_APP_KEY and KIWOOM_SECRET_KEY)
 
 
-def kiwoom_get_token():
+def get_kiwoom_token():
     if TOKEN_CACHE["token"] and time.time() < TOKEN_CACHE["expires"]:
         return TOKEN_CACHE["token"]
     if not kiwoom_ready():
-        msg = "KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 환경변수가 비어 있습니다."
-        TOKEN_CACHE["last_error"] = msg
-        update_kiwoom_debug("token_env_missing", msg)
+        msg = auth_message("")
+        update_kiwoom_debug("env_missing", msg)
         raise RuntimeError(msg)
     try:
         r = requests.post(
@@ -353,515 +284,540 @@ def kiwoom_get_token():
         try:
             data = r.json() if r.text else {}
         except Exception:
-            data = {"raw": r.text[:500]}
-        if r.status_code != 200 or not data.get("token"):
-            msg = data.get("return_msg") or data.get("message") or str(data)[:500]
-            TOKEN_CACHE["last_error"] = msg
-            update_kiwoom_debug("token_fail", msg, status=r.status_code, data=data)
-            raise RuntimeError("키움 토큰 발급 실패: " + str(msg))
-        TOKEN_CACHE["token"] = data["token"]
-        TOKEN_CACHE["expires"] = time.time() + 60 * 60 * 23
-        TOKEN_CACHE["last_error"] = ""
-        update_kiwoom_debug("token_ok", "토큰 발급 성공", status=r.status_code)
-        return TOKEN_CACHE["token"]
+            data = {"raw": r.text[:300]}
+        token = data.get("token")
+        if r.status_code != 200 or not token:
+            msg = data.get("return_msg") or data.get("message") or str(data)[:300]
+            update_kiwoom_debug("token_fail", msg, r.status_code)
+            raise RuntimeError(auth_message(msg))
+        TOKEN_CACHE.update({"token": token, "expires": time.time() + 23 * 3600, "last_error": ""})
+        update_kiwoom_debug("token_ok", "키움 토큰 정상", r.status_code)
+        return token
     except Exception as e:
         TOKEN_CACHE["last_error"] = str(e)
         update_kiwoom_debug("token_exception", str(e))
         raise
 
 
-def kiwoom_headers(api_id):
-    token = kiwoom_get_token()
-    return {
+def kiwoom_post(path, api_id, body=None, timeout=8):
+    token = get_kiwoom_token()
+    headers = {
         "Content-Type": "application/json;charset=UTF-8",
         "authorization": "Bearer " + token,
         "cont-yn": "N",
         "next-key": "",
         "api-id": api_id,
     }
+    r = requests.post(KIWOOM_BASE_URL + path, json=body or {}, headers=headers, timeout=timeout)
+    try:
+        data = r.json() if r.text else {}
+    except Exception:
+        data = {"raw": r.text[:1000]}
+    return r.status_code, data
+
+
+def deep_find_number(obj, keywords):
+    best = 0
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if any(w in str(k) for w in keywords):
+                val = abs(safe_float(str(v).replace("+", "").replace("-", ""), 0))
+                best = max(best, val)
+            best = max(best, deep_find_number(v, keywords))
+    elif isinstance(obj, list):
+        for item in obj:
+            best = max(best, deep_find_number(item, keywords))
+    return best
 
 
 def parse_price(data):
-    keys = ["cur_prc", "curPrice", "currentPrice", "now", "price", "stck_prpr", "현재가", "closePrice", "lastPrice"]
-    if isinstance(data, dict):
-        for k in keys:
-            if k in data:
-                p = abs(safe_float(str(data.get(k)).replace("-", "").replace("+", ""), 0))
-                if p >= 10:
-                    return p
-        for v in data.values():
-            p = parse_price(v)
-            if p >= 10:
-                return p
-    elif isinstance(data, list):
-        for x in data:
-            p = parse_price(x)
-            if p >= 10:
-                return p
-    return 0
+    return deep_find_number(data, ["cur_prc", "현재가", "currentPrice", "stck_prpr", "closePrice", "lastPrice"])
 
 
-def get_kiwoom_live_price(code):
+def get_kiwoom_price(code):
     code = str(code).zfill(6)
     try:
-        r = requests.post(
-            KIWOOM_BASE_URL + "/api/dostk/stkinfo",
-            json={"stk_cd": code},
-            headers=kiwoom_headers("ka10001"),
-            timeout=7,
-        )
-        data = r.json() if r.text else {}
+        st, data = kiwoom_post("/api/dostk/stkinfo", "ka10001", {"stk_cd": code}, timeout=5)
         p = parse_price(data)
-        if r.status_code == 200 and p >= 10:
-            update_kiwoom_debug("price_ok", f"{code} 현재가 {p}", code=code, status=r.status_code)
-            return p
-        msg = data.get("return_msg") or data.get("message") or str(data)[:500]
-        update_kiwoom_debug("price_fail", msg, code=code, status=r.status_code, data=data)
+        if st == 200 and p >= 10:
+            return p, "KIWOOM"
+        update_kiwoom_debug("price_fail", str(data)[:300], st)
     except Exception as e:
-        update_kiwoom_debug("price_exception", str(e), code=code)
-    return 0
+        update_kiwoom_debug("price_exception", str(e))
+    return 0, "NONE"
 
 
-def get_naver_live_price(code):
+def get_naver_price(code):
     code = str(code).zfill(6)
     headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://m.stock.naver.com/"}
-    urls = [f"https://m.stock.naver.com/api/stock/{code}/basic", f"https://api.stock.naver.com/stock/{code}/basic"]
-    for url in urls:
+    for url in [f"https://m.stock.naver.com/api/stock/{code}/basic", f"https://api.stock.naver.com/stock/{code}/basic"]:
         try:
             r = requests.get(url, headers=headers, timeout=3)
-            if r.status_code == 200 and r.text:
+            if r.status_code == 200:
                 data = r.json()
-                for k in ["closePrice", "now", "lastPrice", "currentPrice"]:
-                    if k in data:
-                        p = safe_float(str(data[k]).replace(",", ""), 0)
+                for key in ["closePrice", "now", "lastPrice", "currentPrice"]:
+                    if key in data:
+                        p = safe_float(str(data[key]).replace(",", ""))
                         if p >= 10:
-                            return p
+                            return p, "NAVER"
         except Exception:
             pass
-    try:
-        r = requests.get(f"https://finance.naver.com/item/main.naver?code={code}", headers=headers, timeout=3)
-        m = re.search(r'<p class="no_today">[\s\S]*?<span class="blind">([\d,]+)</span>', r.text)
-        if m:
-            p = safe_float(m.group(1).replace(",", ""), 0)
-            if p >= 10:
-                return p
-    except Exception:
-        pass
-    return 0
+    return 0, "NONE"
 
 
-def get_trade_live_price(code, fallback=True):
-    p = get_kiwoom_live_price(code)
+def get_trade_price(code, fallback=True):
+    p, src = get_kiwoom_price(code)
     if p >= 10:
-        return p, "KIWOOM"
+        return p, src
     if fallback:
-        p2 = get_naver_live_price(code)
-        if p2 >= 10:
-            return p2, "NAVER"
+        return get_naver_price(code)
     return 0, "NONE"
 
 
 def parse_cash(data):
-    if not isinstance(data, (dict, list)):
-        return 0
-    order_keys = ["ord_psbl", "buy_psbl", "주문가능", "매수가능", "현금주문가능", "ord_alow", "available", "avail"]
-    deposit_keys = ["예수금", "dpst", "deposit", "cash", "현금", "추정인출", "인출가능"]
-
-    def deep(obj, keys):
-        best = 0
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                if any(w in str(k) for w in keys):
-                    best = max(best, abs(safe_float(v, 0)))
-                best = max(best, deep(v, keys))
-        elif isinstance(obj, list):
-            for x in obj:
-                best = max(best, deep(x, keys))
-        return best
-
-    return deep(data, order_keys) or deep(data, deposit_keys)
+    orderable = deep_find_number(data, ["주문가능", "매수가능", "ord_psbl", "buy_psbl", "available", "avail"])
+    deposit = deep_find_number(data, ["예수금", "deposit", "dpst", "cash", "현금"])
+    return int(orderable or deposit or 0)
 
 
-def get_kiwoom_cash():
+def get_cash_info():
     if not kiwoom_ready():
-        return {"ok": False, "cash": 0, "source": "NONE", "message": "키움 환경변수 미설정"}
-    endpoints = [
-        ("/api/dostk/acnt", "kt00001", {"qry_tp": os.getenv("KIWOOM_CASH_QRY_TP", "3")}),
-        ("/api/dostk/acnt", "kt00004", {"qry_tp": os.getenv("KIWOOM_CASH_QRY_TP", "3")}),
-        ("/api/dostk/acnt", "kt00018", {"qry_tp": os.getenv("KIWOOM_CASH_QRY_TP", "3")}),
-    ]
+        return {"ok": False, "cash": 0, "source": "NONE", "message": auth_message("")}
+    endpoints = [("kt00001", {"qry_tp": "3"}), ("kt00004", {"qry_tp": "3"}), ("kt00018", {"qry_tp": "3"})]
     last = ""
-    for path, api_id, body in endpoints:
+    for api_id, body in endpoints:
         try:
-            r = requests.post(KIWOOM_BASE_URL + path, json=body, headers=kiwoom_headers(api_id), timeout=7)
-            data = r.json() if r.text else {}
+            st, data = kiwoom_post("/api/dostk/acnt", api_id, body, timeout=7)
             cash = parse_cash(data)
-            if r.status_code == 200 and cash > 0:
-                update_kiwoom_debug("cash_ok", f"주문가능금액 {cash}", status=r.status_code)
+            if st == 200 and cash > 0:
                 return {"ok": True, "cash": cash, "source": "KIWOOM", "message": "키움 주문가능금액 조회 성공"}
-            last = data.get("return_msg") or data.get("message") or str(data)[:500]
-            update_kiwoom_debug("cash_fail", last, status=r.status_code, data=data)
+            last = str(data)[:300]
+            update_kiwoom_debug("cash_fail", last, st)
         except Exception as e:
             last = str(e)
             update_kiwoom_debug("cash_exception", last)
-    return {"ok": False, "cash": 0, "source": "NONE", "message": last or "키움 주문가능금액 조회 실패"}
+    return {"ok": False, "cash": 0, "source": "NONE", "message": auth_message(last)}
 
 
-def find_list_candidates(obj):
-    found = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if isinstance(v, list) and v and isinstance(v[0], dict):
-                joined = " ".join(str(x) for item in v[:2] for x in item.keys())
-                if any(w in joined for w in ["종목", "stk", "qty", "보유", "현재가", "매입"]):
-                    found.append(v)
-            found += find_list_candidates(v)
-    elif isinstance(obj, list):
-        for x in obj:
-            found += find_list_candidates(x)
-    return found
-
-
-def parse_kiwoom_holdings(data):
-    lists = find_list_candidates(data)
+def parse_holdings(data):
+    if not isinstance(data, dict):
+        return []
+    lists = []
+    for v in data.values():
+        if isinstance(v, list):
+            lists.append(v)
+        elif isinstance(v, dict):
+            for vv in v.values():
+                if isinstance(vv, list):
+                    lists.append(vv)
     out = []
-    for rows in lists:
-        for row in rows:
-            if not isinstance(row, dict):
+    for arr in lists:
+        for item in arr:
+            if not isinstance(item, dict):
                 continue
-            code = str(
-                row.get("stk_cd") or row.get("code") or row.get("종목코드") or row.get("pdno") or row.get("isu_cd") or ""
-            )
-            code = re.sub(r"[^0-9]", "", code).zfill(6)
-            name = str(row.get("stk_nm") or row.get("name") or row.get("종목명") or row.get("isu_nm") or "").strip()
-            qty = (
-                row.get("rmnd_qty") or row.get("hldg_qty") or row.get("qty") or row.get("보유수량") or row.get("수량") or row.get("ord_psbl_qty")
-            )
-            buy = (
-                row.get("avg_prc") or row.get("pchs_avg_pric") or row.get("buyPrice") or row.get("매입가") or row.get("평균단가") or row.get("매입평균가")
-            )
-            cur = row.get("cur_prc") or row.get("now") or row.get("현재가") or row.get("lastPrice")
-            q = safe_float(qty, 0)
-            b = abs(safe_float(buy, 0))
-            c = abs(safe_float(cur, 0))
-            if code and code != "000000" and q > 0:
-                target = round(b * (1 + safe_float(read_trade_state().get("target_rate"), 0.027))) if b else 0
-                stop = round(b * (1 + safe_float(read_trade_state().get("stop_rate"), -0.018))) if b else 0
-                out.append(normalize_holding({
-                    "code": code, "name": name or code, "qty": int(q), "buyPrice": b,
-                    "lastPrice": c, "target": target, "stop": stop,
-                    "source": "KIWOOM", "lastCheckedAt": fmt_time(),
-                }))
-    uniq = {}
+            raw = json.dumps(item, ensure_ascii=False)
+            code = ""
+            for key in ["stk_cd", "code", "종목코드", "pdno"]:
+                if key in item:
+                    code = re.sub(r"[^0-9]", "", str(item.get(key, ""))).zfill(6)
+                    break
+            if not code or code == "000000":
+                m = re.search(r"\b(\d{6})\b", raw)
+                code = m.group(1) if m else ""
+            name = ""
+            for key in ["stk_nm", "name", "종목명", "prdt_name"]:
+                if key in item:
+                    name = str(item.get(key, "")).strip()
+                    break
+            qty = deep_find_number(item, ["보유수량", "poss_qty", "hldg_qty", "qty", "수량"])
+            buy = deep_find_number(item, ["평균단가", "매입가", "pchs_avg", "buyPrice", "매수가"])
+            if code and qty > 0:
+                cur, src = get_trade_price(code, fallback=True)
+                if cur <= 0:
+                    cur = buy
+                    src = "CACHE"
+                h = normalize_holding({
+                    "code": code, "name": name or code, "qty": int(qty), "buyPrice": int(buy or cur),
+                    "lastPrice": int(cur), "priceSource": src, "lastCheckedAt": now_text(),
+                    "target": int((buy or cur) * 1.027), "stop": int((buy or cur) * 0.982),
+                })
+                out.append(h)
+    # 중복 제거
+    unique = {}
     for h in out:
-        uniq[h["code"]] = h
-    return list(uniq.values())
+        unique[h["code"]] = h
+    return list(unique.values())
 
 
 def fetch_kiwoom_holdings():
     if not kiwoom_ready():
-        return {"ok": False, "items": [], "message": "키움 환경변수 미설정", "auth_failure": True}
-    endpoints = [
-        ("/api/dostk/acnt", "kt00018", {"qry_tp": "2"}),
-        ("/api/dostk/acnt", "kt00004", {"qry_tp": "2"}),
-        ("/api/dostk/acnt", "kt00001", {"qry_tp": "2"}),
-    ]
+        return {"ok": False, "holdings": [], "message": auth_message(""), "source": "NONE"}
     last = ""
-    for path, api_id, body in endpoints:
+    for api_id in ["kt00018", "kt00004", "kt00001"]:
         try:
-            r = requests.post(KIWOOM_BASE_URL + path, json=body, headers=kiwoom_headers(api_id), timeout=8)
-            data = r.json() if r.text else {}
-            if r.status_code == 200:
-                items = parse_kiwoom_holdings(data)
-                update_kiwoom_debug("holdings_ok", f"보유 {len(items)}개 조회", status=r.status_code)
-                return {"ok": True, "items": items, "message": f"키움 보유 {len(items)}개 조회", "empty": len(items) == 0}
-            last = data.get("return_msg") or data.get("message") or str(data)[:500]
-            update_kiwoom_debug("holdings_fail", last, status=r.status_code, data=data)
+            st, data = kiwoom_post("/api/dostk/acnt", api_id, {"qry_tp": "3"}, timeout=8)
+            items = parse_holdings(data)
+            if st == 200 and items:
+                write_json(HOLDINGS_FILE, items)
+                write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": items})
+                return {"ok": True, "holdings": items, "message": f"키움 실보유 {len(items)}종목 조회 성공", "source": "KIWOOM"}
+            last = str(data)[:300]
+            update_kiwoom_debug("holdings_empty_or_fail", last, st)
         except Exception as e:
             last = str(e)
             update_kiwoom_debug("holdings_exception", last)
-    auth_failure = any(w in last for w in ["8050", "인증", "지정단말기", "token", "토큰", "App Key"])
-    return {"ok": False, "items": [], "message": kiwoom_help_message(last), "auth_failure": auth_failure}
+    cached = get_cached_holdings()
+    return {"ok": False, "holdings": cached, "message": auth_message(last) if last else "키움 보유 조회 실패", "source": "CACHE" if cached else "EMPTY"}
+
+
+def get_cached_holdings():
+    data = read_json(HOLDINGS_BACKUP_FILE, {})
+    if isinstance(data, dict) and isinstance(data.get("items"), list) and data["items"]:
+        return data["items"]
+    items = read_json(HOLDINGS_FILE, [])
+    return items if isinstance(items, list) else []
 
 
 def normalize_holding(h):
     h = dict(h or {})
-    code = re.sub(r"[^0-9]", "", str(h.get("code", ""))).zfill(6)
-    h["code"] = code
-    h["name"] = str(h.get("name") or code)
-    h["qty"] = safe_int(h.get("qty"), 0)
-    h["buyPrice"] = safe_float(h.get("buyPrice"), 0)
-    h["lastPrice"] = safe_float(h.get("lastPrice"), 0)
-    if h["lastPrice"] <= 0 and code != "000000":
-        h["lastPrice"] = get_naver_live_price(code)
-        if h["lastPrice"] > 0:
-            h["priceSource"] = "NAVER"
-    target_rate = safe_float(read_trade_state().get("target_rate"), 0.027)
-    stop_rate = safe_float(read_trade_state().get("stop_rate"), -0.018)
-    if safe_float(h.get("target"), 0) <= 0 and h["buyPrice"] > 0:
-        h["target"] = round(h["buyPrice"] * (1 + target_rate))
-    if safe_float(h.get("stop"), 0) <= 0 and h["buyPrice"] > 0:
-        h["stop"] = round(h["buyPrice"] * (1 + stop_rate))
-    return update_trailing_fields(h)
+    buy = safe_float(h.get("buyPrice") or h.get("buy") or h.get("avgPrice"), 0)
+    cur = safe_float(h.get("lastPrice") or h.get("price") or buy, 0)
+    qty = safe_int(h.get("qty") or h.get("quantity"), 0)
+    target = safe_float(h.get("target"), buy * 1.027 if buy else cur * 1.027)
+    stop = safe_float(h.get("stop"), buy * 0.982 if buy else cur * 0.982)
 
-
-def update_trailing_fields(h):
-    h = dict(h or {})
-    buy = safe_float(h.get("buyPrice"), 0)
-    cur = safe_float(h.get("lastPrice"), 0)
-    target = safe_float(h.get("target"), 0)
-    stop = safe_float(h.get("stop"), 0)
-    state = read_trade_state()
-    trail_rate = safe_float(state.get("trailing_stop_rate"), 0.011)
-    if buy <= 0 or cur <= 0:
-        return h
-    high = max(safe_float(h.get("highestPrice"), 0), cur)
-    high_profit = ((high - buy) / buy * 100) if buy else 0
+    high = max(safe_float(h.get("highestPrice"), 0), cur, buy)
+    base_target = safe_float(h.get("baseTarget"), target)
     dynamic_target = safe_float(h.get("activeDynamicTarget"), 0)
-    ai_hold = False
-    reason = ""
-    if target > 0 and cur >= target:
-        ai_hold = True
-        dynamic_target = max(dynamic_target, round(high * 1.015), round(target * 1.02))
-        trailing_stop = max(stop, round(high * (1 - trail_rate)))
-        reason = "기본 목표가를 돌파했지만 강세로 판단되어 AI 상향 목표/트레일링 보호선으로 추적 중입니다."
-    else:
-        trailing_stop = safe_float(h.get("trailingStopPrice"), 0) or stop
-        reason = "기본 목표/손절 사이 관찰 구간입니다."
-    h["highestPrice"] = high
-    h["highestProfitPct"] = round(high_profit, 2)
-    h["activeDynamicTarget"] = dynamic_target
-    h["trailingStopPrice"] = trailing_stop
-    h["aiHoldMode"] = ai_hold
-    h["aiHoldReason"] = reason
+    if cur > base_target:
+        dynamic_target = max(dynamic_target, cur * 1.012)
+    trail = safe_float(h.get("trailingStopPrice"), 0)
+    if high > base_target:
+        trail = max(trail, high * (1 - safe_float(read_state().get("trailing_stop_rate", 0.011), 0.011)))
+
+    h.update({
+        "code": str(h.get("code", "")).zfill(6),
+        "name": h.get("name") or h.get("code", ""),
+        "qty": qty,
+        "buyPrice": int(buy),
+        "lastPrice": int(cur),
+        "target": int(target),
+        "stop": int(stop),
+        "baseTarget": int(base_target),
+        "activeDynamicTarget": int(dynamic_target) if dynamic_target else 0,
+        "trailingStopPrice": int(trail) if trail else 0,
+        "highestPrice": int(high),
+        "profitRate": ((cur - buy) / buy * 100) if buy else 0,
+        "pnl": int((cur - buy) * qty) if buy and qty else 0,
+    })
     return h
 
 
-def sync_holdings_from_kiwoom(force=False):
-    res = fetch_kiwoom_holdings()
-    if res.get("ok"):
-        items = [normalize_holding(x) for x in res.get("items", [])]
-        if items:
-            write_holdings(items, backup_if_nonempty=True)
-            update_status("키움 실보유 동기화 완료", f"보유 {len(items)}개")
-            return {"ok": True, "items": items, "source": "KIWOOM", "message": f"키움 보유 {len(items)}개 동기화"}
-        # 키움이 정상 응답으로 0개를 준 경우에만 기존 파일을 비워도 되지만,
-        # 사용자가 혼동하지 않도록 장중/인증 애매할 때는 백업 유지.
-        if force:
-            write_holdings([], backup_if_nonempty=False)
-            return {"ok": True, "items": [], "source": "KIWOOM_EMPTY", "message": "키움 정상 응답: 보유 0개"}
-        last_items, updated = read_last_good_holdings()
-        return {"ok": True, "items": last_items, "source": "LAST_GOOD_AFTER_EMPTY", "message": f"키움 0개 응답, 마지막 정상 캐시 유지 {updated}"}
-    # 실패 시 절대 빈 리스트로 덮어쓰지 않음
-    items = read_holdings()
-    source = "LOCAL_CACHE"
-    if not items:
-        items, updated = read_last_good_holdings()
-        source = "LAST_GOOD"
-    msg = res.get("message") or "키움 보유 조회 실패"
-    update_status("키움 API 확인 필요", msg)
-    return {"ok": False, "items": [normalize_holding(x) for x in items], "source": source, "message": msg, "auth_failure": res.get("auth_failure", False)}
+def read_holdings():
+    return [normalize_holding(h) for h in get_cached_holdings()]
 
 
-def classify_theme(name):
-    name = str(name)
-    if name in THEME_MAP:
-        return THEME_MAP[name]
-    for theme, kws in KEYWORD_THEMES.items():
-        if any(kw in name for kw in kws):
-            return theme
-    return "기타/개별이슈"
-
-
-def get_market_rows(limit=900):
-    rows = []
-    if fdr is not None and pd is not None:
-        try:
-            df = fdr.StockListing("KRX")
-            if df is not None and len(df) > 0:
-                for _, r in df.head(limit).iterrows():
-                    rows.append({
-                        "Code": str(r.get("Code", "")).zfill(6),
-                        "Name": str(r.get("Name", "")),
-                        "Market": str(r.get("Market", "")),
-                        "Close": safe_float(r.get("Close"), 0),
-                        "ChagesRatio": safe_float(r.get("ChagesRatio", r.get("Change", 0)), 0),
-                        "Amount": safe_float(r.get("Amount"), 0),
-                        "Volume": safe_float(r.get("Volume"), 0),
-                        "Marcap": safe_float(r.get("Marcap"), 0),
-                    })
-        except Exception as e:
-            update_status("KRX 조회 실패", str(e))
-    if not rows:
-        rows = [dict(x) for x in FALLBACK_STOCKS]
-    return rows
-
-
-def score_candidate(row, cash=500000):
-    name = str(row.get("Name", ""))
-    code = str(row.get("Code", "")).zfill(6)
-    price = safe_float(row.get("Close"), 0)
-    change = safe_float(row.get("ChagesRatio"), 0)
-    amount = safe_float(row.get("Amount"), 0)
-    volume = safe_float(row.get("Volume"), 0)
-    marcap = safe_float(row.get("Marcap"), 0)
-    theme = classify_theme(name)
-    weight = THEME_WEIGHT.get(theme, 0.96)
-    amount_score = min(100, amount / 1_000_000_000 * 2.2)
-    volume_score = min(100, math.log10(max(volume, 10)) * 16)
-    if 1.0 <= change <= 5.0:
-        change_score = 95
-    elif 5.0 < change <= 9.0:
-        change_score = 78
-    elif 0.2 <= change < 1.0:
-        change_score = 55
-    else:
-        change_score = 42
-    marcap_score = min(100, math.log10(max(marcap, 10)) * 5)
-    score = (amount_score * 0.35 + volume_score * 0.22 + change_score * 0.28 + marcap_score * 0.15) * weight
-    score = round(max(0, min(150, score)), 2)
-    qty_possible = int(cash // price) if price > 0 else 0
-    return {
-        "code": code, "name": name, "market": str(row.get("Market", "")), "theme": theme,
-        "price": round(price), "priceSource": "KRX_FAST_CACHE" if fdr is not None else "LOCAL_FALLBACK",
-        "dayChange": round(change, 2), "amount": round(amount), "volume": round(volume),
-        "score": score, "qtyPossible": qty_possible, "buyZone": round(price * 0.995),
-        "target": round(price * 1.035), "stop": round(price * 0.975),
-        "comment": "빠른 후보 화면은 캐시 기준입니다. 실제 매수 직전에는 키움 현재가/주문가능금액을 다시 확인합니다.",
-    }
-
-
-def build_candidates(force=False, min_score=60, max_items=10):
-    cache = read_json(CANDIDATE_CACHE_FILE, {})
-    now = time.time()
-    if not force and isinstance(cache, dict) and cache.get("items") and now - safe_float(cache.get("ts"), 0) < CANDIDATE_REFRESH_SEC:
-        return cache
-    rows = get_market_rows()
-    picks = [score_candidate(r) for r in rows]
-    picks = [p for p in picks if p["price"] >= 1000 and 0.1 <= p["dayChange"] <= 12 and p["amount"] >= 3_000_000_000 and p["score"] >= min_score]
-    if not picks and min_score > 45:
-        picks = [score_candidate(r) for r in rows]
-        picks = [p for p in picks if p["price"] >= 1000 and 0.0 <= p["dayChange"] <= 15 and p["amount"] >= 1_000_000_000 and p["score"] >= 45]
-    picks = sorted(picks, key=lambda x: x["score"], reverse=True)[:max_items]
-    data = {"ok": True, "items": picks, "updated_at": fmt_time(), "ts": now, "source": "FDR_KRX" if fdr else "LOCAL_FALLBACK"}
-    atomic_write_json(CANDIDATE_CACHE_FILE, data)
-    return data
-
-
-def send_telegram_direct(text):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return False, "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID 미설정"
-    try:
-        r = requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True},
-            timeout=6,
-        )
-        if r.status_code == 200:
-            return True, "sent"
-        return False, r.text[:500]
-    except Exception as e:
-        return False, str(e)
-
-
-def enqueue_telegram(text):
-    try:
-        TELEGRAM_Q.put_nowait(text)
-        return True
-    except Exception:
-        return False
-
-
-def telegram_worker():
-    while True:
-        text = TELEGRAM_Q.get()
-        ok, msg = send_telegram_direct(text)
-        write_alert_log(msg if ok else "텔레그램 실패: " + msg, ok)
-        TELEGRAM_Q.task_done()
-
-
-def kiwoom_order(side, code, qty, price=0, order_type="market"):
-    if not KIWOOM_REAL_TRADING:
-        return {"ok": False, "message": "KIWOOM_REAL_TRADING=true 환경변수가 필요합니다."}
-    if KIWOOM_DRY_RUN:
-        return {"ok": True, "dry_run": True, "message": "DRY_RUN 상태라 실제 주문은 전송하지 않았습니다."}
-    code = str(code).zfill(6)
-    qty = int(qty)
-    if qty <= 0:
-        return {"ok": False, "message": "주문 수량 오류"}
-    api_id = "kt10000" if side == "buy" else "kt10001"
-    trde_tp = "3" if order_type == "market" else "0"
-    body = {"dmst_stex_tp": "KRX", "stk_cd": code, "ord_qty": str(qty), "ord_uv": "" if trde_tp == "3" else str(int(price)), "trde_tp": trde_tp, "cond_uv": ""}
-    try:
-        r = requests.post(KIWOOM_BASE_URL + "/api/dostk/ordr", json=body, headers=kiwoom_headers(api_id), timeout=8)
-        data = r.json() if r.text else {}
-        ok = r.status_code == 200 and str(data.get("return_code", "0")) in ["0", ""]
-        return {"ok": ok, "status": r.status_code, "response": data, "request": body, "message": data.get("return_msg") or data.get("message") or str(data)[:300]}
-    except Exception as e:
-        return {"ok": False, "message": str(e)}
-
-
-def auto_sell_holding(reason, h, cur=0):
-    h = normalize_holding(h)
-    if not market_is_open():
-        return {"ok": False, "message": "정규장 시간이 아닙니다."}
-    if not kiwoom_ready():
-        return {"ok": False, "message": "키움 인증정보가 없어 매도 전송 잠금"}
-    with ORDER_LOCK:
-        res = kiwoom_order("sell", h["code"], h["qty"], 0, "market")
-        if res.get("ok"):
-            remove_holding(h["code"])
-            enqueue_telegram(f"✅ <b>시장가 매도 요청</b>\n{h['name']}({h['code']})\n수량 {h['qty']}주\n사유: {reason}")
-        return res
+def write_holdings(items):
+    items = [normalize_holding(h) for h in (items or []) if safe_int(h.get("qty"), 0) > 0]
+    write_json(HOLDINGS_FILE, items)
+    if items:
+        write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": items})
 
 
 def remove_holding(code):
     code = str(code).zfill(6)
-    items = [x for x in read_holdings() if str(x.get("code", "")).zfill(6) != code]
-    write_holdings(items, backup_if_nonempty=True)
+    items = [h for h in read_holdings() if str(h.get("code")).zfill(6) != code]
+    write_holdings(items)
     return items
 
 
-def check_one_holding(h):
-    h = normalize_holding(h)
-    code = h.get("code")
-    cur, src = get_trade_live_price(code, fallback=True)
-    if cur >= 10:
-        h["lastPrice"] = cur
-        h["priceSource"] = src
-        h["lastCheckedAt"] = fmt_time()
-    h = update_trailing_fields(h)
-    cur = safe_float(h.get("lastPrice"), 0)
-    target = safe_float(h.get("target"), 0)
-    stop = safe_float(h.get("stop"), 0)
-    trailing_stop = safe_float(h.get("trailingStopPrice"), 0)
-    if cur > 0 and trailing_stop > 0 and cur <= trailing_stop and safe_float(h.get("highestProfitPct"), 0) >= 1.0:
-        enqueue_telegram(f"⚠️ <b>트레일링 보호선 근접/이탈</b>\n{h['name']}({code})\n현재가 {money(cur)}\n보호선 {money(trailing_stop)}")
-    elif cur > 0 and stop > 0 and cur <= stop:
-        enqueue_telegram(f"⚠️ <b>손절가 이탈</b>\n{h['name']}({code})\n현재가 {money(cur)} / 손절가 {money(stop)}")
-    elif cur > 0 and target > 0 and cur >= target:
-        enqueue_telegram(f"🎯 <b>목표가 도달</b>\n{h['name']}({code})\n현재가 {money(cur)} / 목표가 {money(target)}")
-    return h
+def send_telegram(text):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False, "텔레그램 환경변수가 없습니다."
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "disable_web_page_preview": True},
+            timeout=5,
+        )
+        ok = r.status_code == 200
+        return ok, "발송 성공" if ok else r.text[:300]
+    except Exception as e:
+        return False, str(e)
+
+
+
+STRATEGIES = ["단타형", "안정형", "테마추종형", "가치형", "공격형"]
+
+def strategy_from_candidate(c):
+    score = safe_float(c.get('score'), 0)
+    day = safe_float(c.get('dayChange'), 0)
+    amt = safe_float(c.get('amount'), 0)
+    theme = str(c.get('theme',''))
+    if day >= 5.5 and score >= 90:
+        return "공격형"
+    if "AI" in theme or "전력" in theme or "광통신" in theme:
+        return "테마추종형"
+    if amt >= 100_000_000_000 and day <= 4.5:
+        return "안정형"
+    if day <= 2.0 and amt >= 50_000_000_000:
+        return "가치형"
+    return "단타형"
+
+def read_ledger():
+    data = read_json(TRADE_LEDGER_FILE, [])
+    return data if isinstance(data, list) else []
+
+def write_ledger(items):
+    write_json(TRADE_LEDGER_FILE, items[-500:])
+    backup_json_file(TRADE_LEDGER_FILE, 'trade_ledger')
+
+def append_trade_event(event):
+    items = read_ledger()
+    event = dict(event or {})
+    event.setdefault('time', now_text())
+    event.setdefault('date', now_kst().strftime('%Y-%m-%d'))
+    items.append(event)
+    write_ledger(items)
+    return event
+
+def read_performance():
+    data = read_json(PERFORMANCE_FILE, {})
+    if not isinstance(data, dict):
+        data = {}
+    for s in STRATEGIES:
+        data.setdefault(s, {'trades':0,'wins':0,'losses':0,'realized_pnl':0,'total_return_pct':0.0,'avg_pnl':0.0,'history':[]})
+    return data
+
+def write_performance(data):
+    write_json(PERFORMANCE_FILE, data)
+    backup_json_file(PERFORMANCE_FILE, 'performance')
+
+def record_strategy_result(strategy, pnl, buy_value=0, reason='sell', code='', name=''):
+    strategy = strategy if strategy in STRATEGIES else '단타형'
+    pnl = safe_float(pnl,0); buy_value=safe_float(buy_value,0)
+    ret = (pnl / buy_value * 100) if buy_value else 0
+    perf = read_performance(); row = perf[strategy]
+    row['trades'] = int(row.get('trades',0)) + 1
+    row['wins'] = int(row.get('wins',0)) + (1 if pnl > 0 else 0)
+    row['losses'] = int(row.get('losses',0)) + (1 if pnl <= 0 else 0)
+    row['realized_pnl'] = safe_float(row.get('realized_pnl',0)) + pnl
+    row['total_return_pct'] = safe_float(row.get('total_return_pct',0)) + ret
+    row['avg_pnl'] = row['realized_pnl'] / max(1,row['trades'])
+    hist = row.setdefault('history', [])
+    hist.insert(0, {'time':now_text(),'date':now_kst().strftime('%Y-%m-%d'),'code':code,'name':name,'pnl':int(pnl),'return_pct':round(ret,2),'reason':reason})
+    row['history'] = hist[:300]
+    write_performance(perf)
+    return row
+
+def strategy_rankings(days=1):
+    cutoff = now_kst() - timedelta(days=int(days))
+    perf = read_performance(); ranks=[]
+    for s,row in perf.items():
+        hist=[]
+        for h in row.get('history',[]):
+            try:
+                t = datetime.strptime(h.get('time','1970-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S').replace(tzinfo=KST)
+                if t >= cutoff:
+                    hist.append(h)
+            except Exception:
+                pass
+        trades=len(hist); wins=sum(1 for h in hist if safe_float(h.get('pnl'))>0); pnl=sum(safe_float(h.get('pnl')) for h in hist); ret=sum(safe_float(h.get('return_pct')) for h in hist)
+        ranks.append({'strategy':s,'trades':trades,'wins':wins,'win_rate':round(wins/max(1,trades)*100,1),'pnl':int(pnl),'return_pct':round(ret,2),'avg_pnl':int(pnl/max(1,trades))})
+    return sorted(ranks, key=lambda x:(x['pnl'],x['win_rate'],x['return_pct']), reverse=True)
+
+def ai_loss_review(event):
+    pnl=safe_float(event.get('pnl'),0); ret=safe_float(event.get('return_pct'),0); reason=str(event.get('reason',''))
+    if pnl >= 0:
+        return '익절/수익 거래입니다. 동일 조건의 거래대금 유지율과 진입 타이밍을 복기하세요.'
+    if 'stop' in reason:
+        return '손절 거래입니다. 진입 후 거래대금 유지 실패 또는 고점 근처 추격매수 가능성을 점검하세요.'
+    if ret <= -2:
+        return '손실폭이 큽니다. 슬리피지/호가 얇음/지수 약세에서 신규매수 축소 규칙을 강화하는 것이 좋습니다.'
+    return '소폭 손실입니다. 매도 후 재매수 제한과 과열 감점이 정상 적용되었는지 확인하세요.'
+
+def get_index_risk(df=None):
+    try:
+        if df is not None and pd is not None and not df.empty and 'dayChange' in df.columns:
+            kospi = safe_float(df[df['Market']=='KOSPI']['dayChange'].mean(),0) if 'Market' in df.columns else 0
+            kosdaq = safe_float(df[df['Market']=='KOSDAQ']['dayChange'].mean(),0) if 'Market' in df.columns else 0
+            avg = (kospi + kosdaq) / 2
+            if avg < -1.0:
+                mode='DANGER'
+            elif avg < -0.3:
+                mode='WEAK'
+            else:
+                mode='NORMAL'
+            return {'kospi':round(kospi,2),'kosdaq':round(kosdaq,2),'avg':round(avg,2),'mode':mode}
+    except Exception:
+        pass
+    return {'kospi':0,'kosdaq':0,'avg':0,'mode':'UNKNOWN'}
+
+def enrich_candidate_risk(c, index_risk=None):
+    c=dict(c or {})
+    day=safe_float(c.get('dayChange'),0); amt=safe_float(c.get('amount'),0); score=safe_float(c.get('score'),0)
+    theme=str(c.get('theme','기타'))
+    index_risk=index_risk or {'avg':0,'mode':'UNKNOWN'}
+    market_avg=safe_float(index_risk.get('avg'),0)
+    reverse=max(0, day - market_avg)
+    theme_strength=8 if any(k in theme for k in ['AI','반도체','전력','광통신','데이터센터']) else 3
+    reverse_score=min(100, max(0, reverse*12 + theme_strength + (10 if amt>=50_000_000_000 else 0)))
+    overheat_penalty = 18 if day >= 10 else (10 if day >= 7 else (5 if day >= 5.5 else 0))
+    slippage_penalty = 18 if amt < 10_000_000_000 else (8 if amt < 30_000_000_000 else 0)
+    if day >= 7 and amt < 50_000_000_000:
+        slippage_penalty += 10
+    index_penalty = 8 if index_risk.get('mode')=='WEAK' else (15 if index_risk.get('mode')=='DANGER' else 0)
+    final=max(0, min(150, score + reverse_score*0.18 - overheat_penalty - slippage_penalty - index_penalty))
+    c.update({'marketReverseScore': round(reverse_score,2),'themeStrengthScore': theme_strength,'overheatPenalty': overheat_penalty,'slippagePenalty': slippage_penalty,'indexRiskPenalty': index_penalty,'riskAdjustedScore': round(final,2),'strategy': strategy_from_candidate(c),'riskComment': f"시장역행 {reverse_score:.1f} · 과열감점 {overheat_penalty} · 슬리피지감점 {slippage_penalty} · 지수위험 {index_penalty}"})
+    return c
+
+def classify_theme(name):
+    if name in THEME_MAP:
+        return THEME_MAP[name]
+    if "반도체" in name:
+        return "AI반도체/HBM"
+    if "전기" in name or "전선" in name or "일렉" in name:
+        return "전력설비/데이터센터"
+    if "통신" in name or "광" in name:
+        return "광통신/CPO"
+    return "기타/개별이슈"
+
+
+def get_market_candidates(limit=8, min_score=60):
+    candidates = []
+    if fdr and pd:
+        try:
+            df = fdr.StockListing("KRX")
+            df = df[df["Market"].isin(["KOSPI", "KOSDAQ"])].copy()
+            for col in ["Close", "Volume", "Amount", "Marcap"]:
+                df[col] = pd.to_numeric(df.get(col, 0), errors="coerce").fillna(0)
+            ch_col = "ChagesRatio" if "ChagesRatio" in df.columns else ("Change" if "Change" in df.columns else None)
+            df["dayChange"] = pd.to_numeric(df[ch_col], errors="coerce").fillna(0) if ch_col else 0
+            df["Code"] = df["Code"].astype(str).str.zfill(6)
+            df["Name"] = df["Name"].astype(str)
+            bad = ["ETF", "ETN", "스팩", "SPAC", "KODEX", "TIGER", "인버스", "레버리지"]
+            df = df[~df["Name"].str.upper().apply(lambda n: any(x.upper() in n for x in bad))]
+            df = df[(df["Close"] >= 1000) & (df["Amount"] >= 3_000_000_000) & (df["dayChange"] >= 0.2) & (df["dayChange"] <= 12)].copy()
+            if not df.empty:
+                df["theme"] = df["Name"].apply(classify_theme)
+                df["amountRank"] = df["Amount"].rank(pct=True) * 100
+                df["volumeRank"] = df["Volume"].rank(pct=True) * 100
+                df["sweet"] = (100 - (df["dayChange"] - 3.5).abs() * 7).clip(lower=30, upper=100)
+                df["score"] = (df["amountRank"] * .45 + df["volumeRank"] * .25 + df["sweet"] * .30)
+                df = df[df["score"] >= min_score].sort_values("score", ascending=False).head(limit)
+                for _, r in df.iterrows():
+                    candidates.append({
+                        "market": str(r.get("Market", "")),
+                        "code": str(r["Code"]).zfill(6),
+                        "name": str(r["Name"]),
+                        "theme": str(r["theme"]),
+                        "price": int(safe_float(r["Close"], 0)),
+                        "dayChange": round(safe_float(r["dayChange"], 0), 2),
+                        "amount": int(safe_float(r["Amount"], 0)),
+                        "score": round(safe_float(r["score"], 0), 2),
+                        "source": "KRX_FAST_CACHE",
+                    })
+        except Exception:
+            candidates = []
+
+    if not candidates:
+        candidates = [dict(x, source="FALLBACK") for x in FALLBACK_CANDIDATES]
+
+    idx_risk = get_index_risk(df if 'df' in locals() else None)
+    enriched=[]
+    for c in candidates:
+        p = safe_float(c["price"], 0)
+        c["target"] = int(p * 1.035)
+        c["stop"] = int(p * 0.975)
+        c["buyZone"] = int(p * 0.995)
+        c["amountText"] = f"{safe_float(c.get('amount'), 0) / 100000000:.1f}억"
+        c = enrich_candidate_risk(c, idx_risk)
+        c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
+        enriched.append(c)
+    candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
+    state = read_state(); state['index_risk_mode']=idx_risk.get('mode','UNKNOWN'); state['recommended_strategy'] = candidates[0].get('strategy','단타형') if candidates else state.get('recommended_strategy','단타형'); write_state(state)
+    write_json(CANDIDATE_FILE, {"time": now_text(), "items": candidates, "indexRisk": idx_risk})
+    return candidates
+
+
+def cached_candidates():
+    data = read_json(CANDIDATE_FILE, {})
+    if isinstance(data, dict) and data.get("items"):
+        return data["items"]
+    return get_market_candidates()
+
+
+def market_is_open():
+    n = now_kst()
+    if n.weekday() >= 5:
+        return False
+    return 900 <= n.hour * 100 + n.minute <= 1520
+
+
+def auto_sell_holding(reason, holding, cur_price=None):
+    h = normalize_holding(holding)
+    code, qty = h["code"], h["qty"]
+    if qty <= 0:
+        return {"ok": False, "message": "매도 수량이 없습니다."}
+    if not KIWOOM_REAL_TRADING:
+        return {"ok": False, "message": "KIWOOM_REAL_TRADING=true 필요. 실제 주문은 전송하지 않았습니다."}
+    sell_price = safe_float(cur_price or h.get('lastPrice') or h.get('buyPrice'), 0)
+    buy_value = safe_float(h.get('buyPrice'),0) * qty
+    pnl = (sell_price - safe_float(h.get('buyPrice'),0)) * qty
+    strategy = h.get('strategy') or read_state().get('current_strategy','단타형')
+    if KIWOOM_DRY_RUN:
+        event = append_trade_event({'side':'sell','dry_run':True,'code':code,'name':h.get('name'), 'qty':qty,'fill_price':sell_price,'buy_price':h.get('buyPrice'), 'pnl':int(pnl),'return_pct':round((pnl/buy_value*100) if buy_value else 0,2),'strategy':strategy,'reason':reason})
+        record_strategy_result(strategy, pnl, buy_value, reason, code, h.get('name'))
+        return {"ok": True, "message": "DRY_RUN: 실제 매도 전송 없이 성과/원장 기록", "dry_run": True, "review": ai_loss_review(event)}
+    try:
+        res = kiwoom_order("sell", code, qty)
+        if res.get("ok"):
+            remove_holding(code)
+            event = append_trade_event({'side':'sell','code':code,'name':h.get('name'),'qty':qty,'fill_price':sell_price,'buy_price':h.get('buyPrice'),'pnl':int(pnl),'return_pct':round((pnl/buy_value*100) if buy_value else 0,2),'strategy':strategy,'reason':reason,'order_response':res})
+            record_strategy_result(strategy, pnl, buy_value, reason, code, h.get('name'))
+            state = read_state(); state.setdefault('last_sell_times',{})[code]=time.time(); write_state(state)
+            send_telegram(f"매도 요청: {h['name']} {qty}주 / 사유 {reason} / 손익 {int(pnl):,}원")
+        return res
+    except Exception as e:
+        return {"ok": False, "message": auth_message(str(e))}
+
+
+def kiwoom_order(side, code, qty):
+    api_id = "kt10000" if side == "buy" else "kt10001"
+    body = {"dmst_stex_tp": "KRX", "stk_cd": str(code).zfill(6), "ord_qty": str(int(qty)), "ord_uv": "", "trde_tp": "3", "cond_uv": ""}
+    st, data = kiwoom_post("/api/dostk/ordr", api_id, body, timeout=8)
+    return {"ok": st == 200 and str(data.get("return_code", "0")) in ["0", ""], "status": st, "response": data}
 
 
 def watch_loop():
-    last_candidate = 0
     while WATCH_STATE.get("running"):
         try:
             items = read_holdings()
-            if items:
-                new_items = [check_one_holding(h) for h in items]
-                write_holdings(new_items, backup_if_nonempty=True)
-            if time.time() - last_candidate > CANDIDATE_REFRESH_SEC:
-                build_candidates(force=True)
-                last_candidate = time.time()
-            WATCH_STATE["last_check"] = fmt_time()
+            updated = []
+            for h in items:
+                cur, src = get_trade_price(h["code"], fallback=True)
+                if cur >= 10:
+                    h["lastPrice"] = int(cur)
+                    h["priceSource"] = src
+                    h["lastCheckedAt"] = now_text()
+                h = normalize_holding(h)
+                if h["activeDynamicTarget"] and h["lastPrice"] >= h["baseTarget"]:
+                    h["aiHoldMode"] = True
+                if h["trailingStopPrice"] and h["lastPrice"] <= h["trailingStopPrice"]:
+                    auto_sell_holding("trailing_stop", h, h["lastPrice"])
+                elif h["lastPrice"] <= h["stop"]:
+                    auto_sell_holding("stop", h, h["lastPrice"])
+                updated.append(h)
+            if updated:
+                write_holdings(updated)
+            WATCH_STATE["last_check"] = now_text()
+            get_market_candidates(limit=8, min_score=60)
         except Exception as e:
-            print("watch_loop error:", e, flush=True)
-        time.sleep(WATCH_INTERVAL)
+            WATCH_STATE["last_message"] = str(e)[:200]
+        time.sleep(20)
 
 
-def ensure_watch_running():
+def ensure_watch():
     with WATCH_LOCK:
         WATCH_STATE["running"] = True
         t = WATCH_STATE.get("thread")
@@ -869,421 +825,370 @@ def ensure_watch_running():
             t = threading.Thread(target=watch_loop, daemon=True)
             WATCH_STATE["thread"] = t
             t.start()
-    return True
 
 
-def auth_status_light():
-    state = read_trade_state()
-    dbg = state.get("last_kiwoom_debug", {}) or {}
-    msg = dbg.get("message") or TOKEN_CACHE.get("last_error") or ""
-    if not kiwoom_ready():
-        return {"level": "red", "label": "키움 환경변수 필요", "message": "KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 미설정"}
-    if "8050" in msg or "인증 실패" in msg or "지정단말기" in msg:
-        return {"level": "red", "label": "키움 API 확인 필요", "message": msg}
-    if TOKEN_CACHE.get("token"):
-        return {"level": "green", "label": "키움 API 정상", "message": "토큰 캐시 정상"}
-    return {"level": "yellow", "label": "키움 API 미확인", "message": "상태확인 또는 새로고침을 눌러 확인하세요."}
+def html_escape(s):
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def render_candidate_card(p, idx=0):
+def render_holdings_section():
+    res = fetch_kiwoom_holdings()
+    items = res.get("holdings") or read_holdings()
+    if not items:
+        msg = res.get("message") or "표시 가능한 보유 캐시가 없습니다."
+        return f"""
+        <section class="card" id="holdings">
+          <h2>💼 키움 실보유 자동 동기화</h2>
+          <p class="muted">키움 실제 잔고 기준으로 표시합니다. 인증 실패 시 마지막 정상 캐시를 유지합니다.</p>
+          <div class="btn-row">
+            <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
+            <button class="dark" onclick="location.href='/api/status'">API 확인</button>
+          </div>
+          <div class="notice">{html_escape(msg)}</div>
+          <div class="notice small">화면확인용 수동 표시는 제거했습니다. 실제 보유 조회 또는 마지막 정상 캐시만 표시합니다.</div>
+        </section>"""
+    cards = []
+    for h in items:
+        h = normalize_holding(h)
+        dynamic = h.get("activeDynamicTarget", 0)
+        trail = h.get("trailingStopPrice", 0)
+        ai_note = "AI HOLD · 강세 유지 시 목표가 상향/트레일링 보호" if dynamic else "목표/손절 감시 중"
+        cards.append(f"""
+        <div class="holding-card">
+          <div class="topline"><b>{html_escape(h['name'])}</b><span>{h['code']}</span></div>
+          <div class="grid2">
+            <div><label>매수가</label><b>{money(h['buyPrice'])}</b></div>
+            <div><label>현재가</label><b>{money(h['lastPrice'])}</b></div>
+            <div><label>기존 목표가</label><b class="red">{money(h['baseTarget'])}</b></div>
+            <div><label>손절가</label><b class="blue">{money(h['stop'])}</b></div>
+            <div><label>AI 상향목표</label><b class="red">{money(dynamic) if dynamic else '-'}</b></div>
+            <div><label>트레일링 보호</label><b class="blue">{money(trail) if trail else '-'}</b></div>
+            <div><label>수량/손익</label><b>{h['qty']}주 · {money(h['pnl'])}</b></div>
+            <div><label>수익률</label><b class="red">{pct(h['profitRate'])}</b></div>
+          </div>
+          <div class="comment">{ai_note}<br>최근확인 {html_escape(h.get('lastCheckedAt','-'))} · {html_escape(h.get('priceSource','-'))}</div>
+          <button class="sell" onclick="manualSell('{h['code']}')">시장가 매도</button>
+        </div>""")
     return f"""
-    <div class="candidate-card" onclick="toggleDetail('cand-{idx}')">
-      <div class="tags"><span>{p.get('market')}</span><span>{p.get('code')}</span><span>{p.get('theme')}</span><span>AI {p.get('score')}</span></div>
-      <h3>{p.get('name')}</h3>
-      <div class="grid2 compact">
-        <div><small>현재가</small><b>{money(p.get('price'))}</b><em>{p.get('priceSource')}</em></div>
-        <div><small>당일 흐름</small><b>{pct(p.get('dayChange'))}</b></div>
-        <div><small>목표가</small><b class="red">{money(p.get('target'))}</b></div>
-        <div><small>손절가</small><b class="blue">{money(p.get('stop'))}</b></div>
+    <section class="card" id="holdings">
+      <h2>💼 키움 실보유 자동 동기화</h2>
+      <p class="muted">표시 보유 {len(items)}종목 · 출처 {html_escape(res.get('source','CACHE'))}</p>
+      <div class="btn-row">
+        <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
+        <button class="dark" onclick="location.href='/api/status'">API 확인</button>
       </div>
-      <div class="hint">🔎 종목을 누르면 상세정보를 펼칩니다.</div>
-      <div id="cand-{idx}" class="detail hidden">
-        <p><b>거래대금:</b> {safe_float(p.get('amount'))/100000000:.1f}억</p>
-        <p><b>매수관찰:</b> {money(p.get('buyZone'))} / <b>가능수량:</b> {p.get('qtyPossible')}주</p>
-        <p>{p.get('comment')}</p>
-      </div>
-    </div>
-    """
+      {''.join(cards)}
+    </section>"""
 
 
-def render_holding_card(h, idx=0):
-    h = normalize_holding(h)
-    buy = safe_float(h.get("buyPrice"), 0)
-    cur = safe_float(h.get("lastPrice"), 0)
-    qty = safe_float(h.get("qty"), 0)
-    pnl = (cur - buy) * qty if buy and cur and qty else 0
-    rate = ((cur - buy) / buy * 100) if buy and cur else 0
-    ai_hold = bool(h.get("aiHoldMode"))
-    sell_disabled = "" if kiwoom_ready() else "disabled"
+def render_candidate_card(c, idx):
     return f"""
-    <div class="holding-card">
-      <div class="holding-head">
-        <h3>{h.get('name')} ({h.get('code')})</h3>
-        <button class="danger" onclick="manualSell('{h.get('code')}')" {sell_disabled}>시장가 매도</button>
-      </div>
-      <p class="sub">상태: {'⚡ AI HOLD/트레일링' if ai_hold else '감시중'} · 가격출처 {h.get('priceSource','-')} · 최근확인 {h.get('lastCheckedAt','-')}</p>
+    <div class="pick compact" onclick="toggleDetail('pick{idx}')">
+      <div class="chips"><span>{html_escape(c.get('market',''))}</span><span>{c.get('code')}</span><span>{html_escape(c.get('theme',''))}</span><span>AI {safe_float(c.get('riskAdjustedScore', c.get('score'))):.1f}</span><span>역행 {safe_float(c.get('marketReverseScore')):.0f}</span><span>{html_escape(c.get('strategy','단타형'))}</span></div>
+      <h3>{html_escape(c.get('name'))}</h3>
       <div class="grid2">
-        <div><small>실제 매수가</small><b>{money(buy)}</b></div>
-        <div><small>실시간 현재가</small><b>{money(cur)}</b></div>
-        <div><small>기본 목표가</small><b class="red">{money(h.get('target'))}</b></div>
-        <div><small>손절가</small><b class="blue">{money(h.get('stop'))}</b></div>
-        <div><small>AI 상향 목표가</small><b class="red">{money(h.get('activeDynamicTarget'))}</b></div>
-        <div><small>트레일링 보호선</small><b class="blue">{money(h.get('trailingStopPrice'))}</b></div>
-        <div><small>최고가/최고수익률</small><b>{money(h.get('highestPrice'))} / {pct(h.get('highestProfitPct'))}</b></div>
-        <div><small>수량/평가손익</small><b>{int(qty)}주 / {money(pnl)} ({pct(rate)})</b></div>
+        <div><label>현재가</label><b>{money(c.get('price'))}</b><small>{html_escape(c.get('source','KRX_FAST_CACHE'))}</small></div>
+        <div><label>당일 흐름</label><b>{pct(c.get('dayChange'))}</b></div>
+        <div><label>목표가</label><b class="red">{money(c.get('target'))}</b></div>
+        <div><label>손절가</label><b class="blue">{money(c.get('stop'))}</b></div>
       </div>
-      <div class="comment">AI 코멘트: {h.get('aiHoldReason') or '관찰 구간입니다.'}</div>
-    </div>
-    """
+      <div id="pick{idx}" class="detail">
+        거래대금 {html_escape(c.get('amountText','-'))} · 매수관찰 {money(c.get('buyZone'))}<br>
+        시장역행점수 {safe_float(c.get('marketReverseScore')):.1f} · 테마강도 {safe_float(c.get('themeStrengthScore')):.0f} · 과열감점 {safe_float(c.get('overheatPenalty')):.0f} · 슬리피지감점 {safe_float(c.get('slippagePenalty')):.0f}<br>
+        {html_escape(c.get('comment',''))}
+      </div>
+    </div>"""
 
 
-def page_html():
-    state = read_trade_state()
-    auth = auth_status_light()
-    holdings = read_holdings()
-    candidates = build_candidates(force=False).get("items", [])
-    alert_logs = read_json(ALERT_LOG_FILE, [])
-    status_color = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(auth["level"], "🟡")
-    holding_html = "".join(render_holding_card(h, i) for i, h in enumerate(holdings))
-    if not holdings:
-        last_items, upd = read_last_good_holdings()
-        if last_items:
-            holding_html = f"<div class='notice'>현재 키움 직접조회는 실패했지만 마지막 정상 보유캐시({upd})를 표시합니다.</div>" + "".join(render_holding_card(h, i) for i, h in enumerate(last_items))
-        else:
-            holding_html = "<div class='notice'>보유 캐시가 없습니다. 키움 인증 정상화 후 새로고침하면 실제 보유가 표시됩니다.<br><small>UI 확인이 필요하면 아래 '수동 보유카드 테스트'를 펼치세요.</small></div><details><summary>🧪 수동 보유카드 테스트</summary>" + manual_holding_form() + "</details>"
-    cand_html = "".join(render_candidate_card(p, i) for i, p in enumerate(candidates)) or "<div class='notice'>후보가 없습니다. 필터를 낮추거나 잠시 후 새로고침하세요.</div>"
-    logs_html = "".join(f"<div class='log'>{'✅' if x.get('ok') else '⚠️'} {x.get('time')} · {x.get('message')}</div>" for x in alert_logs[:5]) or "<div class='log'>최근 알림 없음</div>"
-    auto_on = "ON" if state.get("auto_trade_enabled") else "OFF"
-
+def render_candidates():
+    picks = cached_candidates()[:8]
+    cards = "".join(render_candidate_card(c, i) for i, c in enumerate(picks))
     return f"""
+    <section class="card" id="picks">
+      <h2>👀 급등 예상 감시 후보</h2>
+      <p class="muted">후보는 축소 표시됩니다. 종목을 누르면 상세정보가 펼쳐집니다.</p>
+      {cards}
+    </section>"""
+
+
+def render_trade_section():
+    state = read_state()
+    cash = get_cash_info()
+    status_badge = "🟢 키움 API 정상" if cash.get("ok") else "🟡 키움 API 미확인"
+    if "8050" in str(cash.get("message")):
+        status_badge = "🔴 키움 API 확인 필요"
+    return f"""
+    <section class="card" id="trade">
+      <h2>🤖 키움 실전 자동매매</h2>
+      <div class="notice">
+        상태: <b>{'ON' if state.get('auto_trade_enabled') else 'OFF'}</b> · <span class="badge">{status_badge}</span><br>
+        키움 주문가능금액은 실제 주문 직전에 다시 확인합니다.
+      </div>
+      <div class="comment">현재전략: <b>{html_escape(state.get('current_strategy','단타형'))}</b> · 추천전략: <b>{html_escape(state.get('recommended_strategy','단타형'))}</b> · 지수위험: <b>{html_escape(state.get('index_risk_mode','UNKNOWN'))}</b></div>
+      <div class="btn-row">
+        <button onclick="location.href='/api/auto_on'">자동매매 ON</button>
+        <button onclick="location.href='/api/auto_off'">OFF</button>
+        <button class="brown" onclick="location.href='/api/buy_best'">AI 즉시매수</button>
+        <button class="dark" onclick="location.href='/api/panic_stop'">긴급정지</button>
+      </div>
+      <details>
+        <summary>🔎 상세 진행내용 보기 / 숨기기</summary>
+        <div class="notice small">
+          최근: {html_escape(state.get('last_status','-'))} · {html_escape(state.get('last_status_time','-'))}<br>
+          {html_escape(state.get('last_message',''))}<br>
+          {html_escape(cash.get('message',''))}
+        </div>
+      </details>
+    </section>"""
+
+
+
+
+def render_performance_section():
+    r1=strategy_rankings(1); r7=strategy_rankings(7); r30=strategy_rankings(30)
+    def rows(ranks):
+        if not ranks:
+            return '<li>성과 기록 없음</li>'
+        return ''.join(f"<li><b>{html_escape(x['strategy'])}</b> · 손익 {money(x['pnl'])} · 승률 {x['win_rate']}% · {x['trades']}회</li>" for x in ranks[:5])
+    ledger=read_ledger()[:5]
+    reviews=''.join(f"<li>{html_escape(e.get('name',''))} {html_escape(e.get('side',''))} · {money(e.get('pnl',0)) if 'pnl' in e else money(0)} · {html_escape(ai_loss_review(e)) if safe_float(e.get('pnl',0))<0 else ''}</li>" for e in ledger) or '<li>최근 매매 원장 없음</li>'
+    return f"""
+    <section class="card" id="performance">
+      <h2>📊 AI 전략성과/복기</h2>
+      <p class="muted">실체결가 또는 주문 응답 기준으로 매매 원장을 저장하고 전략별 성과를 누적합니다.</p>
+      <div class="grid2">
+        <div><label>최근 1일 1위</label><b>{html_escape(r1[0]['strategy']) if r1 else '-'}</b></div>
+        <div><label>최근 1주 1위</label><b>{html_escape(r7[0]['strategy']) if r7 else '-'}</b></div>
+        <div><label>최근 1개월 1위</label><b>{html_escape(r30[0]['strategy']) if r30 else '-'}</b></div>
+        <div><label>백업</label><b>자동</b></div>
+      </div>
+      <details><summary>전략 랭킹 자세히 보기</summary><div class="notice small"><b>1일</b><ul>{rows(r1)}</ul><b>1주</b><ul>{rows(r7)}</ul><b>1개월</b><ul>{rows(r30)}</ul></div></details>
+      <details><summary>AI 복기 최근 매매</summary><div class="notice small"><ul>{reviews}</ul></div></details>
+    </section>"""
+
+def render_alert_center():
+    state = read_state()
+    alerts = state.get("recent_alerts", [])
+    rows = "".join(f"<li>{html_escape(a.get('time',''))} · {html_escape(a.get('text',''))}</li>" for a in alerts) or "<li>최근 알림 없음</li>"
+    return f"""
+    <section class="card">
+      <h2>📨 실전 알림센터</h2>
+      <p class="muted">매수·매도·손절·오류 발생 시 텔레그램으로 알립니다.</p>
+      <div class="btn-row">
+        <button onclick="location.href='/api/telegram_test'">테스트알림</button>
+      </div>
+      <ul class="alerts">{rows}</ul>
+    </section>"""
+
+
+def render_page():
+    state = read_state()
+    return render_template_string(TEMPLATE,
+        version=APP_VERSION,
+        app_name=APP_NAME,
+        holdings=render_holdings_section(),
+        trade=render_trade_section(),
+        candidates=render_candidates(),
+        performance=render_performance_section(),
+        alerts=render_alert_center(),
+        auto_on=state.get("auto_trade_enabled"),
+    )
+
+
+TEMPLATE = """
 <!doctype html><html lang="ko"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{APP_NAME} {APP_VERSION}</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{app_name}} {{version}}</title>
 <style>
-body{{margin:0;background:linear-gradient(135deg,#f8fbf2,#eef8ee);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#20372c;font-size:15px}}
-.wrap{{max-width:560px;margin:0 auto;padding:16px 10px 60px}}
-.badge{{display:inline-block;background:#e4f3df;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:900;color:#426d49}}
-h1{{font-size:28px;line-height:1.12;margin:12px 0 6px}} h2{{font-size:23px;margin:10px 0 12px}} h3{{font-size:20px;margin:6px 0 8px}}
-.card{{background:#fff;border-radius:22px;padding:16px;margin:14px 0;box-shadow:0 2px 10px rgba(60,80,50,.07)}}
-.nav{{position:sticky;top:0;background:rgba(245,250,238,.96);backdrop-filter:blur(8px);z-index:5;padding:8px 0;display:flex;gap:7px;overflow-x:auto;scrollbar-width:none}}
-.nav::-webkit-scrollbar{{display:none}}
-.nav button,.btn{{border:0;border-radius:16px;padding:11px 13px;font-size:14px;font-weight:900;background:#eaf5e5;color:#2e5935;white-space:nowrap;line-height:1.15}}
-.nav button{{min-width:72px;flex:0 0 auto}}
-.btn.primary{{background:#5c9868;color:#fff}} .btn.dark{{background:#2d465b;color:#fff}} .btn.brown{{background:#a66a28;color:#fff}} .danger{{background:#ffe3e3;color:#b42323;border:0;border-radius:14px;padding:10px 12px;font-weight:900;font-size:13px}}
-input{{width:100%;box-sizing:border-box;border:1px solid #d8e5d0;border-radius:14px;padding:12px;font-size:16px;margin:6px 0 10px}}
-.notice{{background:#fff6d9;border-radius:18px;padding:14px;margin:10px 0;color:#6a5a36;font-size:15px;line-height:1.45}}
-.status-pill{{display:inline-block;border-radius:999px;padding:7px 10px;background:#f8d7da;color:#b42323;font-size:14px;font-weight:900}}
-.grid2{{display:grid;grid-template-columns:1fr 1fr;gap:8px}} .grid2>div{{background:#fbf6e8;border-radius:16px;padding:12px;text-align:center;min-width:0}}
-.grid2 small{{display:block;color:#6d7489;font-size:12px}} .grid2 b{{display:block;font-size:16px;margin-top:5px;word-break:keep-all}} .grid2 em{{display:block;color:#6d7489;font-style:normal;font-size:11px;overflow:hidden;text-overflow:ellipsis}}
-.compact b{{font-size:16px}} .red{{color:#d3272d}} .blue{{color:#2d6cdf}}
-.candidate-card,.holding-card{{background:#fffdf7;border:1px solid #e4e8d6;border-radius:20px;padding:14px;margin:12px 0;overflow:hidden}}
-.tags span{{display:inline-block;background:#e9f4df;border-radius:999px;padding:6px 9px;margin:3px;font-size:12px;font-weight:800;color:#6b5d3d}}
-.hint,.comment{{background:#eaf8dd;border-radius:15px;padding:12px;margin-top:10px;font-size:14px;font-weight:800;color:#416f45;line-height:1.45}}
-.detail{{background:#fff7df;border-radius:15px;padding:12px;margin-top:10px;font-size:14px;line-height:1.45;max-height:320px;overflow:auto}} .hidden{{display:none}}
-.holding-head{{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}} .sub{{color:#687086;font-size:12px;line-height:1.35}}
-.log{{background:#fffdf7;border:1px solid #eadfbf;border-radius:12px;padding:10px;margin:6px 0;font-size:14px}}
-details summary{{cursor:pointer;font-size:16px;font-weight:900;background:#eaf5e5;border-radius:15px;padding:13px}}
-.header-desc{{font-size:15px!important;color:#697287;line-height:1.45}}
-.btn-row{{display:flex;flex-wrap:wrap;gap:8px}}
-.btn-row .btn{{margin:0}}
-@media(max-width:600px){{.wrap{{padding:14px 10px 54px}}h1{{font-size:27px}}h2{{font-size:22px}}.card{{padding:15px;margin:12px 0}}.grid2{{grid-template-columns:1fr 1fr}}}}
-</style></head><body><div class="wrap">
-<div class="badge">🌿 {APP_BADGE}</div>
-<h1>{APP_NAME}</h1>
-<p class="header-desc">키움 REST API 연동 · AI 자동매수 · 목표/손절/트레일링 · 텔레그램 알림</p>
-<div class="nav">
-<button onclick="location.hash='setting'">⚙️ 설정</button><button onclick="location.hash='candidate'">⚡ 단타</button><button onclick="location.hash='holdings'">💼 보유</button><button onclick="location.hash='auto'">🤖 자동</button><button onclick="location.hash='alert'">📨 알림</button>
-</div>
-
-<section id="setting" class="card">
-<h2>⚙️ 단타AI 필터 설정</h2>
-<details><summary>🔎 필터 조건 보기 / 접기</summary>
-<p>후보 필터는 화면 후보를 고르는 조건입니다. 실제 매수 직전에는 키움 현재가와 주문가능금액을 다시 확인합니다.</p>
-<label>최소 AI 점수</label><input id="minScore" value="60">
-<label>최대 당일 등락률(%)</label><input id="maxChange" value="12">
-<label>최소 거래대금(원)</label><input id="minAmount" value="3000000000">
-</details>
-<div class="btn-row"><button class="btn primary" onclick="refreshCandidates()">필터 적용</button><button class="btn dark" onclick="nextCandidate()">다음 후보</button><button class="btn brown" onclick="testTelegram()">알림 테스트</button></div>
-</section>
-
-<section id="candidate" class="card"><h2>👀 급등 예상 감시 후보</h2><div id="candidateBox">{cand_html}</div></section>
-
-<section id="holdings" class="card">
-<h2>💼 키움 실보유 자동 동기화</h2>
-<p style="font-size:21px;color:#697287">키움 실제 잔고 기준으로 표시합니다. 인증 실패 시 마지막 정상 캐시를 유지합니다.</p>
-<div class="btn-row"><button class="btn primary" onclick="syncHoldings()">실보유 새로고침</button><button class="btn dark" onclick="diagnose()">API 확인</button><button class="btn" onclick="clearScreen()">화면초기화</button></div>
-<div id="holdingStatus" class="notice">표시 보유 {len(holdings)}종목 · 최근확인 {fmt_time()}</div>
-<div id="holdingBox">{holding_html}</div>
-</section>
-
-<section id="auto" class="card">
-<h2>🤖 키움 실전 자동매매</h2>
-<div class="notice">상태: <b>{auto_on}</b> · <span class="status-pill">{status_color} {auth['label']}</span><br>키움 주문가능금액은 실제 주문 직전에 다시 확인합니다.<br>{auth['message']}</div>
-<div class="btn-row"><button class="btn primary" onclick="setAuto(1)">자동매매 ON</button><button class="btn" onclick="setAuto(0)">OFF</button><button class="btn brown" onclick="buyBest()">AI 즉시매수</button><button class="btn dark" onclick="panic()">긴급정지</button></div>
-<div id="autoStatus" class="notice">최근: {state.get('last_status')} · {state.get('last_status_time')}<br>{state.get('last_order_message')}</div>
-<details><summary>🔎 상세 진행내용 보기 / 숨기기</summary>
-<div class="notice">
-<b>실전 운영 대시보드</b><br>
-<span class="status-pill">{status_color} {auth['label']}</span><br>
-오늘 실현손익/거래횟수는 앱 자동매매 기록 기준입니다. MTS 직접 매매 내역까지 가져오려면 키움 일별체결 API 연동이 추가로 필요합니다.
-</div>
-</details>
-</section>
-
-<section id="alert" class="card">
-<h2>📨 실전 알림센터</h2>
-<div class="notice"><b>이 기능은 무엇인가요?</b><br>매수·매도·손절·목표가 도달·키움 API 오류 발생 시 텔레그램으로 바로 알려주는 실전 모니터링 알림 기능입니다.</div>
-<div class="btn-row"><button class="btn primary" onclick="checkTelegram()">연결확인</button><button class="btn brown" onclick="testTelegram()">테스트알림</button><button class="btn dark" onclick="ensureWatch()">감시 ON</button></div>
-<div id="telegramStatus" class="notice">{logs_html}</div>
-</section>
-</div>
+:root{--bg:#eef7e8;--card:#fffefb;--ink:#203b2d;--muted:#667085;--green:#5c9b68;--pale:#eef8e9;--cream:#fff4d5;--dark:#2e4960;--brown:#a76b29;--red:#d12e35;--blue:#246fe0}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(90deg,#eaf5e6,#fff9db);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);font-size:16px;line-height:1.45}
+.wrap{max-width:760px;margin:0 auto;padding:18px 14px 80px}.hero{padding:16px 4px 8px}.badge{display:inline-block;background:var(--pale);border-radius:999px;padding:8px 14px;font-weight:800;color:#3d6b43}.hero h1{font-size:34px;line-height:1.05;margin:16px 0 10px}.hero p{font-size:17px;color:var(--muted);margin:0}
+.nav{position:sticky;top:0;z-index:50;background:rgba(244,250,237,.92);backdrop-filter:blur(10px);display:flex;gap:8px;overflow-x:auto;padding:10px 2px 12px;border-bottom:1px solid #dbe8d5}.nav a{flex:0 0 auto;text-decoration:none;color:#285139;background:var(--pale);border-radius:999px;padding:10px 14px;font-weight:800;white-space:nowrap}
+.card{background:rgba(255,255,255,.93);border:1px solid #dbe8d5;border-radius:28px;padding:22px;margin:16px 0;box-shadow:0 8px 24px rgba(32,59,45,.06)}.card h2{font-size:27px;margin:0 0 14px}.muted{color:var(--muted);font-size:16px}.notice{background:var(--cream);border-radius:20px;padding:16px;margin:12px 0;color:#6a5938}.notice.small{font-size:14px}
+.btn-row{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}button,.button{border:0;border-radius:18px;padding:13px 18px;background:var(--green);color:white;font-weight:900;font-size:16px;text-decoration:none}button.dark{background:var(--dark)}button.brown{background:var(--brown)}button.sell{background:#cf3d35;width:100%;margin-top:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid2>div{background:#fff8e9;border-radius:18px;padding:13px;text-align:center;min-width:0}.grid2 label{display:block;color:var(--muted);font-size:13px}.grid2 b{font-size:20px}.grid2 small{display:block;color:var(--muted);font-size:12px}.red{color:var(--red)}.blue{color:var(--blue)}
+.holding-card,.pick{border:1px solid #e2ead9;border-radius:22px;padding:16px;margin:12px 0;background:#fffef8}.topline{display:flex;justify-content:space-between;gap:8px;font-size:22px}.topline span{font-size:14px;background:var(--pale);border-radius:999px;padding:6px 10px}.comment{background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}
+.chips{display:flex;flex-wrap:wrap;gap:7px}.chips span{background:var(--pale);border-radius:999px;padding:6px 10px;font-size:13px;font-weight:800}.pick h3{font-size:28px;margin:12px 0}.detail{display:none;background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}.detail.open{display:block}
+details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding:14px;font-weight:900}.alerts{margin:8px 0 0;padding-left:20px;color:#5b513d}
+@media(max-width:430px){body{font-size:15px}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.nav a{font-size:14px;padding:9px 12px}}
+</style>
 <script>
-function q(id){{return document.getElementById(id)}}
-function toggleDetail(id){{let e=q(id); if(e)e.classList.toggle('hidden')}}
-async function fetchJson(url, opt){{try{{let r=await fetch(url,opt||{{}}); return await r.json()}}catch(e){{return {{ok:false,message:String(e)}}}}}}
-async function refreshCandidates(){{q('candidateBox').innerHTML='<div class="notice">후보 갱신중...</div>';let d=await fetchJson('/api/candidates?force=1&minScore='+q('minScore').value+'&maxChange='+q('maxChange').value+'&minAmount='+q('minAmount').value);q('candidateBox').innerHTML=d.html||'<div class="notice">'+(d.message||'후보 없음')+'</div>'}}
-async function nextCandidate(){{await refreshCandidates(); location.hash='candidate'}}
-async function syncHoldings(){{q('holdingStatus').innerHTML='키움 실보유 조회중...';let d=await fetchJson('/api/holdings/sync?force=1');q('holdingStatus').innerHTML=d.message||'완료'; if(d.html)q('holdingBox').innerHTML=d.html}}
-async function diagnose(){{let d=await fetchJson('/api/diagnose');q('autoStatus').innerHTML='<pre style="white-space:pre-wrap">'+JSON.stringify(d,null,2)+'</pre>'}}
-async function clearScreen(){{q('holdingStatus').innerHTML='화면 표시만 초기화했습니다. 실제 키움 잔고는 변경되지 않습니다.'}}
-async function setAuto(v){{q('autoStatus').innerHTML='화면 반영 완료 / 서버 저장 확인중...';let d=await fetchJson('/api/auto?enabled='+v);q('autoStatus').innerHTML=d.message||'완료'}}
-async function panic(){{let d=await fetchJson('/api/panic');q('autoStatus').innerHTML=d.message||'긴급정지'}}
-async function buyBest(){{let d=await fetchJson('/api/buy_best');q('autoStatus').innerHTML=d.message||JSON.stringify(d)}}
-async function manualSell(code){{if(!confirm(code+' 시장가 매도 요청할까요? 실제 주문 전송은 키움 인증 정상일 때만 가능합니다.'))return;let d=await fetchJson('/api/holdings/sell?code='+code);alert(d.message||JSON.stringify(d));}}
-async function testTelegram(){{let d=await fetchJson('/api/telegram/test');q('telegramStatus').innerHTML=d.message||JSON.stringify(d)}}
-async function checkTelegram(){{let d=await fetchJson('/api/telegram/check');q('telegramStatus').innerHTML=d.message||JSON.stringify(d)}}
-async function ensureWatch(){{let d=await fetchJson('/api/watch/start');q('telegramStatus').innerHTML=d.message||'실전감시 시작'}}
-</script></body></html>
+function toggleDetail(id){const el=document.getElementById(id); if(el){el.classList.toggle('open')}}
+async function manualSell(code){
+ if(!confirm(code+' 시장가 매도를 요청할까요? 실제 주문 전 키움 인증 상태를 확인합니다.')) return;
+ const r=await fetch('/api/manual_sell?code='+encodeURIComponent(code));
+ const j=await r.json(); alert(j.message||JSON.stringify(j)); location.reload();
+}
+</script>
+</head><body>
+<div class="wrap">
+  <div class="hero">
+    <span class="badge">🌿 KIWOOM REAL AUTO {{version}}</span>
+    <h1>{{app_name}}</h1>
+    <p>키움 REST API 연동 · AI 단타 후보 · 실보유 감시 · 목표/손절/트레일링 · 텔레그램 알림</p>
+  </div>
+  <div class="nav">
+    <a href="#picks">⚡ 단타</a><a href="#holdings">💼 보유</a><a href="#trade">🤖 자동</a><a href="#performance">📊 성과</a><a href="#alerts">📨 알림</a>
+  </div>
+  {{candidates|safe}}
+  {{holdings|safe}}
+  {{trade|safe}}
+  {{performance|safe}}
+  <div id="alerts">{{alerts|safe}}</div>
+</div>
+</body></html>
 """
-
-
-def manual_holding_form():
-    return """
-    <div class="notice" style="border:2px dashed #cfe2c8">
-    <b>🧪 화면 확인용 수동 표시</b><br>실제 키움 잔고는 변경되지 않습니다.
-    <input id="mhName" placeholder="종목명 예: 제주반도체">
-    <input id="mhCode" placeholder="종목코드 예: 080220">
-    <input id="mhQty" placeholder="수량 예: 2">
-    <input id="mhBuy" placeholder="매수가 예: 109450">
-    <button class="btn primary" onclick="manualHolding()">화면에 보유카드 표시</button>
-    </div>
-    <script>
-    async function manualHolding(){
-      const p={name:q('mhName').value,code:q('mhCode').value,qty:q('mhQty').value,buyPrice:q('mhBuy').value};
-      let d=await fetchJson('/api/holdings/manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
-      q('holdingStatus').innerHTML=d.message||'수동 표시 완료'; if(d.html)q('holdingBox').innerHTML=d.html;
-    }
-    </script>
-    """
 
 
 @app.route("/")
 def index():
-    ensure_watch_running()
-    return render_template_string(page_html())
+    ensure_watch()
+    return render_page()
 
 
-@app.route("/api/health")
-def api_health():
-    return jsonify({"ok": True, "version": APP_VERSION, "time": fmt_time()})
+@app.route("/api/status")
+def api_status():
+    cash = get_cash_info()
+    return jsonify({"ok": cash.get("ok"), "version": APP_VERSION, "cash": cash, "state": read_state(), "watch": WATCH_STATE})
 
 
-@app.route("/api/diagnose")
-def api_diagnose():
-    state = read_trade_state()
-    return jsonify({
-        "ok": True,
-        "version": APP_VERSION,
-        "time": fmt_time(),
-        "kiwoom_ready": kiwoom_ready(),
-        "auth": auth_status_light(),
-        "token_cached": bool(TOKEN_CACHE.get("token")),
-        "fdr_available": fdr is not None,
-        "pandas_available": pd is not None,
-        "numpy_available": np is not None,
-        "holdings_count": len(read_holdings()),
-        "last_good_count": len(read_last_good_holdings()[0]),
-        "last_kiwoom_debug": state.get("last_kiwoom_debug"),
-    })
-
-
-@app.route("/api/candidates")
-def api_candidates():
-    force = request.args.get("force", "0") == "1"
-    min_score = safe_float(request.args.get("minScore", 60), 60)
-    max_change = safe_float(request.args.get("maxChange", 12), 12)
-    min_amount = safe_float(request.args.get("minAmount", 3_000_000_000), 3_000_000_000)
-    data = build_candidates(force=force, min_score=min_score)
-    items = []
-    for p in data.get("items", []):
-        if safe_float(p.get("dayChange"), 0) <= max_change and safe_float(p.get("amount"), 0) >= min_amount:
-            items.append(p)
-    html = "".join(render_candidate_card(p, i) for i, p in enumerate(items))
-    if not html:
-        html = "<div class='notice'>조건에 맞는 후보가 없습니다. 조건을 낮춰보세요.</div>"
-    return jsonify({"ok": True, "items": items, "html": html, "updated_at": data.get("updated_at"), "source": data.get("source")})
-
-
-@app.route("/api/holdings/sync")
-def api_holdings_sync():
-    force = request.args.get("force", "0") == "1"
-    res = sync_holdings_from_kiwoom(force=force)
-    items = [normalize_holding(x) for x in res.get("items", [])]
-    html = "".join(render_holding_card(h, i) for i, h in enumerate(items))
-    if not html:
-        html = f"<div class='notice'>{res.get('message','표시 가능한 보유가 없습니다.')}</div>" + manual_holding_form()
-    return jsonify({"ok": res.get("ok"), "items": items, "html": html, "message": res.get("message"), "source": res.get("source")})
+@app.route("/api/refresh_holdings")
+def api_refresh_holdings():
+    res = fetch_kiwoom_holdings()
+    set_status("실보유 새로고침", res.get("message", ""))
+    return render_page()
 
 
 @app.route("/api/holdings")
 def api_holdings():
-    items = read_holdings()
-    if not items:
-        items, _ = read_last_good_holdings()
-    items = [normalize_holding(x) for x in items]
-    return jsonify({"ok": True, "items": items, "count": len(items)})
-
-
-@app.route("/api/holdings/manual", methods=["POST"])
-def api_holdings_manual():
-    data = request.get_json(silent=True) or {}
-    h = normalize_holding(data)
-    if not h.get("name") or h.get("code") == "000000" or h.get("qty") <= 0:
-        return jsonify({"ok": False, "message": "종목명/코드/수량을 확인하세요."})
-    items = read_holdings()
-    items = [x for x in items if str(x.get("code", "")).zfill(6) != h["code"]]
-    items.append(h)
-    write_holdings(items, backup_if_nonempty=True)
-    html = "".join(render_holding_card(x, i) for i, x in enumerate(items))
-    return jsonify({"ok": True, "message": "화면 확인용 보유카드를 표시했습니다. 실제 키움 잔고 변경은 아닙니다.", "html": html})
-
-
-@app.route("/api/holdings/sell")
-def api_holding_sell():
-    code = str(request.args.get("code", "")).zfill(6)
-    item = None
-    for h in read_holdings():
-        if str(h.get("code", "")).zfill(6) == code:
-            item = h
-            break
-    if not item:
-        return jsonify({"ok": False, "message": "보유카드에서 종목을 찾지 못했습니다."})
-    if not kiwoom_ready():
-        return jsonify({"ok": False, "message": "키움 인증정보가 없어 매도 전송이 잠겨 있습니다."})
-    res = auto_sell_holding("수동 시장가 매도", item)
+    res = fetch_kiwoom_holdings()
     return jsonify(res)
 
 
-@app.route("/api/auto")
-def api_auto():
-    enabled = request.args.get("enabled", "0") in ["1", "true", "yes", "on"]
-    state = read_trade_state()
-    state["auto_trade_enabled"] = enabled
-    if enabled:
-        state["panic_stop"] = False
-    write_trade_state(state)
-    ensure_watch_running()
-    msg = f"실전 자동매매 {'ON' if enabled else 'OFF'} · 화면 즉시 반영 완료. 잔고/가격 확인은 백그라운드에서 진행됩니다."
-    update_status(f"실전 자동매매 {'ON' if enabled else 'OFF'}", msg)
-    return jsonify({"ok": True, "enabled": enabled, "message": msg})
+@app.route("/api/candidates")
+def api_candidates():
+    return jsonify({"ok": True, "items": get_market_candidates()})
 
 
-@app.route("/api/panic")
-def api_panic():
-    state = read_trade_state()
+@app.route("/api/auto_on")
+def api_auto_on():
+    state = read_state()
+    state["auto_trade_enabled"] = True
+    state["panic_stop"] = False
+    write_state(state)
+    set_status("실전 자동매매 ON", "화면 즉시 반영 완료. 잔고/가격 확인은 백그라운드에서 진행됩니다.")
+    return render_page()
+
+
+@app.route("/api/auto_off")
+def api_auto_off():
+    state = read_state()
+    state["auto_trade_enabled"] = False
+    write_state(state)
+    set_status("자동매매 OFF", "자동매매를 중지했습니다.")
+    return render_page()
+
+
+@app.route("/api/panic_stop")
+def api_panic_stop():
+    state = read_state()
     state["auto_trade_enabled"] = False
     state["panic_stop"] = True
-    write_trade_state(state)
-    msg = "긴급정지 완료. 자동매매 OFF, 신규 주문 금지."
-    update_status("긴급정지", msg)
-    enqueue_telegram("🛑 <b>긴급정지</b>\n자동매매 OFF / 신규 주문 금지")
-    return jsonify({"ok": True, "message": msg})
+    write_state(state)
+    set_status("긴급정지", "자동매매와 주문 요청을 중지했습니다.")
+    add_alert("긴급정지 실행")
+    return render_page()
 
 
 @app.route("/api/buy_best")
 def api_buy_best():
-    state = read_trade_state()
+    picks = get_market_candidates(limit=8)
+    picks = sorted(picks, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:1]
+    if not picks:
+        msg = "매수 후보가 없습니다."
+        set_status("매수 보류", msg)
+        return jsonify({"ok": False, "message": msg})
+    pick = picks[0]
+    state = read_state()
+    last_sell = safe_float(state.get('last_sell_times',{}).get(str(pick.get('code')).zfill(6),0),0)
+    cooldown = safe_float(state.get('rebuy_cooldown_minutes',30),30) * 60
+    if last_sell and time.time() - last_sell < cooldown:
+        msg = "매도 후 재매수 제한 시간입니다."
+        set_status("매수 보류", msg, {"last_candidate": pick})
+        return jsonify({"ok": False, "message": msg, "candidate": pick})
+    if state.get('index_risk_mode') in ['WEAK','DANGER'] and safe_float(pick.get('marketReverseScore'),0) < 60:
+        msg = "지수 약세 구간입니다. 시장역행 점수가 부족해 신규매수를 축소합니다."
+        set_status("매수 보류", msg, {"last_candidate": pick})
+        return jsonify({"ok": False, "message": msg, "candidate": pick})
     if not state.get("auto_trade_enabled"):
-        return jsonify({"ok": False, "message": "자동매매 OFF 상태입니다."})
-    if not market_is_open():
-        return jsonify({"ok": False, "message": "정규장 시간이 아닙니다."})
-    candidates = build_candidates(force=False).get("items", [])
-    if not candidates:
-        return jsonify({"ok": False, "message": "AI 후보가 없습니다."})
-    p = candidates[0]
-    code = p["code"]
-    live, src = get_trade_live_price(code, fallback=True)
-    if live <= 0:
-        return jsonify({"ok": False, "message": "주문 직전 현재가 확인 실패"})
-    cash = get_kiwoom_cash()
-    if not cash.get("ok"):
-        return jsonify({"ok": False, "message": "키움 주문가능금액 확인 실패: " + cash.get("message", "")})
-    order_cash = safe_float(cash.get("cash"), 0) * ORDER_CASH_SAFETY_RATE
-    qty = int(order_cash // live)
+        msg = "자동매매 OFF 상태입니다."
+        set_status("매수 보류", msg, {"last_candidate": pick})
+        return jsonify({"ok": False, "message": msg, "candidate": pick})
+    cur, src = get_trade_price(pick["code"], fallback=False)
+    if cur < 10:
+        msg = "키움 현재가 확인 실패로 주문하지 않습니다."
+        set_status("매수 보류", msg, {"last_candidate": pick})
+        return jsonify({"ok": False, "message": msg, "candidate": pick})
+    cash = get_cash_info()
+    if not cash.get("ok") or safe_float(cash.get("cash"), 0) < max(safe_float(cur), safe_float(read_state().get("min_order_cash", 50000))):
+        msg = "키움 주문가능금액 확인 실패 또는 부족으로 주문하지 않습니다."
+        set_status("매수 보류", msg, {"last_candidate": pick})
+        return jsonify({"ok": False, "message": msg, "candidate": pick, "cash": cash})
+    qty = int(safe_float(cash.get("cash"), 0) * 0.96 // cur)
     if qty <= 0:
-        return jsonify({"ok": False, "message": "주문 가능 수량이 0입니다."})
-    gap = abs(safe_float(p.get("price"), 0) - live) / live
-    if gap > PRICE_DIFF_LIMIT:
-        return jsonify({"ok": False, "message": f"AI 후보가격과 키움 현재가 차이 {gap*100:.2f}%로 매수 보류"})
-    with ORDER_LOCK:
-        res = kiwoom_order("buy", code, qty, 0, "market")
-    if res.get("ok"):
-        h = normalize_holding({"code": code, "name": p["name"], "qty": qty, "buyPrice": live, "lastPrice": live, "source": "AUTO_BUY"})
-        items = read_holdings()
-        items = [x for x in items if str(x.get("code", "")).zfill(6) != code]
-        items.append(h)
-        write_holdings(items, backup_if_nonempty=True)
-        enqueue_telegram(f"✅ <b>AI 자동매수 요청</b>\n{p['name']}({code})\n수량 {qty}주\n현재가 {money(live)}")
+        msg = "주문 가능 수량이 없습니다."
+        return jsonify({"ok": False, "message": msg})
+    if not KIWOOM_REAL_TRADING or KIWOOM_DRY_RUN:
+        msg = f"DRY/RUN 또는 실전주문 비활성: {pick['name']} {qty}주 주문 전송 안 함"
+        append_trade_event({'side':'buy','dry_run':True,'code':pick['code'],'name':pick['name'],'qty':qty,'fill_price':int(cur),'strategy':pick.get('strategy','단타형'),'candidate_score':pick.get('riskAdjustedScore',pick.get('score'))})
+        set_status("매수 테스트", msg, {"last_candidate": pick, "current_strategy": pick.get('strategy','단타형')})
+        return jsonify({"ok": True, "dry_run": True, "message": msg})
+    res = kiwoom_order("buy", pick["code"], qty)
+    if res.get('ok'):
+        append_trade_event({'side':'buy','code':pick['code'],'name':pick['name'],'qty':qty,'fill_price':int(cur),'strategy':pick.get('strategy','단타형'),'candidate_score':pick.get('riskAdjustedScore',pick.get('score')),'order_response':res})
+    set_status("매수 요청", str(res)[:400], {"last_candidate": pick, "current_strategy": pick.get('strategy','단타형')})
     return jsonify(res)
 
 
-@app.route("/api/telegram/check")
-def api_telegram_check():
-    ok = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
-    msg = "텔레그램 환경변수 설정 완료" if ok else "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 없습니다."
+@app.route("/api/manual_sell")
+def api_manual_sell():
+    code = str(request.args.get("code", "")).zfill(6)
+    h = next((x for x in read_holdings() if str(x.get("code")).zfill(6) == code), None)
+    if not h:
+        return jsonify({"ok": False, "message": "보유 캐시에서 종목을 찾지 못했습니다."})
+    res = auto_sell_holding("manual", h)
+    return jsonify({"ok": bool(res.get("ok")), "message": res.get("message") or str(res)[:300], "result": res})
+
+
+
+@app.route("/api/strategy_performance")
+def api_strategy_performance():
+    return jsonify({"ok": True, "performance": read_performance(), "rank_1d": strategy_rankings(1), "rank_1w": strategy_rankings(7), "rank_1m": strategy_rankings(30), "ledger": read_ledger()[:50]})
+
+
+@app.route("/api/backup_now")
+def api_backup_now():
+    ok = auto_backup_all()
+    return jsonify({"ok": ok, "message": "백업 완료" if ok else "백업 실패"})
+
+
+@app.route("/api/ai_review")
+def api_ai_review():
+    ledger = read_ledger()[:20]
+    return jsonify({"ok": True, "reviews": [{"event": e, "review": ai_loss_review(e)} for e in ledger]})
+
+
+@app.route("/api/telegram_test")
+def api_telegram_test():
+    ok, msg = send_telegram(f"{APP_NAME} {APP_VERSION} 텔레그램 테스트 알림 {now_text()}")
+    add_alert("텔레그램 테스트 " + ("성공" if ok else "실패"))
+    state = read_state()
+    state["last_telegram_status"] = msg
+    write_state(state)
     return jsonify({"ok": ok, "message": msg})
 
 
-@app.route("/api/telegram/test")
-def api_telegram_test():
-    ok, msg = send_telegram_direct(f"✅ {APP_NAME} {APP_VERSION} 텔레그램 테스트 알림\n시간: {fmt_time()}")
-    write_alert_log("텔레그램 테스트 성공" if ok else msg, ok)
-    return jsonify({"ok": ok, "message": "텔레그램 테스트 성공" if ok else "텔레그램 실패: " + msg})
-
-
-@app.route("/api/watch/start")
-def api_watch_start():
-    ensure_watch_running()
-    return jsonify({"ok": True, "message": "실전 감시 백그라운드가 실행 중입니다."})
-
-
-@app.route("/api/render_ip")
-def api_render_ip():
-    info = {"ok": False, "ip": "", "message": "확인 실패"}
-    for url in ["https://api.ipify.org", "https://ifconfig.me/ip"]:
-        try:
-            r = requests.get(url, timeout=4)
-            if r.status_code == 200 and r.text.strip():
-                info = {"ok": True, "ip": r.text.strip(), "source": url, "message": "이 IP를 키움 REST API 허용 IP에 등록하세요."}
-                break
-        except Exception:
-            pass
-    return jsonify(info)
-
-
-def start_background():
-    try:
-        threading.Thread(target=telegram_worker, daemon=True).start()
-    except Exception:
-        pass
-    try:
-        ensure_watch_running()
-    except Exception:
-        pass
-
-
-start_background()
-
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False)
