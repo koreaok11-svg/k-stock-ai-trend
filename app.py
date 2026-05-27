@@ -41,7 +41,7 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v154"
+APP_VERSION = "v155"
 APP_NAME = "성일의 AI 주식바람"
 KST = timezone(timedelta(hours=9))
 app = Flask(__name__)
@@ -95,6 +95,7 @@ DEFAULT_STATE = {
     "dynamic_target_min_profit_rate": 0.027,
     "dynamic_target_min_ai_score": 85,
     "candidate_scan_interval": 30,
+    "candidate_price_warning_sec": 60,
     "last_candidate_scan_time": "",
     "last_candidate_scan_count": 0,
     "last_candidate_symbols": "",
@@ -385,6 +386,67 @@ def get_trade_price(code, fallback=True):
     if fallback:
         return get_naver_price(code)
     return 0, "NONE"
+
+
+def get_display_price(code):
+    """AI후보 화면 표시용 현재가입니다.
+    키움 인증 장애가 있어도 화면 현재가 괴리를 줄이기 위해 NAVER를 먼저 확인하고,
+    실패 시 KIWOOM을 보조로 사용합니다. 실제 주문 전에는 별도로 KIWOOM 현재가를 재검증합니다.
+    """
+    p, src = get_naver_price(code)
+    if p >= 10:
+        return p, src
+    try:
+        p, src = get_kiwoom_price(code)
+        if p >= 10:
+            return p, src
+    except Exception:
+        pass
+    return 0, "NONE"
+
+
+def refresh_candidate_prices(items, force=True):
+    """AI후보 카드의 현재가/목표가/손절가를 최신 표시가격 기준으로 보정합니다."""
+    state = read_state()
+    target_rate = safe_float(state.get("target_rate", 0.027), 0.027)
+    stop_rate = safe_float(state.get("stop_rate", -0.018), -0.018)
+    refreshed = []
+    checked = now_text()
+    for c in (items or []):
+        c = dict(c or {})
+        code = str(c.get("code", "")).zfill(6)
+        old_price = safe_float(c.get("price"), 0)
+        p, src = get_display_price(code) if code and force else (0, "NONE")
+        if p >= 10:
+            c["price"] = int(p)
+            c["displayPrice"] = int(p)
+            c["priceSource"] = src
+            c["priceCheckedAt"] = checked
+            c["priceDiffFromCache"] = int(p - old_price) if old_price else 0
+            base = p
+        else:
+            base = old_price
+            c.setdefault("priceSource", c.get("source", "KRX_FAST_CACHE"))
+            c.setdefault("priceCheckedAt", c.get("scanTime") or checked)
+            c.setdefault("priceDiffFromCache", 0)
+        if base >= 10:
+            c["target"] = int(base * (1 + target_rate))
+            c["stop"] = int(base * (1 + stop_rate))
+            c["buyZone"] = int(base * 0.995)
+        c["priceRefreshNote"] = "실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 검증합니다."
+        refreshed.append(c)
+    return refreshed
+
+
+def candidate_price_age_seconds(c):
+    try:
+        t = str(c.get("priceCheckedAt") or c.get("scanTime") or c.get("time") or "")
+        if not t:
+            return 9999
+        dt = datetime.strptime(t[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST)
+        return max(0, int((now_kst() - dt).total_seconds()))
+    except Exception:
+        return 9999
 
 
 def parse_cash(data):
@@ -759,15 +821,18 @@ def get_market_candidates(limit=8, min_score=None):
         c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
         enriched.append(c)
     candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
+    # v155: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
+    candidates = refresh_candidate_prices(candidates, force=True)
     scan_time = now_text()
     state = read_state()
     state['index_risk_mode']=idx_risk.get('mode','UNKNOWN')
     state['recommended_strategy'] = candidates[0].get('strategy','AI후보형') if candidates else state.get('recommended_strategy','AI후보형')
     state['last_candidate_scan_time'] = scan_time
+    state['last_candidate_price_time'] = scan_time
     state['last_candidate_scan_count'] = len(candidates)
     state['last_candidate_symbols'] = ' / '.join([str(x.get('name') or x.get('code')) for x in candidates[:3]])
     write_state(state)
-    write_json(CANDIDATE_FILE, {"time": scan_time, "items": candidates, "indexRisk": idx_risk, "scanInterval": safe_int(state.get('candidate_scan_interval',30),30)})
+    write_json(CANDIDATE_FILE, {"time": scan_time, "priceTime": scan_time, "items": candidates, "indexRisk": idx_risk, "scanInterval": safe_int(state.get('candidate_scan_interval',30),30)})
     return candidates
 
 
@@ -916,20 +981,27 @@ def render_holdings_section():
 
 
 def render_candidate_card(c, idx):
+    age = candidate_price_age_seconds(c)
+    stale = age > 60
+    price_src = c.get('priceSource') or c.get('source','KRX_FAST_CACHE')
+    checked = c.get('priceCheckedAt') or c.get('scanTime') or '-'
+    diff = safe_float(c.get('priceDiffFromCache'), 0)
+    diff_txt = f" · 캐시대비 {int(diff):+,}원" if diff else ""
     return f"""
     <div class="pick compact" onclick="toggleDetail('pick{idx}')">
       <div class="chips"><span>{html_escape(c.get('market',''))}</span><span>{c.get('code')}</span><span>{html_escape(c.get('theme',''))}</span><span>AI {safe_float(c.get('riskAdjustedScore', c.get('score'))):.1f}</span><span>역행 {safe_float(c.get('marketReverseScore')):.0f}</span><span>{html_escape(c.get('strategy','AI후보형'))}</span></div>
       <h3>{html_escape(c.get('name'))}</h3>
       <div class="grid2">
-        <div><label>현재가</label><b>{money(c.get('price'))}</b><small>{html_escape(c.get('source','KRX_FAST_CACHE'))}</small></div>
+        <div><label>현재가</label><b>{money(c.get('price'))}</b><small>{html_escape(price_src)} · {age}초 전</small></div>
         <div><label>당일 흐름</label><b>{pct(c.get('dayChange'))}</b></div>
         <div><label>목표가</label><b class="red">{money(c.get('target'))}</b></div>
         <div><label>손절가</label><b class="blue">{money(c.get('stop'))}</b></div>
       </div>
+      <div class="price-meta {'stale' if stale else ''}">⏱ 가격확인 {html_escape(checked)} · {html_escape(price_src)}{html_escape(diff_txt)}{' · 오래된 가격일 수 있습니다' if stale else ''}</div>
       <div id="pick{idx}" class="detail">
         거래대금 {html_escape(c.get('amountText','-'))} · 매수관찰 {money(c.get('buyZone'))}<br>
         시장역행점수 {safe_float(c.get('marketReverseScore')):.1f} · 테마강도 {safe_float(c.get('themeStrengthScore')):.0f} · 과열감점 {safe_float(c.get('overheatPenalty')):.0f} · 슬리피지감점 {safe_float(c.get('slippagePenalty')):.0f}<br>
-        {html_escape(c.get('comment',''))}
+        {html_escape(c.get('comment',''))}<br>{html_escape(c.get('priceRefreshNote',''))}
       </div>
     </div>"""
 
@@ -939,9 +1011,11 @@ def render_candidates():
     picks = (data.get("items") if isinstance(data, dict) else None) or cached_candidates()[:8]
     state = read_state()
     scan_time = data.get("time") if isinstance(data, dict) else state.get("last_candidate_scan_time", "")
+    price_time = data.get("priceTime") if isinstance(data, dict) else state.get("last_candidate_price_time", "")
     scan_interval = safe_int(state.get("candidate_scan_interval", 30), 30)
     scan_count = len(picks)
     symbols = " / ".join([str(x.get("name") or x.get("code")) for x in picks[:3]]) if picks else "대기중"
+    oldest_age = max([candidate_price_age_seconds(x) for x in picks] or [0])
     cards = "".join(render_candidate_card(c, i) for i, c in enumerate(picks))
     return f"""
     <section class="card" id="picks">
@@ -951,12 +1025,16 @@ def render_candidates():
         <div><b>🔎 AI 분석 상태</b></div>
         <div>TOP 후보 분석 완료: <b>{scan_count}</b>개</div>
         <div>현재 감시 후보: <b>{html_escape(symbols)}</b></div>
-        <div>최근 스캔: <b>{html_escape(scan_time or '-')}</b> · 다음 재스캔: <b id="scanCountdown">{scan_interval}</b>초 후</div>
+        <div>최근 후보스캔: <b>{html_escape(scan_time or '-')}</b></div>
+        <div>최근 가격확인: <b>{html_escape(price_time or '-')}</b> · 가격나이 <b>{oldest_age}</b>초</div>
+        <div>다음 재스캔: <b id="scanCountdown">{scan_interval}</b>초 후</div>
       </div>
       <div class="btn-row">
         <button onclick="location.href='/api/refresh_candidates'">후보 즉시검색</button>
+        <button class="dark" onclick="location.href='/api/refresh_candidate_prices'">현재가 새로고침</button>
         <button class="brown" onclick="location.href='/api/buy_best'">최우선 후보 매수</button>
       </div>
+      <div class="notice small">표시가격은 NAVER/KIWOOM 보정값입니다. 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 검증합니다.</div>
       {cards}
     </section>"""
 
@@ -1200,7 +1278,7 @@ TEMPLATE = """
 details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding:14px;font-weight:900}.alerts{margin:8px 0 0;padding-left:20px;color:#5b513d}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
 .scan-status{background:#f4f8ff;border:1px dashed #bfd3ef;border-radius:20px;padding:15px;margin:12px 0;color:#334155;font-weight:700}.scan-status b{color:#0f172a}
-.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.summary-grid div{background:#f8fbff;border:1px solid #e3ebf4;border-radius:16px;padding:12px}.summary-grid span{display:block;color:var(--muted);font-size:12px}.summary-grid b{font-size:20px}.upgrade-box{border:1px solid #dce8dc;border-radius:22px;padding:16px;margin:12px 0;background:#fbfffb}.strategy-card{border:1px solid #dfe8f2;border-radius:20px;padding:14px;margin:10px 0;background:#fff}.strategy-card.best{border-color:#9bd4ad;background:#f4fff6}.strategy-card .tag{float:right;border-radius:999px;background:#eaf2ff;color:#2d6cdf;padding:5px 10px;font-weight:900;font-size:12px}.reason-list{color:#667085}.reason-list li{margin:6px 0}.pill-warn{display:inline-block;border-radius:999px;background:#fff4d5;color:#8a5a00;padding:6px 10px;font-weight:900}.pill-ok{display:inline-block;border-radius:999px;background:#e8fff0;color:#10803d;padding:6px 10px;font-weight:900}
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.summary-grid div{background:#f8fbff;border:1px solid #e3ebf4;border-radius:16px;padding:12px}.summary-grid span{display:block;color:var(--muted);font-size:12px}.summary-grid b{font-size:20px}.upgrade-box{border:1px solid #dce8dc;border-radius:22px;padding:16px;margin:12px 0;background:#fbfffb}.strategy-card{border:1px solid #dfe8f2;border-radius:20px;padding:14px;margin:10px 0;background:#fff}.strategy-card.best{border-color:#9bd4ad;background:#f4fff6}.strategy-card .tag{float:right;border-radius:999px;background:#eaf2ff;color:#2d6cdf;padding:5px 10px;font-weight:900;font-size:12px}.reason-list{color:#667085}.reason-list li{margin:6px 0}.pill-warn{display:inline-block;border-radius:999px;background:#fff4d5;color:#8a5a00;padding:6px 10px;font-weight:900}.pill-ok{display:inline-block;border-radius:999px;background:#e8fff0;color:#10803d;padding:6px 10px;font-weight:900}.price-meta{margin-top:10px;padding:10px 12px;border-radius:14px;background:#eef8e9;color:#385c42;font-size:13px;font-weight:800}.price-meta.stale{background:#fff4d5;color:#8a5a00}
 @media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.nav a{font-size:14px;padding:9px 12px}}
 </style>
 <script>
@@ -1270,7 +1348,31 @@ def api_holdings():
 @app.route("/api/refresh_candidates")
 def api_refresh_candidates():
     items = get_market_candidates(limit=8)
-    set_status("AI후보 즉시검색", f"AI후보 {len(items)}개를 즉시 검색했습니다.")
+    set_status("AI후보 즉시검색", f"AI후보 {len(items)}개를 즉시 검색하고 현재가를 보정했습니다.")
+    return render_page()
+
+
+@app.route("/api/refresh_candidate_prices")
+def api_refresh_candidate_prices():
+    data = read_json(CANDIDATE_FILE, {})
+    items = data.get("items") if isinstance(data, dict) else []
+    if not items:
+        items = get_market_candidates(limit=8)
+    items = refresh_candidate_prices(items, force=True)
+    price_time = now_text()
+    if isinstance(data, dict):
+        data["items"] = items
+        data["priceTime"] = price_time
+        data.setdefault("time", price_time)
+        data["scanInterval"] = safe_int(read_state().get("candidate_scan_interval",30),30)
+    else:
+        data = {"time": price_time, "priceTime": price_time, "items": items, "scanInterval": safe_int(read_state().get("candidate_scan_interval",30),30)}
+    write_json(CANDIDATE_FILE, data)
+    state = read_state()
+    state["last_candidate_price_time"] = price_time
+    state["last_candidate_scan_count"] = len(items)
+    write_state(state)
+    set_status("AI후보 현재가 새로고침", f"AI후보 {len(items)}개 현재가를 새로 확인했습니다.")
     return render_page()
 
 
@@ -1412,7 +1514,7 @@ def api_update_conditions():
     state["dynamic_target_enabled"] = bool(request.form.get("dynamic_target_enabled"))
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
     write_state(state)
-    set_status("매매조건 저장", "v154 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
+    set_status("매매조건 저장", "v155 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
     return render_page()
 
 @app.route("/api/reset_conditions")
@@ -1421,7 +1523,7 @@ def api_reset_conditions():
     for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
-    set_status("기본조건 복원", "매매조건을 v154 기본값으로 복원했습니다.")
+    set_status("기본조건 복원", "매매조건을 v155 기본값으로 복원했습니다.")
     return render_page()
 
 
