@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v156 AI CANDIDATE CONDITIONS TABS FINAL
-파일명: app_kiwoom_real_auto_scalping_v156_ai_candidate_conditions_tabs_final.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v157 AI CANDIDATE CONDITIONS TABS FINAL
+파일명: app_kiwoom_real_auto_scalping_v157_ai_candidate_conditions_tabs_final.py
 
 목표:
 - 누적 패치/중복 route/inject 제거
@@ -12,7 +12,7 @@
 - 보유카드 직접 시장가 매도 버튼
 - AI후보 축소 카드 + 터치 상세 펼침
 
-v156 보강:
+v157 보강:
 - AI 전략별 성과 누적 저장
 - 실체결 기준 손익 계산용 매매 원장
 - 1일/1주/1개월 전략 랭킹
@@ -41,7 +41,7 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v156"
+APP_VERSION = "v157"
 APP_NAME = "성일의 AI 주식바람"
 KST = timezone(timedelta(hours=9))
 app = Flask(__name__)
@@ -49,13 +49,13 @@ app = Flask(__name__)
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-STATE_FILE = BASE_DIR / "sungil_trade_state_v156.json"
-HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v156.json"
-HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v156.json"
-CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v156.json"
-PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v156.json"
-TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v156.json"
-BACKUP_DIR = BASE_DIR / "sungil_backups_v156"
+STATE_FILE = BASE_DIR / "sungil_trade_state_v157.json"
+HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v157.json"
+HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v157.json"
+CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v157.json"
+PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v157.json"
+TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v157.json"
+BACKUP_DIR = BASE_DIR / "sungil_backups_v157"
 try:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
@@ -910,7 +910,7 @@ def get_market_candidates(limit=8, min_score=None):
         c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
         enriched.append(c)
     candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
-    # v156: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
+    # v157: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
     candidates = refresh_candidate_prices(candidates, force=True)
     scan_time = now_text()
     state = read_state()
@@ -1339,6 +1339,160 @@ def render_alert_center():
     </section>"""
 
 
+
+def _top_theme_summary(items):
+    themes = {}
+    for c in items or []:
+        t = str(c.get('theme') or '기타')
+        row = themes.setdefault(t, {'theme': t, 'count': 0, 'amount': 0, 'avg_change': 0, 'score': 0})
+        row['count'] += 1
+        row['amount'] += safe_float(c.get('amount'), 0)
+        row['avg_change'] += safe_float(c.get('dayChange'), 0)
+        row['score'] += safe_float(c.get('riskAdjustedScore', c.get('score', 0)), 0)
+    out=[]
+    for r in themes.values():
+        if r['count']:
+            r['avg_change'] = round(r['avg_change']/r['count'], 2)
+            r['score'] = round(r['score']/r['count'], 1)
+            out.append(r)
+    return sorted(out, key=lambda x:(x['score'], x['amount']), reverse=True)[:5]
+
+
+def build_ai_daily_report(force=False):
+    """전날 기준 AI 일일 리포트. 실제 과거 데이터 API가 없으면 최신 KRX/캐시를 기반으로 전일 복기형 리포트를 만듭니다."""
+    cached = read_json(DAILY_REPORT_FILE, {})
+    today = now_kst().strftime('%Y-%m-%d')
+    if cached.get('date') == today and not force:
+        return cached
+    try:
+        items = get_market_candidates(limit=12)
+    except Exception:
+        data = read_json(CANDIDATE_FILE, {})
+        items = data.get('items', []) if isinstance(data, dict) else []
+    idx = read_state().get('index_risk_mode', 'UNKNOWN')
+    themes = _top_theme_summary(items)
+    total_amount = sum(safe_float(x.get('amount'), 0) for x in items)
+    avg_change = round(sum(safe_float(x.get('dayChange'), 0) for x in items) / max(1, len(items)), 2)
+    strong = [x for x in items if safe_float(x.get('riskAdjustedScore', x.get('score',0))) >= 80]
+    risk_notes=[]
+    if idx in ['WEAK','DANGER']:
+        risk_notes.append('지수 약세 구간이므로 신규매수는 시장역행 점수가 높은 후보 위주로 축소 접근이 좋습니다.')
+    if any(safe_float(x.get('overheatPenalty'),0) >= 10 for x in items):
+        risk_notes.append('일부 후보는 단기 급등/과열 감점이 있어 추격매수보다 눌림 확인이 필요합니다.')
+    if not risk_notes:
+        risk_notes.append('과열 위험은 제한적이나 실시간 가격과 거래대금 유지 여부 확인이 필요합니다.')
+    report = {
+        'date': today,
+        'base_day': '전일 기준 자동 리포트',
+        'created_at': now_text(),
+        'index_risk': idx,
+        'candidate_count': len(items),
+        'total_amount_text': f"{total_amount/100000000:.1f}억",
+        'avg_change': avg_change,
+        'themes': themes,
+        'top_candidates': items[:5],
+        'strong_count': len(strong),
+        'summary': f"AI후보 {len(items)}개 기준 평균 등락률 {avg_change:.2f}%, 주요 거래대금 합계 {total_amount/100000000:.1f}억 수준입니다. 강한 후보는 {len(strong)}개로 분류됩니다.",
+        'opinion': '오늘은 거래대금이 유지되고 시장역행 점수가 높은 종목을 우선 감시하는 방향이 좋습니다. 테마가 강하더라도 고점 근처 후보는 추격매수보다 눌림 후 재돌파 확인이 안전합니다.',
+        'risk_notes': risk_notes,
+    }
+    write_json(DAILY_REPORT_FILE, report)
+    return report
+
+
+def build_ai_investment_review(force=False):
+    cached = read_json(INVESTMENT_REVIEW_FILE, {})
+    today = now_kst().strftime('%Y-%m-%d')
+    if cached.get('date') == today and not force:
+        return cached
+    holdings = read_holdings()
+    ledger = read_ledger()[:50]
+    perf1 = strategy_rankings(1)
+    perf7 = strategy_rankings(7)
+    total_value = sum(safe_float(h.get('lastPrice'),0)*safe_float(h.get('qty'),0) for h in holdings)
+    total_buy = sum(safe_float(h.get('buyPrice'),0)*safe_float(h.get('qty'),0) for h in holdings)
+    total_pnl = sum(safe_float(h.get('pnl'),0) for h in holdings)
+    total_rate = (total_pnl / total_buy * 100) if total_buy else 0
+    risk_flags=[]
+    if len(holdings) == 0:
+        risk_flags.append('현재 앱에서 확인되는 보유종목이 없습니다. 키움 인증/잔고동기화 상태를 먼저 확인하세요.')
+    if len(holdings) >= safe_int(read_state().get('max_positions'),3):
+        risk_flags.append('보유종목 수가 설정 한도에 가까워 신규매수보다 보유관리 우선이 좋습니다.')
+    if total_rate < -2:
+        risk_flags.append('전체 평가손익률이 손실권입니다. 신규매수보다 손절/비중 축소 기준을 먼저 점검하세요.')
+    elif total_rate > 3:
+        risk_flags.append('수익권입니다. AI 상향목표와 트레일링 보호선을 함께 확인하는 것이 좋습니다.')
+    if not risk_flags:
+        risk_flags.append('현재 포트폴리오 위험은 중립입니다. 시장상태에 따라 신규매수 비중을 조절하세요.')
+    best_strategy = perf7[0]['strategy'] if perf7 else (perf1[0]['strategy'] if perf1 else read_state().get('current_strategy','AI후보형'))
+    direction = '보유종목은 목표가/트레일링 보호선 기준으로 관리하고, 신규 진입은 AI후보 중 시장역행·거래대금 유지 후보로 제한하는 방향을 권장합니다.'
+    if read_state().get('index_risk_mode') in ['WEAK','DANGER']:
+        direction = '지수 약세 구간입니다. 신규매수는 축소하고, 이미 수익 중인 보유종목은 트레일링 보호선 중심으로 관리하는 것이 좋습니다.'
+    report = {
+        'date': today,
+        'created_at': now_text(),
+        'holdings_count': len(holdings),
+        'total_value': int(total_value),
+        'total_buy': int(total_buy),
+        'total_pnl': int(total_pnl),
+        'total_rate': round(total_rate,2),
+        'best_strategy': best_strategy,
+        'rank_1d': perf1[:3],
+        'rank_1w': perf7[:3],
+        'recent_trades': ledger[:5],
+        'risk_flags': risk_flags,
+        'direction': direction,
+        'summary': f"현재 확인 보유 {len(holdings)}종목, 평가손익 {int(total_pnl):,}원({total_rate:.2f}%)입니다. 최근 성과 기준 우선 전략은 {best_strategy}입니다.",
+    }
+    write_json(INVESTMENT_REVIEW_FILE, report)
+    return report
+
+
+def render_daily_report_section():
+    r = build_ai_daily_report()
+    theme_rows = ''.join(f"<li><b>{html_escape(x.get('theme'))}</b> · 평균등락 {x.get('avg_change')}% · AI강도 {x.get('score')} · 거래대금 {safe_float(x.get('amount'))/100000000:.1f}억</li>" for x in r.get('themes', [])) or '<li>테마 데이터 대기중</li>'
+    pick_rows = ''.join(f"<li><b>{html_escape(x.get('name'))}</b> · {html_escape(x.get('theme',''))} · AI {safe_float(x.get('riskAdjustedScore',x.get('score'))):.1f} · {pct(x.get('dayChange'))}</li>" for x in r.get('top_candidates', [])) or '<li>후보 데이터 대기중</li>'
+    risk_rows = ''.join(f"<li>{html_escape(x)}</li>" for x in r.get('risk_notes', []))
+    return f"""
+    <section class="card" id="daily-report">
+      <h2>📰 AI 일일리포트</h2>
+      <p class="muted">전날 기준 시장 흐름을 복기하고 오늘 감시 방향을 제시합니다.</p>
+      <div class="btn-row"><button onclick="location.href='/api/refresh_daily_report'">AI일일리포트 새로작성</button></div>
+      <div class="summary-grid">
+        <div><span>작성시간</span><b>{html_escape(r.get('created_at','-'))}</b></div>
+        <div><span>지수위험</span><b>{html_escape(r.get('index_risk','UNKNOWN'))}</b></div>
+        <div><span>AI후보 수</span><b>{r.get('candidate_count',0)}개</b></div>
+        <div><span>거래대금 합계</span><b>{html_escape(r.get('total_amount_text','-'))}</b></div>
+      </div>
+      <div class="ai-verdict">{html_escape(r.get('summary',''))}</div>
+      <details open><summary>상승/강세 테마 분석</summary><div class="notice small"><ul>{theme_rows}</ul></div></details>
+      <details><summary>오늘 관심 후보 의견</summary><div class="notice small"><ul>{pick_rows}</ul><p>{html_escape(r.get('opinion',''))}</p></div></details>
+      <details><summary>위험요소/주의사항</summary><div class="notice small"><ul>{risk_rows}</ul></div></details>
+    </section>"""
+
+
+def render_investment_review_section():
+    r = build_ai_investment_review()
+    risk_rows = ''.join(f"<li>{html_escape(x)}</li>" for x in r.get('risk_flags', []))
+    rank_rows = ''.join(f"<li><b>{html_escape(x.get('strategy'))}</b> · 손익 {money(x.get('pnl'))} · 승률 {x.get('win_rate')}% · {x.get('trades')}회</li>" for x in r.get('rank_1w', [])) or '<li>전략 성과 데이터 대기중</li>'
+    return f"""
+    <section class="card" id="my-review">
+      <h2>🧾 AI 내투자평가</h2>
+      <p class="muted">보유종목, 매매원장, 전략성과를 기준으로 현재 투자상태를 평가합니다.</p>
+      <div class="btn-row"><button onclick="location.href='/api/refresh_investment_review'">내투자평가 새로작성</button></div>
+      <div class="summary-grid">
+        <div><span>보유종목</span><b>{r.get('holdings_count',0)}개</b></div>
+        <div><span>평가손익</span><b class="{'red' if safe_float(r.get('total_pnl'))>=0 else 'blue'}">{money(r.get('total_pnl'))}</b></div>
+        <div><span>전체수익률</span><b>{pct(r.get('total_rate'))}</b></div>
+        <div><span>추천전략</span><b>{html_escape(r.get('best_strategy','-'))}</b></div>
+      </div>
+      <div class="ai-verdict">{html_escape(r.get('summary',''))}</div>
+      <details open><summary>투자방향 의견</summary><div class="notice small">{html_escape(r.get('direction',''))}</div></details>
+      <details><summary>위험/개선 포인트</summary><div class="notice small"><ul>{risk_rows}</ul></div></details>
+      <details><summary>최근 우수 전략</summary><div class="notice small"><ul>{rank_rows}</ul></div></details>
+    </section>"""
+
+
 def render_page():
     state = read_state()
     return render_template_string(TEMPLATE,
@@ -1348,6 +1502,8 @@ def render_page():
         trade=render_trade_section(),
         candidates=render_candidates(),
         conditions=render_conditions_section(),
+        daily_report=render_daily_report_section(),
+        my_review=render_investment_review_section(),
         performance=render_performance_section(),
         ai_upgrade=render_ai_upgrade_section(),
         alerts=render_alert_center(),
@@ -1402,9 +1558,11 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
     <p>키움 REST API 연동 · AI후보 감시 · 추천이유 설명 · 목표/손절/트레일링 · 전략성과 학습</p>
   </div>
   <div class="nav">
-    <a href="#picks">🤖 AI후보</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
+    <a href="#picks">🤖 AI후보</a><a href="#daily-report">📰 AI일일리포트</a><a href="#my-review">🧾 AI내투자평가</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
   </div>
   {{candidates|safe}}
+  {{daily_report|safe}}
+  {{my_review|safe}}
   {{conditions|safe}}
   {{ai_upgrade|safe}}
   {{holdings|safe}}
@@ -1610,7 +1768,7 @@ def api_update_conditions():
     state["dynamic_target_enabled"] = bool(request.form.get("dynamic_target_enabled"))
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
     write_state(state)
-    set_status("매매조건 저장", "v156 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
+    set_status("매매조건 저장", "v157 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
     return render_page()
 
 @app.route("/api/reset_conditions")
@@ -1619,7 +1777,7 @@ def api_reset_conditions():
     for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
-    set_status("기본조건 복원", "매매조건을 v156 기본값으로 복원했습니다.")
+    set_status("기본조건 복원", "매매조건을 v157 기본값으로 복원했습니다.")
     return render_page()
 
 
@@ -1652,6 +1810,27 @@ def api_keep_conditions():
     write_state(state)
     set_status("기존조건 유지", "AI 추천은 참고만 하고 기존 매매조건을 유지했습니다.")
     return jsonify({"ok": True, "message": "기존조건 유지 완료"})
+
+
+@app.route("/api/refresh_daily_report")
+def api_refresh_daily_report():
+    r = build_ai_daily_report(force=True)
+    set_status("AI일일리포트 작성", r.get('summary',''))
+    return render_page()
+
+@app.route("/api/refresh_investment_review")
+def api_refresh_investment_review():
+    r = build_ai_investment_review(force=True)
+    set_status("AI 내투자평가 작성", r.get('summary',''))
+    return render_page()
+
+@app.route("/api/ai_daily_report")
+def api_ai_daily_report():
+    return jsonify({"ok": True, "report": build_ai_daily_report(force=str(request.args.get('force','0'))=='1')})
+
+@app.route("/api/ai_investment_review")
+def api_ai_investment_review():
+    return jsonify({"ok": True, "review": build_ai_investment_review(force=str(request.args.get('force','0'))=='1')})
 
 @app.route("/api/telegram_test")
 def api_telegram_test():
