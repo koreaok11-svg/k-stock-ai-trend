@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v153 AI CANDIDATE CONDITIONS TABS FINAL
-파일명: app_kiwoom_real_auto_scalping_v153_ai_candidate_conditions_tabs_final.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v156 AI CANDIDATE CONDITIONS TABS FINAL
+파일명: app_kiwoom_real_auto_scalping_v156_ai_candidate_conditions_tabs_final.py
 
 목표:
 - 누적 패치/중복 route/inject 제거
@@ -12,7 +12,7 @@
 - 보유카드 직접 시장가 매도 버튼
 - AI후보 축소 카드 + 터치 상세 펼침
 
-v153 보강:
+v156 보강:
 - AI 전략별 성과 누적 저장
 - 실체결 기준 손익 계산용 매매 원장
 - 1일/1주/1개월 전략 랭킹
@@ -41,7 +41,7 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v155"
+APP_VERSION = "v156"
 APP_NAME = "성일의 AI 주식바람"
 KST = timezone(timedelta(hours=9))
 app = Flask(__name__)
@@ -49,13 +49,13 @@ app = Flask(__name__)
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-STATE_FILE = BASE_DIR / "sungil_trade_state_v152.json"
-HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v152.json"
-HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v152.json"
-CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v152.json"
-PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v152.json"
-TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v152.json"
-BACKUP_DIR = BASE_DIR / "sungil_backups_v152"
+STATE_FILE = BASE_DIR / "sungil_trade_state_v156.json"
+HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v156.json"
+HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v156.json"
+CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v156.json"
+PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v156.json"
+TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v156.json"
+BACKUP_DIR = BASE_DIR / "sungil_backups_v156"
 try:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
@@ -734,6 +734,94 @@ def get_index_risk(df=None):
         pass
     return {'kospi':0,'kosdaq':0,'avg':0,'mode':'UNKNOWN'}
 
+
+def build_ai_reason(c, index_risk=None):
+    """AI후보 선정 이유/위험요소/진입타입/확신도를 사람이 이해하기 쉽게 만듭니다."""
+    c = dict(c or {})
+    day = safe_float(c.get('dayChange'), 0)
+    amt = safe_float(c.get('amount'), 0)
+    score = safe_float(c.get('score'), 0)
+    theme = str(c.get('theme') or '기타')
+    market_avg = safe_float((index_risk or {}).get('avg'), 0)
+    reverse = day - market_avg
+
+    reasons = []
+    risks = []
+    entry_types = []
+
+    if score >= 90:
+        reasons.append('AI 기본점수가 매우 높습니다')
+    elif score >= 80:
+        reasons.append('AI 기본점수가 양호합니다')
+    else:
+        reasons.append('기본점수는 보통이나 조건 완화 구간에서 감시합니다')
+
+    if amt >= 100_000_000_000:
+        reasons.append('거래대금이 강해 수급 관심이 큽니다')
+    elif amt >= 30_000_000_000:
+        reasons.append('거래대금이 일정 수준 이상 유지됩니다')
+    else:
+        risks.append('거래대금이 상대적으로 작아 슬리피지 위험이 있습니다')
+
+    if reverse >= 3:
+        reasons.append('지수 대비 독립강세가 뚜렷합니다')
+        entry_types.append('독립강세')
+    elif reverse >= 1:
+        reasons.append('시장 대비 상대강도가 좋습니다')
+
+    if any(k in theme for k in ['AI','반도체','HBM','전력','광통신','데이터센터','PCB']):
+        reasons.append(f'{theme} 테마 강도가 반영되었습니다')
+        entry_types.append('테마추종')
+
+    if 1.0 <= day <= 4.8:
+        reasons.append('당일 상승률이 추격매수보다 건강한 구간입니다')
+        entry_types.append('눌림/재상승 관찰')
+    elif 4.8 < day <= 7.0:
+        reasons.append('강한 상승 흐름이 유지되고 있습니다')
+        entry_types.append('돌파관찰')
+        risks.append('상승률이 높아 눌림 확인이 필요합니다')
+    elif day > 7.0:
+        risks.append('단기 급등 구간이라 추격매수 위험이 큽니다')
+        entry_types.append('과열주의')
+    elif day < 0.5:
+        risks.append('상승 탄력이 아직 약합니다')
+
+    if safe_float((index_risk or {}).get('avg'), 0) < -0.3 and day > 0:
+        reasons.append('지수 약세에도 상승해 시장역행 후보입니다')
+
+    if not entry_types:
+        entry_types.append('AI감시')
+
+    confidence = score * 0.45
+    confidence += min(25, max(0, reverse) * 5)
+    confidence += 15 if amt >= 100_000_000_000 else (9 if amt >= 30_000_000_000 else 2)
+    confidence += 10 if any(k in theme for k in ['AI','반도체','전력','광통신','데이터센터']) else 3
+    confidence -= 18 if day >= 10 else (10 if day >= 7 else (4 if day >= 5.5 else 0))
+    confidence -= 12 if amt < 10_000_000_000 else 0
+    confidence = max(0, min(100, confidence))
+
+    if confidence >= 82:
+        verdict = '우선 감시 후보입니다. 눌림 또는 재돌파 확인 시 매수 우선순위가 높습니다.'
+    elif confidence >= 65:
+        verdict = '관심 감시 후보입니다. 가격/거래대금 유지 여부를 더 확인합니다.'
+    else:
+        verdict = '보조 감시 후보입니다. 조건이 더 좋아질 때만 진입을 검토합니다.'
+
+    return {
+        'reasons': reasons[:6],
+        'risks': risks[:5] or ['현재 큰 위험감점은 제한적입니다'],
+        'entryType': ' / '.join(entry_types[:3]),
+        'confidence': round(confidence, 1),
+        'verdict': verdict,
+    }
+
+
+def render_badges(items, prefix='✅'):
+    try:
+        return ''.join(f'<span>{prefix} {html_escape(x)}</span>' for x in (items or []))
+    except Exception:
+        return ''
+
 def enrich_candidate_risk(c, index_risk=None):
     c=dict(c or {})
     day=safe_float(c.get('dayChange'),0); amt=safe_float(c.get('amount'),0); score=safe_float(c.get('score'),0)
@@ -749,7 +837,8 @@ def enrich_candidate_risk(c, index_risk=None):
         slippage_penalty += 10
     index_penalty = 8 if index_risk.get('mode')=='WEAK' else (15 if index_risk.get('mode')=='DANGER' else 0)
     final=max(0, min(150, score + reverse_score*0.18 - overheat_penalty - slippage_penalty - index_penalty))
-    c.update({'marketReverseScore': round(reverse_score,2),'themeStrengthScore': theme_strength,'overheatPenalty': overheat_penalty,'slippagePenalty': slippage_penalty,'indexRiskPenalty': index_penalty,'riskAdjustedScore': round(final,2),'strategy': strategy_from_candidate(c),'riskComment': f"시장역행 {reverse_score:.1f} · 과열감점 {overheat_penalty} · 슬리피지감점 {slippage_penalty} · 지수위험 {index_penalty}"})
+    explain = build_ai_reason(c, index_risk)
+    c.update({'marketReverseScore': round(reverse_score,2),'themeStrengthScore': theme_strength,'overheatPenalty': overheat_penalty,'slippagePenalty': slippage_penalty,'indexRiskPenalty': index_penalty,'riskAdjustedScore': round(final,2),'strategy': strategy_from_candidate(c),'riskComment': f"시장역행 {reverse_score:.1f} · 과열감점 {overheat_penalty} · 슬리피지감점 {slippage_penalty} · 지수위험 {index_penalty}", 'aiReasons': explain.get('reasons', []), 'aiRisks': explain.get('risks', []), 'entryType': explain.get('entryType','AI감시'), 'aiConfidence': explain.get('confidence',0), 'aiVerdict': explain.get('verdict','AI 감시 후보입니다.')})
     return c
 
 def classify_theme(name):
@@ -821,7 +910,7 @@ def get_market_candidates(limit=8, min_score=None):
         c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
         enriched.append(c)
     candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
-    # v155: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
+    # v156: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
     candidates = refresh_candidate_prices(candidates, force=True)
     scan_time = now_text()
     state = read_state()
@@ -989,7 +1078,7 @@ def render_candidate_card(c, idx):
     diff_txt = f" · 캐시대비 {int(diff):+,}원" if diff else ""
     return f"""
     <div class="pick compact" onclick="toggleDetail('pick{idx}')">
-      <div class="chips"><span>{html_escape(c.get('market',''))}</span><span>{c.get('code')}</span><span>{html_escape(c.get('theme',''))}</span><span>AI {safe_float(c.get('riskAdjustedScore', c.get('score'))):.1f}</span><span>역행 {safe_float(c.get('marketReverseScore')):.0f}</span><span>{html_escape(c.get('strategy','AI후보형'))}</span></div>
+      <div class="chips"><span>{html_escape(c.get('market',''))}</span><span>{c.get('code')}</span><span>{html_escape(c.get('theme',''))}</span><span>AI {safe_float(c.get('riskAdjustedScore', c.get('score'))):.1f}</span><span>역행 {safe_float(c.get('marketReverseScore')):.0f}</span><span>{html_escape(c.get('strategy','AI후보형'))}</span><span>확신 {safe_float(c.get('aiConfidence')):.0f}%</span><span>{html_escape(c.get('entryType','AI감시'))}</span></div>
       <h3>{html_escape(c.get('name'))}</h3>
       <div class="grid2">
         <div><label>현재가</label><b>{money(c.get('price'))}</b><small>{html_escape(price_src)} · {age}초 전</small></div>
@@ -999,9 +1088,15 @@ def render_candidate_card(c, idx):
       </div>
       <div class="price-meta {'stale' if stale else ''}">⏱ 가격확인 {html_escape(checked)} · {html_escape(price_src)}{html_escape(diff_txt)}{' · 오래된 가격일 수 있습니다' if stale else ''}</div>
       <div id="pick{idx}" class="detail">
-        거래대금 {html_escape(c.get('amountText','-'))} · 매수관찰 {money(c.get('buyZone'))}<br>
-        시장역행점수 {safe_float(c.get('marketReverseScore')):.1f} · 테마강도 {safe_float(c.get('themeStrengthScore')):.0f} · 과열감점 {safe_float(c.get('overheatPenalty')):.0f} · 슬리피지감점 {safe_float(c.get('slippagePenalty')):.0f}<br>
-        {html_escape(c.get('comment',''))}<br>{html_escape(c.get('priceRefreshNote',''))}
+        <div class="reason-title">🤖 AI 추천 이유</div>
+        <div class="reason-tags">{render_badges(c.get('aiReasons'), '✅')}</div>
+        <div class="reason-title">⚠️ 위험/감점 요소</div>
+        <div class="risk-tags">{render_badges(c.get('aiRisks'), '⚠')}</div>
+        <div class="ai-verdict">종합판단: {html_escape(c.get('aiVerdict','AI 감시 후보입니다.'))}</div>
+        <div class="mini-line">진입타입 <b>{html_escape(c.get('entryType','AI감시'))}</b> · AI확신도 <b>{safe_float(c.get('aiConfidence')):.1f}%</b></div>
+        <div class="mini-line">거래대금 {html_escape(c.get('amountText','-'))} · 매수관찰 {money(c.get('buyZone'))}</div>
+        <div class="mini-line">시장역행 {safe_float(c.get('marketReverseScore')):.1f} · 테마강도 {safe_float(c.get('themeStrengthScore')):.0f} · 과열감점 {safe_float(c.get('overheatPenalty')):.0f} · 슬리피지감점 {safe_float(c.get('slippagePenalty')):.0f}</div>
+        <div class="mini-line">{html_escape(c.get('priceRefreshNote',''))}</div>
       </div>
     </div>"""
 
@@ -1020,7 +1115,7 @@ def render_candidates():
     return f"""
     <section class="card" id="picks">
       <h2>🤖 AI후보</h2>
-      <p class="muted">AI가 감시하는 후보입니다. 종목을 누르면 거래대금·시장역행·위험감점 상세정보가 펼쳐집니다.</p>
+      <p class="muted">AI가 감시하는 후보입니다. 종목을 누르면 AI 추천 이유·위험요소·진입타입·확신도가 펼쳐집니다.</p>
       <div class="scan-status">
         <div><b>🔎 AI 분석 상태</b></div>
         <div>TOP 후보 분석 완료: <b>{scan_count}</b>개</div>
@@ -1275,6 +1370,7 @@ TEMPLATE = """
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid2>div{background:#fff8e9;border-radius:18px;padding:13px;text-align:center;min-width:0}.grid2 label{display:block;color:var(--muted);font-size:13px}.grid2 b{font-size:20px}.grid2 small{display:block;color:var(--muted);font-size:12px}.red{color:var(--red)}.blue{color:var(--blue)}
 .holding-card,.pick{border:1px solid #e2ead9;border-radius:22px;padding:16px;margin:12px 0;background:#fffef8}.topline{display:flex;justify-content:space-between;gap:8px;font-size:22px}.topline span{font-size:14px;background:var(--pale);border-radius:999px;padding:6px 10px}.comment{background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}
 .chips{display:flex;flex-wrap:wrap;gap:7px}.chips span{background:var(--pale);border-radius:999px;padding:6px 10px;font-size:13px;font-weight:800}.pick h3{font-size:28px;margin:12px 0}.detail{display:none;background:var(--pale);border-radius:16px;padding:12px;margin-top:10px;color:#43654a}.detail.open{display:block}
+.reason-title{font-weight:900;margin:10px 0 6px;color:#203b2d}.reason-tags,.risk-tags{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.reason-tags span,.risk-tags span{background:#fff;border:1px solid #dbe8d5;border-radius:999px;padding:6px 9px;font-size:13px;font-weight:800}.risk-tags span{border-color:#ffd1a6;background:#fff7ed}.ai-verdict{background:#fff;border-left:4px solid var(--green);border-radius:12px;padding:10px;margin:8px 0;font-weight:800}.mini-line{font-size:13px;color:#5b6b5c;margin-top:5px}
 details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding:14px;font-weight:900}.alerts{margin:8px 0 0;padding-left:20px;color:#5b513d}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
 .scan-status{background:#f4f8ff;border:1px dashed #bfd3ef;border-radius:20px;padding:15px;margin:12px 0;color:#334155;font-weight:700}.scan-status b{color:#0f172a}
@@ -1303,7 +1399,7 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
   <div class="hero">
     <span class="badge">🌿 KIWOOM REAL AUTO {{version}}</span>
     <h1>{{app_name}}</h1>
-    <p>키움 REST API 연동 · AI후보 감시 · 실보유 동기화 · 목표/손절/트레일링 · 전략성과 학습</p>
+    <p>키움 REST API 연동 · AI후보 감시 · 추천이유 설명 · 목표/손절/트레일링 · 전략성과 학습</p>
   </div>
   <div class="nav">
     <a href="#picks">🤖 AI후보</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
@@ -1514,7 +1610,7 @@ def api_update_conditions():
     state["dynamic_target_enabled"] = bool(request.form.get("dynamic_target_enabled"))
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
     write_state(state)
-    set_status("매매조건 저장", "v155 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
+    set_status("매매조건 저장", "v156 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
     return render_page()
 
 @app.route("/api/reset_conditions")
@@ -1523,7 +1619,7 @@ def api_reset_conditions():
     for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
-    set_status("기본조건 복원", "매매조건을 v155 기본값으로 복원했습니다.")
+    set_status("기본조건 복원", "매매조건을 v156 기본값으로 복원했습니다.")
     return render_page()
 
 
