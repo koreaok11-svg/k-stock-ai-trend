@@ -1,25 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v157 AI CANDIDATE CONDITIONS TABS FINAL
-파일명: app_kiwoom_real_auto_scalping_v157_ai_candidate_conditions_tabs_final.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v159 VERSION UNIFIED
+파일명: app_kiwoom_real_auto_scalping_v159_version_unified_history.py
 
 목표:
-- 누적 패치/중복 route/inject 제거
-- 모바일 보기 좋은 컴팩트 UI
-- 키움 인증 실패 메시지 1개만 표시
-- 화면확인용 수동 보유표시 제거
-- 실제 보유는 키움 REST 잔고 또는 마지막 정상 캐시만 표시
-- 보유카드 직접 시장가 매도 버튼
-- AI후보 축소 카드 + 터치 상세 펼침
+- 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
+- 패치노트/업데이트 이력을 앱 화면과 API에서 확인
+- AI후보 감시, AI일일리포트, AI내투자평가, 매매조건, 전략성과 학습 유지
+- 실전 매매 조건은 사용자 승인 후 적용하는 안전장치 유지
 
-v157 보강:
-- AI 전략별 성과 누적 저장
-- 실체결 기준 손익 계산용 매매 원장
-- 1일/1주/1개월 전략 랭킹
-- 시장역행 강세 점수
-- 과열/추격매수/슬리피지 위험 감점
-- 최소 주문금액/예수금 방어 강화
-- 상태/보유/전략성과/매매로그 자동 백업
+v159 보강:
+- 코드 상단 주석/파일명/상단 UI/상태 메시지 버전 불일치 해결
+- /api/version 추가
+- 상단에 현재버전·업데이트 이력 요약 표시
+- 다음 업데이트부터 APP_VERSION 한 줄만 바꾸면 화면/로그/리포트가 통일되도록 개선
 """
 
 import os, re, json, time, math, threading
@@ -41,7 +35,16 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v157"
+APP_VERSION = "v159"
+APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v159_version_unified_history.py"
+APP_PATCH_NAME = "VERSION_UNIFIED_HISTORY"
+UPDATE_HISTORY = [
+    {"version": "v159", "title": "버전 통합관리", "items": ["코드/화면/로그 버전 표기 통일", "패치노트 화면 표시", "버전 확인 API 추가"]},
+    {"version": "v158", "title": "AI리포트 런타임 안정화", "items": ["AI일일리포트 저장 오류 방어", "AI내투자평가 저장 오류 방어"]},
+    {"version": "v157", "title": "AI일일리포트/내투자평가", "items": ["전날 시장 종합평가", "내 투자 평가", "투자방향 의견"]},
+    {"version": "v156", "title": "AI추천 이유 설명", "items": ["추천 이유", "위험요소", "AI확신도", "진입타입"]},
+]
 APP_NAME = "성일의 AI 주식바람"
 KST = timezone(timedelta(hours=9))
 app = Flask(__name__)
@@ -49,13 +52,15 @@ app = Flask(__name__)
 BASE_DIR = Path(os.getenv("APP_DATA_DIR", "/var/data" if os.path.isdir("/var/data") else "/tmp"))
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-STATE_FILE = BASE_DIR / "sungil_trade_state_v157.json"
-HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v157.json"
-HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v157.json"
-CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v157.json"
-PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v157.json"
-TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v157.json"
-BACKUP_DIR = BASE_DIR / "sungil_backups_v157"
+STATE_FILE = BASE_DIR / "sungil_trade_state_v159.json"
+HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v159.json"
+HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v159.json"
+CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v159.json"
+PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v159.json"
+TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v159.json"
+DAILY_REPORT_FILE = BASE_DIR / "sungil_ai_daily_report_v159.json"
+INVESTMENT_REVIEW_FILE = BASE_DIR / "sungil_ai_investment_review_v159.json"
+BACKUP_DIR = BASE_DIR / "sungil_backups_v159"
 try:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
@@ -218,7 +223,7 @@ def backup_json_file(path, label):
 
 def auto_backup_all():
     try:
-        for p,label in [(STATE_FILE,'state'),(HOLDINGS_FILE,'holdings'),(HOLDINGS_BACKUP_FILE,'holdings_last_good'),(PERFORMANCE_FILE,'performance'),(TRADE_LEDGER_FILE,'trade_ledger')]:
+        for p,label in [(STATE_FILE,'state'),(HOLDINGS_FILE,'holdings'),(HOLDINGS_BACKUP_FILE,'holdings_last_good'),(PERFORMANCE_FILE,'performance'),(TRADE_LEDGER_FILE,'trade_ledger'),(DAILY_REPORT_FILE,'daily_report'),(INVESTMENT_REVIEW_FILE,'investment_review')]:
             backup_json_file(p,label)
         return True
     except Exception:
@@ -910,7 +915,7 @@ def get_market_candidates(limit=8, min_score=None):
         c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
         enriched.append(c)
     candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
-    # v157: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
+    # v159: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
     candidates = refresh_candidate_prices(candidates, force=True)
     scan_time = now_text()
     state = read_state()
@@ -1017,6 +1022,31 @@ def ensure_watch():
 
 def html_escape(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def render_version_summary():
+    try:
+        latest = UPDATE_HISTORY[0]
+        items = "".join(f"<li>{html_escape(x)}</li>" for x in latest.get("items", []))
+        history = "".join(
+            f"<div class='version-row'><b>{html_escape(h.get('version',''))}</b><span>{html_escape(h.get('title',''))}</span></div>"
+            for h in UPDATE_HISTORY[:4]
+        )
+        return f"""
+        <div class="version-summary">
+          <div><b>{APP_TITLE}</b></div>
+          <div class="mini-line">파일: {APP_FILE_NAME} · 패치: {APP_PATCH_NAME}</div>
+          <details>
+            <summary>📌 업데이트 이력 보기 / 접기</summary>
+            <div class="notice small">
+              <b>{html_escape(latest.get('version'))} 핵심 변경</b>
+              <ul>{items}</ul>
+              {history}
+            </div>
+          </details>
+        </div>"""
+    except Exception:
+        return f"<div class='version-summary'><b>{APP_TITLE}</b></div>"
 
 
 def render_holdings_section():
@@ -1493,6 +1523,31 @@ def render_investment_review_section():
     </section>"""
 
 
+
+
+def render_daily_report_section_safe():
+    try:
+        return render_daily_report_section()
+    except Exception as e:
+        return f"""
+        <section class="card" id="daily-report">
+          <h2>📰 AI 일일리포트</h2>
+          <div class="notice">AI일일리포트 생성 중 오류가 발생했습니다. 앱은 계속 동작합니다.<br>{html_escape(str(e))}</div>
+          <div class="btn-row"><button onclick="location.href='/api/refresh_daily_report'">AI일일리포트 새로작성</button></div>
+        </section>"""
+
+
+def render_investment_review_section_safe():
+    try:
+        return render_investment_review_section()
+    except Exception as e:
+        return f"""
+        <section class="card" id="my-review">
+          <h2>🧾 AI 내투자평가</h2>
+          <div class="notice">AI내투자평가 생성 중 오류가 발생했습니다. 앱은 계속 동작합니다.<br>{html_escape(str(e))}</div>
+          <div class="btn-row"><button onclick="location.href='/api/refresh_investment_review'">내투자평가 새로작성</button></div>
+        </section>"""
+
 def render_page():
     state = read_state()
     return render_template_string(TEMPLATE,
@@ -1502,12 +1557,13 @@ def render_page():
         trade=render_trade_section(),
         candidates=render_candidates(),
         conditions=render_conditions_section(),
-        daily_report=render_daily_report_section(),
-        my_review=render_investment_review_section(),
+        daily_report=render_daily_report_section_safe(),
+        my_review=render_investment_review_section_safe(),
         performance=render_performance_section(),
         ai_upgrade=render_ai_upgrade_section(),
         alerts=render_alert_center(),
         auto_on=state.get("auto_trade_enabled"),
+        version_summary=render_version_summary(),
     )
 
 
@@ -1520,6 +1576,7 @@ TEMPLATE = """
 :root{--bg:#eef7e8;--card:#fffefb;--ink:#203b2d;--muted:#667085;--green:#5c9b68;--pale:#eef8e9;--cream:#fff4d5;--dark:#2e4960;--brown:#a76b29;--red:#d12e35;--blue:#246fe0}
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(90deg,#eaf5e6,#fff9db);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);font-size:16px;line-height:1.45}
 .wrap{max-width:760px;margin:0 auto;padding:18px 14px 80px}.hero{padding:16px 4px 8px}.badge{display:inline-block;background:var(--pale);border-radius:999px;padding:8px 14px;font-weight:800;color:#3d6b43}.hero h1{font-size:34px;line-height:1.05;margin:16px 0 10px}.hero p{font-size:17px;color:var(--muted);margin:0}
+.version-summary{margin-top:12px;background:rgba(255,255,255,.72);border:1px solid #dbe8d5;border-radius:18px;padding:12px;color:#33523c}.version-summary details summary{margin-top:8px;padding:10px;border-radius:14px}.version-row{display:flex;gap:10px;align-items:center;margin:6px 0}.version-row b{min-width:48px;color:#2d6cdf}.version-row span{color:#4b5563}
 .nav{position:sticky;top:0;z-index:50;background:rgba(244,250,237,.92);backdrop-filter:blur(10px);display:flex;gap:8px;overflow-x:auto;padding:10px 2px 12px;border-bottom:1px solid #dbe8d5}.nav a{flex:0 0 auto;text-decoration:none;color:#285139;background:var(--pale);border-radius:999px;padding:10px 14px;font-weight:800;white-space:nowrap}
 .card{background:rgba(255,255,255,.93);border:1px solid #dbe8d5;border-radius:28px;padding:22px;margin:16px 0;box-shadow:0 8px 24px rgba(32,59,45,.06)}.card h2{font-size:27px;margin:0 0 14px}.muted{color:var(--muted);font-size:16px}.notice{background:var(--cream);border-radius:20px;padding:16px;margin:12px 0;color:#6a5938}.notice.small{font-size:14px}
 .btn-row{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}button,.button{border:0;border-radius:18px;padding:13px 18px;background:var(--green);color:white;font-weight:900;font-size:16px;text-decoration:none}button.dark{background:var(--dark)}button.brown{background:var(--brown)}button.sell{background:#cf3d35;width:100%;margin-top:10px}
@@ -1556,6 +1613,7 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
     <span class="badge">🌿 KIWOOM REAL AUTO {{version}}</span>
     <h1>{{app_name}}</h1>
     <p>키움 REST API 연동 · AI후보 감시 · 추천이유 설명 · 목표/손절/트레일링 · 전략성과 학습</p>
+    {{version_summary|safe}}
   </div>
   <div class="nav">
     <a href="#picks">🤖 AI후보</a><a href="#daily-report">📰 AI일일리포트</a><a href="#my-review">🧾 AI내투자평가</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
@@ -1583,7 +1641,19 @@ def index():
 @app.route("/api/status")
 def api_status():
     cash = get_cash_info()
-    return jsonify({"ok": cash.get("ok"), "version": APP_VERSION, "cash": cash, "state": read_state(), "watch": WATCH_STATE})
+    return jsonify({"ok": cash.get("ok"), "version": APP_VERSION, "title": APP_TITLE, "file_name": APP_FILE_NAME, "patch_name": APP_PATCH_NAME, "cash": cash, "state": read_state(), "watch": WATCH_STATE})
+
+
+@app.route("/api/version")
+def api_version():
+    return jsonify({
+        "ok": True,
+        "version": APP_VERSION,
+        "title": APP_TITLE,
+        "file_name": APP_FILE_NAME,
+        "patch_name": APP_PATCH_NAME,
+        "update_history": UPDATE_HISTORY,
+    })
 
 
 @app.route("/api/refresh_holdings")
@@ -1768,7 +1838,7 @@ def api_update_conditions():
     state["dynamic_target_enabled"] = bool(request.form.get("dynamic_target_enabled"))
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
     write_state(state)
-    set_status("매매조건 저장", "v157 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
+    set_status("매매조건 저장", "v159 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
     return render_page()
 
 @app.route("/api/reset_conditions")
@@ -1777,7 +1847,7 @@ def api_reset_conditions():
     for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
-    set_status("기본조건 복원", "매매조건을 v157 기본값으로 복원했습니다.")
+    set_status("기본조건 복원", "매매조건을 v159 기본값으로 복원했습니다.")
     return render_page()
 
 
@@ -1814,14 +1884,22 @@ def api_keep_conditions():
 
 @app.route("/api/refresh_daily_report")
 def api_refresh_daily_report():
-    r = build_ai_daily_report(force=True)
-    set_status("AI일일리포트 작성", r.get('summary',''))
+    
+    try:
+        r = build_ai_daily_report(force=True)
+        set_status("AI일일리포트 작성", r.get('summary',''))
+    except Exception as e:
+        set_status("AI일일리포트 오류", str(e))
     return render_page()
 
 @app.route("/api/refresh_investment_review")
 def api_refresh_investment_review():
-    r = build_ai_investment_review(force=True)
-    set_status("AI 내투자평가 작성", r.get('summary',''))
+    
+    try:
+        r = build_ai_investment_review(force=True)
+        set_status("AI 내투자평가 작성", r.get('summary',''))
+    except Exception as e:
+        set_status("AI 내투자평가 오류", str(e))
     return render_page()
 
 @app.route("/api/ai_daily_report")
