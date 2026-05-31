@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v162 KIWOOM DIAGNOSIS PRO
-파일명: app_kiwoom_real_auto_scalping_v162_kiwoom_diagnosis_pro.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v163 KIWOOM DIAGNOSIS AUTO INTERPRETER
+파일명: app_kiwoom_real_auto_scalping_v163_kiwoom_auto_interpreter.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v162"
+APP_VERSION = "v163"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v162_kiwoom_diagnosis_pro.py"
-APP_PATCH_NAME = "KIWOOM_DIAGNOSIS_PRO"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v163_kiwoom_auto_interpreter.py"
+APP_PATCH_NAME = "KIWOOM_DIAGNOSIS_AUTO_INTERPRETER"
 UPDATE_HISTORY = [
+    {"version": "v163", "title": "키움 오류코드 자동해석/자가진단", "items": ["8050 등 키움 오류코드 자동 해석", "Render 현재 IP 표시", "키움 연동 건강도 점수", "원클릭 전체 진단 결과를 사용자 문장으로 변환", "진단 로그 자동 저장"]},
     {"version": "v162", "title": "키움 진단센터 PRO", "items": ["APP KEY/SECRET/ACCOUNT/TOKEN 상태 분리 표시", "지정단말기/추가인증/계좌조회/주문가능/실보유 조회 진단", "토큰 재발급/실보유 강제조회/전체 진단 실행 버튼", "최종 진단 결과와 조치 가이드 표시"]},
     {"version": "v161", "title": "실보유 파싱/진단센터/TOP3 후보비교", "items": ["키움 보유응답 다중 구조 파싱 강화", "키움 진단센터 화면 추가", "현재가 출처/시간/가격나이 표시 강화", "TOP3 후보 비교 카드 추가"]},
     {"version": "v160", "title": "키움 진단/보유 파싱 복구", "items": ["/api/auth_status 추가", "/api/status 500 오류 방지", "키움 보유종목 RAW 저장", "보유종목 응답구조 자동 파싱 강화", "상태 진단 API 추가"]},
@@ -65,6 +66,7 @@ STATE_FILE = BASE_DIR / "sungil_trade_state_v159.json"
 HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v159.json"
 HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v159.json"
 KIWOOM_RAW_HOLDINGS_FILE = BASE_DIR / "sungil_kiwoom_raw_holdings_debug.json"
+KIWOOM_DIAG_LOG_FILE = BASE_DIR / "sungil_kiwoom_diagnosis_log_v163.json"
 CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v159.json"
 PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v159.json"
 TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v159.json"
@@ -271,26 +273,91 @@ def add_alert(text):
     write_state(state)
 
 
+def kiwoom_error_analysis(msg):
+    """v163: 키움 오류 메시지를 사용자가 바로 이해할 수 있게 자동 해석합니다."""
+    s = str(msg or "")
+    low = s.lower()
+    if "8050" in s or "지정단말" in s or "인증에 실패" in s:
+        return {
+            "code": "8050",
+            "name": "지정단말기/IP 인증 실패",
+            "category": "designated_device",
+            "severity": "critical",
+            "summary": "키움 토큰 발급이 지정단말기 또는 허용 IP 문제로 실패했습니다.",
+            "action": "키움 REST API 사이트에서 Render 현재 IP 등록 여부를 확인하고, 영웅문S# 지정단말기/추가인증 상태를 확인한 뒤 토큰을 재발급하세요.",
+            "steps": ["키움 REST API 사이트 접속", "IP 등록현황에서 Render 현재 IP 확인", "필요 시 기존 IP 삭제 후 새 IP 추가", "영웅문S# 지정단말기/추가인증 확인", "앱에서 토큰 재발급/전체진단 실행"],
+        }
+    if "8001" in s or "app key" in s or "appkey" in low or "키" in s and "오류" in s:
+        return {"code": "8001", "name": "APP KEY 확인 필요", "category": "key_secret", "severity": "critical", "summary": "APP KEY가 누락되었거나 키움에 등록된 값과 다를 수 있습니다.", "action": "키움 REST API 사이트에서 App Key를 재다운로드 또는 재발급 후 Render KIWOOM_APP_KEY에 정확히 입력하세요.", "steps": ["App Key 재확인", "Render 환경변수 KIWOOM_APP_KEY 수정", "Render 재배포", "토큰 재발급"]}
+    if "8002" in s or "secret" in low:
+        return {"code": "8002", "name": "APP SECRET 확인 필요", "category": "key_secret", "severity": "critical", "summary": "APP SECRET이 누락되었거나 키움에 등록된 값과 다를 수 있습니다.", "action": "키움 REST API 사이트에서 App Secret을 재다운로드 또는 재발급 후 Render KIWOOM_APP_SECRET에 정확히 입력하세요.", "steps": ["App Secret 재확인", "Render 환경변수 KIWOOM_APP_SECRET 수정", "Render 재배포", "토큰 재발급"]}
+    if "추가인증" in s or "보안" in s or "단말" in s:
+        return {"code": "AUTH", "name": "추가인증/보안 확인 필요", "category": "additional_auth", "severity": "warning", "summary": "키움 계정의 추가인증 또는 보안 설정 확인이 필요합니다.", "action": "영웅문S#에서 지정단말기/추가인증 상태를 확인하세요.", "steps": ["영웅문S# 접속", "인증/보안 메뉴 확인", "지정단말기 또는 추가인증 완료", "토큰 재발급"]}
+    if "계좌" in s and ("없" in s or "누락" in s or "account" in low):
+        return {"code": "ACCOUNT", "name": "계좌번호 누락", "category": "account_missing", "severity": "critical", "summary": "Render 환경변수에 KIWOOM_ACCOUNT가 없거나 앱에서 인식하지 못합니다.", "action": "Render Environment에 KIWOOM_ACCOUNT 값을 추가하세요. 예: 66476264", "steps": ["Render Environment 이동", "KIWOOM_ACCOUNT 추가", "계좌번호 입력", "재배포", "전체 진단 실행"]}
+    if "timeout" in low or "timed out" in low or "시간" in s and "초과" in s:
+        return {"code": "TIMEOUT", "name": "키움/네트워크 응답 지연", "category": "timeout", "severity": "warning", "summary": "키움 서버 또는 Render 네트워크 응답이 지연되었습니다.", "action": "잠시 후 재시도하고 반복되면 Render 재배포 또는 키움 서버 상태를 확인하세요.", "steps": ["5초 후 재시도", "전체 진단 실행", "반복 시 Render 재배포"]}
+    return {"code": "UNKNOWN", "name": "미분류 오류", "category": "unknown", "severity": "info", "summary": "키움 메시지를 자동 분류하지 못했습니다.", "action": "RAW 응답과 키움 상태 JSON을 확인하세요.", "steps": ["키움 상태 JSON 확인", "RAW 보유응답 확인", "Render 로그 확인"]}
+
+
 def auth_message(msg):
     s = str(msg or "")
-    if "8050" in s or "지정단말기" in s or "인증에 실패" in s:
-        return "키움 인증 실패(8050/지정단말기)입니다. Render IP 등록, App Key/Secret 재발급·입력, 영웅문S# 지정단말기/추가인증 상태를 확인하세요."
-    if "App Key" in s or "Secret" in s or "8001" in s or "8002" in s:
-        return "키움 App Key/Secret 확인이 필요합니다. Render 환경변수를 다시 확인하세요."
     if not KIWOOM_APP_KEY or not KIWOOM_SECRET_KEY:
-        return "키움 환경변수 KIWOOM_APP_KEY / KIWOOM_SECRET_KEY가 필요합니다."
+        return "키움 환경변수 KIWOOM_APP_KEY / KIWOOM_APP_SECRET가 필요합니다."
+    if s:
+        a = kiwoom_error_analysis(s)
+        if a.get("code") != "UNKNOWN":
+            return f"키움 인증 실패({a.get('code')}/{a.get('name')})입니다. {a.get('action')}"
     return s or "키움 API 미확인"
 
 
+def append_kiwoom_diag_log(item):
+    try:
+        logs = read_json(KIWOOM_DIAG_LOG_FILE, [])
+        if not isinstance(logs, list):
+            logs = []
+        logs.insert(0, item)
+        write_json(KIWOOM_DIAG_LOG_FILE, logs[:50])
+    except Exception:
+        pass
+
+
+def get_render_public_ip():
+    cached = read_state().get("render_public_ip", {})
+    if isinstance(cached, dict) and cached.get("ip") and time.time() - safe_float(cached.get("ts"), 0) < 1800:
+        return cached
+    for url in ["https://api.ipify.org?format=json", "https://ifconfig.me/all.json"]:
+        try:
+            r = requests.get(url, timeout=3)
+            txt = r.text.strip()
+            ip = ""
+            try:
+                data = r.json()
+                ip = data.get("ip") or data.get("ip_addr") or data.get("remote_addr") or ""
+            except Exception:
+                ip = txt if re.match(r"^\d+\.\d+\.\d+\.\d+$", txt) else ""
+            if ip:
+                state = read_state()
+                state["render_public_ip"] = {"ip": ip, "source": url, "checked_at": now_text(), "ts": time.time()}
+                write_state(state)
+                return state["render_public_ip"]
+        except Exception:
+            pass
+    return cached if isinstance(cached, dict) else {"ip": "", "source": "", "checked_at": "", "ts": 0}
+
 def update_kiwoom_debug(stage, message="", http_status=0):
+    analysis = kiwoom_error_analysis(message)
     state = read_state()
     state["last_kiwoom_debug"] = {
         "time": now_text(),
         "stage": stage,
         "http_status": http_status,
         "message": auth_message(message),
+        "raw_message": str(message or "")[:1000],
+        "analysis": analysis,
     }
     write_state(state)
+    append_kiwoom_diag_log({"time": now_text(), "stage": stage, "http_status": http_status, "message": str(message or "")[:1000], "analysis": analysis})
 
 
 def kiwoom_ready():
@@ -1802,19 +1869,28 @@ def render_kiwoom_diagnosis_section():
         account_ok = auth.get('env',{}).get('KIWOOM_ACCOUNT')
         raw_rows = summary.get('probable_rows', 0) if isinstance(summary, dict) else 0
         codes = ', '.join(summary.get('codes_found', [])[:6]) if isinstance(summary, dict) else ''
-
-        final_status = '정상 사용 가능' if (auth.get('env',{}).get('KIWOOM_APP_KEY') and auth.get('env',{}).get('KIWOOM_APP_SECRET') and account_ok and token_ok and cached) else '확인 필요'
+        analysis = auth.get('token_analysis') or last_debug.get('analysis') or kiwoom_error_analysis(last_debug.get('raw_message') or auth.get('token_message'))
+        render_ip = auth.get('render_public_ip') or {}
+        health = auth.get('health_score', 0)
+        final_status = '정상 사용 가능' if (auth.get('env',{}).get('KIWOOM_APP_KEY') and auth.get('env',{}).get('KIWOOM_APP_SECRET') and account_ok and token_ok) else '확인 필요'
         final_class = 'ok-pill' if final_status == '정상 사용 가능' else 'warn-pill'
+        ip_line = f"Render 현재 IP: {html_escape(render_ip.get('ip') or '확인 필요')}"
+        if KIWOOM_REGISTERED_IPS:
+            ip_line += f" / 등록IP환경변수: {html_escape(', '.join(KIWOOM_REGISTERED_IPS))}"
+        else:
+            ip_line += " / 키움 사이트 등록 IP와 직접 비교하세요"
+        steps_html = ''.join(f"<li>{html_escape(x)}</li>" for x in (analysis.get('steps') or [])[:5])
 
         return f"""
         <section class="card" id="kiwoom-diagnosis">
-          <h2>🧪 키움 진단센터 PRO</h2>
-          <p class="muted">키움 연동이 안 될 때 APP KEY·SECRET·ACCOUNT·TOKEN·지정단말기·추가인증·계좌조회를 한 화면에서 확인합니다.</p>
+          <h2>🧪 키움 진단센터 PRO v163</h2>
+          <p class="muted">APP KEY·SECRET·ACCOUNT·TOKEN·지정단말기·추가인증·계좌조회를 한 화면에서 확인하고, 오류코드를 자동 해석합니다.</p>
+          <div class="notice small"><b>키움 연동 건강도: {health}점</b><br>{ip_line}</div>
           <div class="summary-grid">
-            <div><span>APP KEY</span><b>🟢 입력 완료</b></div>
+            <div><span>APP KEY</span><b>{'🟢 입력 완료' if auth.get('env',{}).get('KIWOOM_APP_KEY') else '🔴 없음'}</b></div>
             <div><span>APP SECRET</span><b>{'🟢 입력 완료' if auth.get('env',{}).get('KIWOOM_APP_SECRET') else '🔴 없음'}</b></div>
             <div><span>ACCOUNT</span><b>{'🟢 ' + html_escape(auth.get('env',{}).get('KIWOOM_ACCOUNT_DISPLAY','')) if account_ok else '🔴 KIWOOM_ACCOUNT 없음'}</b></div>
-            <div><span>TOKEN</span><b>{'🟢 발급/캐시 정상' if token_ok else '🟡 미확인 또는 실패'}</b></div>
+            <div><span>TOKEN</span><b>{'🟢 발급/캐시 정상' if token_ok else '🔴 실패 또는 미확인'}</b></div>
             <div><span>지정단말기</span><b>{_diag_color(designated)} {'정상' if designated is True else '확인필요' if designated is False else '미확인'}</b></div>
             <div><span>추가인증</span><b>{_diag_color(additional)} {'정상' if additional is True else '확인필요' if additional is False else '미확인'}</b></div>
             <div><span>계좌조회/주문가능</span><b>{'🟢 확인가능' if token_ok and account_ok else '🔴 확인필요'}</b></div>
@@ -1823,15 +1899,22 @@ def render_kiwoom_diagnosis_section():
             <div><span>최종판정</span><b class="{final_class}">{final_status}</b></div>
           </div>
           <div class="notice small">
+            <b>오류코드 자동해석</b><br>
+            코드/분류: {html_escape(analysis.get('code','UNKNOWN'))} / {html_escape(analysis.get('name','미분류'))}<br>
+            원인: {html_escape(analysis.get('summary','-'))}<br>
+            조치: {html_escape(analysis.get('action','-'))}
+            <ol>{steps_html}</ol>
+          </div>
+          <div class="notice small">
             최근 키움 메시지: {html_escape(last_debug.get('message') or auth.get('token_message','-'))}<br>
-            RAW에서 찾은 코드: {html_escape(codes or '없음')}<br>
-            조치 가이드: {html_escape(auth.get('account_warning') or '토큰 실패 시 Render IP 등록, App Key/Secret 재입력, 영웅문S# 지정단말기/추가인증을 확인하세요.')}
+            RAW에서 찾은 코드: {html_escape(codes or '없음')}
           </div>
           <div class="btn-row">
-            <a class="button" href="/api/auth_status?check=1">토큰 재발급/진단</a>
-            <a class="button dark" href="/api/v162_full_diagnosis">전체 진단 실행</a>
+            <a class="button" href="/api/v163_token_refresh">토큰 재발급/진단</a>
+            <a class="button dark" href="/api/v163_full_diagnosis">전체 진단 실행</a>
             <a class="button brown" href="/api/holdings?force=1">실보유 강제조회</a>
             <a class="button light" href="/api/kiwoom_raw_holdings">RAW 보유응답</a>
+            <a class="button light" href="/api/v163_diagnosis_log">진단로그</a>
           </div>
         </section>"""
     except Exception as e:
@@ -1954,16 +2037,27 @@ def _diag_badge(ok, label_ok, label_bad):
 
 
 def _classify_kiwoom_problem(message):
-    m = str(message or "")
-    if "8050" in m or "지정단말기" in m or "지정단말" in m:
-        return "designated_device"
-    if "추가인증" in m or "보안" in m or "인증에 실패" in m:
-        return "additional_auth"
-    if "App Key" in m or "Secret" in m or "8001" in m or "8002" in m:
-        return "key_secret"
-    if "계좌" in m and ("없" in m or "누락" in m):
-        return "account_missing"
-    return "unknown"
+    return kiwoom_error_analysis(message).get("category", "unknown")
+
+
+def _diag_health_score(result_or_auth):
+    score = 0
+    keys = []
+    if isinstance(result_or_auth, dict) and "checks" in result_or_auth:
+        checks = result_or_auth.get("checks", {})
+        weights = {"app_key":15, "secret":15, "account":15, "token":25, "designated_device":10, "additional_auth":5, "cash":10, "holdings":5}
+        for k,w in weights.items():
+            ok = checks.get(k, {}).get("ok")
+            if ok is True:
+                score += w
+            keys.append(k)
+    else:
+        env = result_or_auth.get("env", {}) if isinstance(result_or_auth, dict) else {}
+        score += 15 if env.get("KIWOOM_APP_KEY") else 0
+        score += 15 if env.get("KIWOOM_APP_SECRET") else 0
+        score += 15 if env.get("KIWOOM_ACCOUNT") else 0
+        score += 25 if result_or_auth.get("token_ok") else 0
+    return max(0, min(100, int(score)))
 
 
 def build_auth_status(check_token=False):
@@ -2012,23 +2106,32 @@ def build_auth_status(check_token=False):
         designated_device_ok = None
         additional_auth_ok = False
 
-    return {
+    render_ip = get_render_public_ip()
+    analysis = kiwoom_error_analysis(last_msg or token_message)
+    auth_result = {
         "ok": bool(KIWOOM_APP_KEY and KIWOOM_SECRET_KEY),
         "authenticated": token_ok,
         "token_ok": token_ok,
         "token_message": token_message,
         "token_problem": token_problem,
+        "token_analysis": analysis,
         "env": env,
         "account_warning": account_warning,
         "last_kiwoom_debug": last_debug,
         "designated_device_ok": designated_device_ok,
         "additional_auth_ok": additional_auth_ok,
+        "render_public_ip": render_ip,
+        "registered_ips_env": KIWOOM_REGISTERED_IPS,
+        "ip_match_env": bool(render_ip.get("ip") and render_ip.get("ip") in KIWOOM_REGISTERED_IPS) if KIWOOM_REGISTERED_IPS else None,
+        "health_score": 0,
         "version": APP_VERSION,
     }
+    auth_result["health_score"] = _diag_health_score(auth_result)
+    return auth_result
 
 
 def run_kiwoom_full_diagnosis():
-    """v162: 키움 상태를 한 번에 점검. 실주문은 하지 않습니다."""
+    """v163: 키움 상태를 원클릭으로 점검하고 오류코드를 자동 해석합니다. 실주문은 하지 않습니다."""
     result = {
         "version": APP_VERSION,
         "time": now_text(),
@@ -2036,10 +2139,24 @@ def run_kiwoom_full_diagnosis():
         "final_status": "UNKNOWN",
         "summary": "진단 대기",
         "action": "",
+        "health_score": 0,
+        "render_public_ip": get_render_public_ip(),
+        "registered_ips_env": KIWOOM_REGISTERED_IPS,
+        "error_analysis": {},
     }
     result["checks"]["app_key"] = {"ok": bool(KIWOOM_APP_KEY), "label": "APP KEY", "message": "입력 완료" if KIWOOM_APP_KEY else "Render 환경변수 KIWOOM_APP_KEY 누락"}
     result["checks"]["secret"] = {"ok": bool(KIWOOM_SECRET_KEY), "label": "APP SECRET", "message": "입력 완료" if KIWOOM_SECRET_KEY else "Render 환경변수 KIWOOM_APP_SECRET 누락"}
     result["checks"]["account"] = {"ok": bool(KIWOOM_ACCOUNT), "label": "ACCOUNT", "message": _mask_account_for_display(KIWOOM_ACCOUNT) if KIWOOM_ACCOUNT else "Render 환경변수 KIWOOM_ACCOUNT 누락"}
+
+    ip = result["render_public_ip"].get("ip") if isinstance(result.get("render_public_ip"), dict) else ""
+    ip_msg = f"Render 현재 IP {ip or '확인실패'}"
+    if KIWOOM_REGISTERED_IPS:
+        ip_msg += " / 등록IP환경변수 " + ", ".join(KIWOOM_REGISTERED_IPS)
+        ip_ok = bool(ip and ip in KIWOOM_REGISTERED_IPS)
+    else:
+        ip_ok = None
+        ip_msg += " / 키움 사이트 등록 IP는 화면에서 직접 비교하세요"
+    result["checks"]["render_ip"] = {"ok": ip_ok, "label": "Render IP", "message": ip_msg}
 
     token_ok = False
     token_msg = ""
@@ -2049,15 +2166,17 @@ def run_kiwoom_full_diagnosis():
         token_msg = "토큰 발급 성공"
     except Exception as e:
         token_msg = auth_message(str(e))
-    result["checks"]["token"] = {"ok": token_ok, "label": "TOKEN", "message": token_msg}
+    analysis = kiwoom_error_analysis(token_msg)
+    result["error_analysis"] = analysis
+    result["checks"]["token"] = {"ok": token_ok, "label": "TOKEN", "message": token_msg, "analysis": analysis}
 
-    problem = _classify_kiwoom_problem(token_msg)
+    problem = analysis.get("category")
     if token_ok:
         result["checks"]["designated_device"] = {"ok": True, "label": "지정단말기", "message": "토큰 발급 성공 기준 정상"}
         result["checks"]["additional_auth"] = {"ok": True, "label": "추가인증", "message": "토큰 발급 성공 기준 정상"}
     elif problem == "designated_device":
-        result["checks"]["designated_device"] = {"ok": False, "label": "지정단말기", "message": "8050/지정단말기 인증 실패 가능성"}
-        result["checks"]["additional_auth"] = {"ok": None, "label": "추가인증", "message": "토큰 실패로 확인 불가"}
+        result["checks"]["designated_device"] = {"ok": False, "label": "지정단말기", "message": "8050 지정단말기/IP 인증 실패 가능성"}
+        result["checks"]["additional_auth"] = {"ok": None, "label": "추가인증", "message": "토큰 실패로 확인 불가. 영웅문S# 보안/추가인증도 함께 확인"}
     elif problem == "additional_auth":
         result["checks"]["designated_device"] = {"ok": None, "label": "지정단말기", "message": "토큰 실패로 확인 불가"}
         result["checks"]["additional_auth"] = {"ok": False, "label": "추가인증", "message": "영웅문S# 추가인증/보안 설정 확인 필요"}
@@ -2071,28 +2190,29 @@ def run_kiwoom_full_diagnosis():
         try:
             cash_info = get_cash_info()
         except Exception as e:
-            cash_info = {"ok": False, "message": auth_message(str(e))}
+            cash_info = {"ok": False, "message": auth_message(str(e)), "analysis": kiwoom_error_analysis(str(e))}
         try:
             holdings_info = fetch_kiwoom_holdings()
         except Exception as e:
-            holdings_info = {"ok": False, "holdings": [], "message": auth_message(str(e))}
+            holdings_info = {"ok": False, "holdings": [], "message": auth_message(str(e)), "analysis": kiwoom_error_analysis(str(e))}
 
     result["checks"]["cash"] = {"ok": bool(cash_info.get("ok")), "label": "계좌조회/주문가능", "message": cash_info.get("message") or f"주문가능금액 {format_won(cash_info.get('cash',0))}"}
     result["checks"]["holdings"] = {"ok": bool(holdings_info.get("ok")), "label": "실보유조회", "message": holdings_info.get("message") or f"{len(holdings_info.get('holdings',[]))}종목"}
 
-    all_required = ["app_key", "secret", "account", "token", "cash", "holdings"]
+    result["health_score"] = _diag_health_score(result)
+    all_required = ["app_key", "secret", "account", "token", "cash"]
     if all(result["checks"].get(k, {}).get("ok") is True for k in all_required):
-        result["final_status"] = "NORMAL"
-        result["summary"] = "키움 인증/계좌/보유조회 정상"
-        result["action"] = "AI 자동매매 사용 가능"
+        result["final_status"] = "NORMAL" if result["checks"].get("holdings", {}).get("ok") is True else "PARTIAL"
+        result["summary"] = "키움 인증/계좌조회 정상" if result["final_status"] == "PARTIAL" else "키움 인증/계좌/보유조회 정상"
+        result["action"] = "AI 자동매매 사용 가능. 단, 보유가 0종목이면 MTS 실제 보유 여부를 확인하세요."
     else:
         result["final_status"] = "NEED_CHECK"
         if not KIWOOM_ACCOUNT:
             result["summary"] = "계좌번호 환경변수 누락"
             result["action"] = "Render Environment에 KIWOOM_ACCOUNT를 추가하세요. 예: 66476264"
         elif not token_ok:
-            result["summary"] = "토큰 발급 실패"
-            result["action"] = "App Key/Secret, Render IP 등록, 지정단말기/추가인증 상태를 확인하세요."
+            result["summary"] = analysis.get("name") or "토큰 발급 실패"
+            result["action"] = analysis.get("action") or "App Key/Secret, Render IP 등록, 지정단말기/추가인증 상태를 확인하세요."
         elif not cash_info.get("ok"):
             result["summary"] = "계좌조회/주문가능금액 조회 실패"
             result["action"] = "계좌번호 형식, API 권한, 키움 응답 메시지를 확인하세요."
@@ -2102,6 +2222,7 @@ def run_kiwoom_full_diagnosis():
         else:
             result["summary"] = "일부 항목 확인 필요"
             result["action"] = "아래 상세 진단을 확인하세요."
+    append_kiwoom_diag_log({"time": now_text(), "stage": "full_diagnosis", "result": {"final_status": result["final_status"], "summary": result["summary"], "health_score": result["health_score"], "error_analysis": result.get("error_analysis")}})
     return result
 
 
@@ -2166,15 +2287,22 @@ def api_kiwoom_status():
 
 
 
+@app.route("/api/v163_full_diagnosis")
 @app.route("/api/v162_full_diagnosis")
-def api_v162_full_diagnosis():
+def api_v163_full_diagnosis():
     return jsonify(run_kiwoom_full_diagnosis())
 
 
+@app.route("/api/v163_token_refresh")
 @app.route("/api/v162_token_refresh")
-def api_v162_token_refresh():
+def api_v163_token_refresh():
     TOKEN_CACHE.update({"token": "", "expires": 0, "last_error": ""})
     return jsonify(build_auth_status(check_token=True))
+
+
+@app.route("/api/v163_diagnosis_log")
+def api_v163_diagnosis_log():
+    return jsonify({"ok": True, "version": APP_VERSION, "logs": read_json(KIWOOM_DIAG_LOG_FILE, [])[:50]})
 
 
 @app.route("/api/kiwoom_raw_holdings")
