@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v159 VERSION UNIFIED
-파일명: app_kiwoom_real_auto_scalping_v159_version_unified_history.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v160 KIWOOM DIAG HOLDINGS PARSER
+파일명: app_kiwoom_real_auto_scalping_v160_kiwoom_diag_holdings_parser.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -35,11 +35,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v159"
+APP_VERSION = "v160"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v159_version_unified_history.py"
-APP_PATCH_NAME = "VERSION_UNIFIED_HISTORY"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v160_kiwoom_diag_holdings_parser.py"
+APP_PATCH_NAME = "KIWOOM_DIAG_HOLDINGS_PARSER"
 UPDATE_HISTORY = [
+    {"version": "v160", "title": "키움 진단/보유 파싱 복구", "items": ["/api/auth_status 추가", "/api/status 500 오류 방지", "키움 보유종목 RAW 저장", "보유종목 응답구조 자동 파싱 강화", "상태 진단 API 추가"]},
     {"version": "v159", "title": "버전 통합관리", "items": ["코드/화면/로그 버전 표기 통일", "패치노트 화면 표시", "버전 확인 API 추가"]},
     {"version": "v158", "title": "AI리포트 런타임 안정화", "items": ["AI일일리포트 저장 오류 방어", "AI내투자평가 저장 오류 방어"]},
     {"version": "v157", "title": "AI일일리포트/내투자평가", "items": ["전날 시장 종합평가", "내 투자 평가", "투자방향 의견"]},
@@ -55,6 +56,7 @@ BASE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = BASE_DIR / "sungil_trade_state_v159.json"
 HOLDINGS_FILE = BASE_DIR / "sungil_holdings_v159.json"
 HOLDINGS_BACKUP_FILE = BASE_DIR / "sungil_holdings_last_good_v159.json"
+KIWOOM_RAW_HOLDINGS_FILE = BASE_DIR / "sungil_kiwoom_raw_holdings_debug.json"
 CANDIDATE_FILE = BASE_DIR / "sungil_candidates_v159.json"
 PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v159.json"
 TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v159.json"
@@ -78,6 +80,7 @@ KIWOOM_SECRET_KEY = (
 ).strip()
 KIWOOM_REAL_TRADING = os.getenv("KIWOOM_REAL_TRADING", "false").lower() == "true"
 KIWOOM_DRY_RUN = os.getenv("KIWOOM_DRY_RUN", "true").lower() == "true"
+KIWOOM_ACCOUNT = (os.getenv("KIWOOM_ACCOUNT", "") or os.getenv("KIWOOM_ACCOUNT_NO", "") or os.getenv("ACCOUNT_NO", "")).strip()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
@@ -479,76 +482,178 @@ def get_cash_info():
     return {"ok": False, "cash": 0, "source": "NONE", "message": auth_message(last)}
 
 
+
+def _walk_dicts(obj, depth=0, max_depth=8):
+    """키움 REST 응답 구조가 바뀌어도 dict/list를 재귀적으로 훑습니다."""
+    if depth > max_depth:
+        return
+    if isinstance(obj, dict):
+        yield obj
+        for v in obj.values():
+            yield from _walk_dicts(v, depth + 1, max_depth)
+    elif isinstance(obj, list):
+        for item in obj:
+            yield from _walk_dicts(item, depth + 1, max_depth)
+
+
+def _first_value(d, keys):
+    if not isinstance(d, dict):
+        return ""
+    for k in keys:
+        if k in d and d.get(k) not in (None, ""):
+            return d.get(k)
+    # 키 일부 포함 매칭도 허용
+    for dk, v in d.items():
+        sk = str(dk)
+        if any(k in sk for k in keys) and v not in (None, ""):
+            return v
+    return ""
+
+
+def _code_from_row(row):
+    raw = json.dumps(row, ensure_ascii=False)
+    val = _first_value(row, ["stk_cd", "stk_code", "code", "종목코드", "pdno", "isu_cd", "prdt_cd", "종목번호"])
+    code = re.sub(r"[^0-9]", "", str(val or ""))
+    if len(code) >= 6:
+        return code[-6:]
+    m = re.search(r"(?<!\d)(\d{6})(?!\d)", raw)
+    return m.group(1) if m else ""
+
+
+def _name_from_row(row, code=""):
+    val = _first_value(row, ["stk_nm", "stk_name", "name", "종목명", "prdt_name", "item_nm", "isu_nm", "hts_kor_isnm"])
+    name = str(val or "").strip()
+    if name and name != code:
+        return name
+    return code or "종목명미확인"
+
+
+def _numeric_from_row(row, keys):
+    val = _first_value(row, keys)
+    if val not in (None, ""):
+        return abs(safe_float(str(val).replace("+", "").replace("-", ""), 0))
+    return deep_find_number(row, keys)
+
+
 def parse_holdings(data):
-    if not isinstance(data, dict):
+    """키움 보유종목 응답 파서 v160.
+    기존 output1/output2 고정 구조 대신 전체 응답에서 종목코드·보유수량을 가진 행을 자동 탐색합니다.
+    """
+    if not isinstance(data, (dict, list)):
         return []
-    lists = []
-    for v in data.values():
-        if isinstance(v, list):
-            lists.append(v)
-        elif isinstance(v, dict):
-            for vv in v.values():
-                if isinstance(vv, list):
-                    lists.append(vv)
     out = []
-    for arr in lists:
-        for item in arr:
-            if not isinstance(item, dict):
-                continue
-            raw = json.dumps(item, ensure_ascii=False)
-            code = ""
-            for key in ["stk_cd", "code", "종목코드", "pdno"]:
-                if key in item:
-                    code = re.sub(r"[^0-9]", "", str(item.get(key, ""))).zfill(6)
-                    break
-            if not code or code == "000000":
-                m = re.search(r"\b(\d{6})\b", raw)
-                code = m.group(1) if m else ""
-            name = ""
-            for key in ["stk_nm", "name", "종목명", "prdt_name"]:
-                if key in item:
-                    name = str(item.get(key, "")).strip()
-                    break
-            qty = deep_find_number(item, ["보유수량", "poss_qty", "hldg_qty", "qty", "수량"])
-            buy = deep_find_number(item, ["평균단가", "매입가", "pchs_avg", "buyPrice", "매수가"])
-            if code and qty > 0:
-                cur, src = get_trade_price(code, fallback=True)
-                if cur <= 0:
-                    cur = buy
-                    src = "CACHE"
-                h = normalize_holding({
-                    "code": code, "name": name or code, "qty": int(qty), "buyPrice": int(buy or cur),
-                    "lastPrice": int(cur), "priceSource": src, "lastCheckedAt": now_text(),
-                    "target": int((buy or cur) * 1.027), "stop": int((buy or cur) * 0.982),
-                })
-                out.append(h)
-    # 중복 제거
+    seen_rows = set()
+    for row in _walk_dicts(data):
+        if not isinstance(row, dict):
+            continue
+        code = _code_from_row(row)
+        if not code:
+            continue
+        raw = json.dumps(row, ensure_ascii=False, sort_keys=True)
+        if raw in seen_rows:
+            continue
+        seen_rows.add(raw)
+        qty = _numeric_from_row(row, [
+            "rmnd_qty", "hldg_qty", "poss_qty", "ord_psbl_qty", "qty", "quantity",
+            "보유수량", "잔고수량", "평가수량", "가능수량", "보유잔고수량"
+        ])
+        # 일부 응답은 수량 필드가 없고 매입/평가금액만 있을 수 있습니다.
+        buy = _numeric_from_row(row, [
+            "pchs_avg_pric", "pchs_avg_price", "avg_prc", "avg_price", "pchs_avg", "buyPrice",
+            "매입평균가격", "평균단가", "매입가", "매수가", "매입단가"
+        ])
+        cur = _numeric_from_row(row, [
+            "cur_prc", "now_pric", "prpr", "stck_prpr", "lastPrice", "currentPrice",
+            "현재가", "평가가격", "기준가"
+        ])
+        pchs_amt = _numeric_from_row(row, ["pchs_amt", "purchaseAmount", "매입금액", "매수금액"])
+        evlt_amt = _numeric_from_row(row, ["evlt_amt", "evalAmount", "평가금액"])
+        if qty <= 0 and buy > 0 and pchs_amt > 0:
+            qty = int(pchs_amt // buy)
+        if qty <= 0 and cur > 0 and evlt_amt > 0:
+            qty = int(evlt_amt // cur)
+        if qty <= 0:
+            continue
+        name = _name_from_row(row, code)
+        if cur <= 0:
+            cur, src = get_trade_price(code, fallback=True)
+        else:
+            src = "KIWOOM"
+        if buy <= 0:
+            buy = cur
+        if cur <= 0:
+            cur = buy
+            src = "CACHE"
+        h = normalize_holding({
+            "code": code,
+            "name": name,
+            "qty": int(qty),
+            "buyPrice": int(buy or cur),
+            "lastPrice": int(cur or buy),
+            "priceSource": src,
+            "lastCheckedAt": now_text(),
+            "target": int((buy or cur) * 1.027),
+            "stop": int((buy or cur) * 0.982),
+        })
+        out.append(h)
     unique = {}
     for h in out:
         unique[h["code"]] = h
     return list(unique.values())
 
 
+def holdings_fail_reason(raw_text, last_status=0):
+    s = str(raw_text or "")
+    if "8050" in s or "지정단말기" in s or "인증에 실패" in s:
+        return auth_message(s)
+    if "prfa_ch" in s or "fc_stk_krw" in s or "예수금" in s or "주문가능" in s:
+        return "키움 서버 응답은 왔지만 보유종목 배열을 찾지 못했습니다. 계좌번호(KIWOOM_ACCOUNT) 누락, 조회구분, 또는 키움 보유응답 필드 변경 가능성이 있습니다. v160 RAW 진단파일에 원본을 저장했습니다."
+    if last_status and int(last_status) != 200:
+        return f"키움 보유 조회 HTTP {last_status} 응답입니다. 인증/권한/지정단말기 상태를 확인하세요."
+    return "키움 응답은 받았지만 보유종목으로 해석할 수 있는 코드·수량 필드를 찾지 못했습니다."
+
+
 def fetch_kiwoom_holdings():
     if not kiwoom_ready():
-        return {"ok": False, "holdings": [], "message": auth_message(""), "source": "NONE"}
+        return {"ok": False, "holdings": get_cached_holdings(), "message": auth_message(""), "source": "CACHE" if get_cached_holdings() else "NONE"}
     last = ""
+    last_status = 0
+    attempts = []
+    # 키움 REST 계좌 API가 계정/조회구분에 따라 응답 형태가 달라지는 경우가 있어 여러 body를 순차 시도합니다.
+    bodies = [
+        {"qry_tp": "3"},
+        {"qry_tp": "2"},
+        {"qry_tp": "1"},
+        {"dmst_stex_tp": "KRX", "qry_tp": "3"},
+    ]
+    if KIWOOM_ACCOUNT:
+        bodies.insert(0, {"acc_no": KIWOOM_ACCOUNT, "qry_tp": "3"})
+        bodies.insert(1, {"account_no": KIWOOM_ACCOUNT, "qry_tp": "3"})
     for api_id in ["kt00018", "kt00004", "kt00001"]:
-        try:
-            st, data = kiwoom_post("/api/dostk/acnt", api_id, {"qry_tp": "3"}, timeout=8)
-            items = parse_holdings(data)
-            if st == 200 and items:
-                write_json(HOLDINGS_FILE, items)
-                write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": items})
-                return {"ok": True, "holdings": items, "message": f"키움 실보유 {len(items)}종목 조회 성공", "source": "KIWOOM"}
-            last = str(data)[:300]
-            update_kiwoom_debug("holdings_empty_or_fail", last, st)
-        except Exception as e:
-            last = str(e)
-            update_kiwoom_debug("holdings_exception", last)
+        for body in bodies:
+            try:
+                st, data = kiwoom_post("/api/dostk/acnt", api_id, body, timeout=8)
+                last_status = st
+                last = str(data)[:1200]
+                attempts.append({"time": now_text(), "api_id": api_id, "body": body, "http_status": st, "preview": last[:500]})
+                try:
+                    write_json(KIWOOM_RAW_HOLDINGS_FILE, {"time": now_text(), "api_id": api_id, "body": body, "http_status": st, "raw": data, "attempts": attempts})
+                except Exception:
+                    pass
+                items = parse_holdings(data)
+                if st == 200 and items:
+                    write_json(HOLDINGS_FILE, items)
+                    write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": items, "raw_source": api_id})
+                    update_kiwoom_debug("holdings_ok", f"키움 실보유 {len(items)}종목 조회 성공", st)
+                    return {"ok": True, "holdings": items, "message": f"키움 실보유 {len(items)}종목 조회 성공", "source": "KIWOOM", "api_id": api_id}
+                update_kiwoom_debug("holdings_parse_empty", holdings_fail_reason(last, st), st)
+            except Exception as e:
+                last = str(e)
+                attempts.append({"time": now_text(), "api_id": api_id, "body": body, "http_status": 0, "preview": last[:500]})
+                update_kiwoom_debug("holdings_exception", last)
     cached = get_cached_holdings()
-    return {"ok": False, "holdings": cached, "message": auth_message(last) if last else "키움 보유 조회 실패", "source": "CACHE" if cached else "EMPTY"}
-
+    msg = holdings_fail_reason(last, last_status)
+    return {"ok": False, "holdings": cached, "message": msg, "source": "CACHE" if cached else "EMPTY", "attempts": attempts[-5:]}
 
 def get_cached_holdings():
     data = read_json(HOLDINGS_BACKUP_FILE, {})
@@ -1638,10 +1743,69 @@ def index():
     return render_page()
 
 
+def safe_watch_state():
+    return {
+        "running": bool(WATCH_STATE.get("running")),
+        "last_check": WATCH_STATE.get("last_check", ""),
+        "last_message": WATCH_STATE.get("last_message", ""),
+        "thread_alive": bool(WATCH_STATE.get("thread") and WATCH_STATE.get("thread").is_alive()),
+    }
+
+
+def build_auth_status(check_token=False):
+    env = {
+        "KIWOOM_APP_KEY": bool(KIWOOM_APP_KEY),
+        "KIWOOM_APP_SECRET": bool(KIWOOM_SECRET_KEY),
+        "KIWOOM_ACCOUNT": bool(KIWOOM_ACCOUNT),
+        "KIWOOM_REAL_TRADING": KIWOOM_REAL_TRADING,
+        "KIWOOM_DRY_RUN": KIWOOM_DRY_RUN,
+    }
+    token_ok = False
+    token_message = TOKEN_CACHE.get("last_error", "") or "토큰 미확인"
+    if check_token:
+        try:
+            get_kiwoom_token()
+            token_ok = True
+            token_message = "키움 토큰 정상"
+        except Exception as e:
+            token_message = auth_message(str(e))
+    elif TOKEN_CACHE.get("token") and time.time() < TOKEN_CACHE.get("expires", 0):
+        token_ok = True
+        token_message = "캐시 토큰 정상"
+    account_warning = "" if KIWOOM_ACCOUNT else "KIWOOM_ACCOUNT 환경변수가 없으면 일부 계좌/보유 조회가 EMPTY로 나올 수 있습니다."
+    return {
+        "ok": bool(KIWOOM_APP_KEY and KIWOOM_SECRET_KEY),
+        "authenticated": token_ok,
+        "token_ok": token_ok,
+        "token_message": token_message,
+        "env": env,
+        "account_warning": account_warning,
+        "last_kiwoom_debug": read_state().get("last_kiwoom_debug", {}),
+        "version": APP_VERSION,
+    }
+
+
 @app.route("/api/status")
 def api_status():
-    cash = get_cash_info()
-    return jsonify({"ok": cash.get("ok"), "version": APP_VERSION, "title": APP_TITLE, "file_name": APP_FILE_NAME, "patch_name": APP_PATCH_NAME, "cash": cash, "state": read_state(), "watch": WATCH_STATE})
+    try:
+        cash = get_cash_info()
+    except Exception as e:
+        cash = {"ok": False, "cash": 0, "source": "ERROR", "message": auth_message(str(e))}
+    try:
+        state = read_state()
+    except Exception as e:
+        state = {"last_status": "상태파일 오류", "last_message": str(e)}
+    return jsonify({
+        "ok": bool(cash.get("ok")),
+        "version": APP_VERSION,
+        "title": APP_TITLE,
+        "file_name": APP_FILE_NAME,
+        "patch_name": APP_PATCH_NAME,
+        "cash": cash,
+        "state": state,
+        "watch": safe_watch_state(),
+        "auth": build_auth_status(check_token=False),
+    })
 
 
 @app.route("/api/version")
@@ -1654,6 +1818,35 @@ def api_version():
         "patch_name": APP_PATCH_NAME,
         "update_history": UPDATE_HISTORY,
     })
+
+
+@app.route("/api/auth_status")
+def api_auth_status():
+    check = str(request.args.get("check", "0")).lower() in ("1", "true", "yes")
+    return jsonify(build_auth_status(check_token=check))
+
+
+@app.route("/api/kiwoom_status")
+def api_kiwoom_status():
+    auth = build_auth_status(check_token=True)
+    raw_exists = KIWOOM_RAW_HOLDINGS_FILE.exists()
+    cached = get_cached_holdings()
+    return jsonify({
+        "ok": True,
+        "version": APP_VERSION,
+        "auth": auth,
+        "cached_holdings_count": len(cached),
+        "raw_holdings_debug_saved": raw_exists,
+        "raw_holdings_debug_file": str(KIWOOM_RAW_HOLDINGS_FILE),
+        "last_kiwoom_debug": read_state().get("last_kiwoom_debug", {}),
+        "guide": "token_ok가 true인데 holdings가 EMPTY이면 보유종목 파싱/계좌번호/조회구분 문제일 가능성이 큽니다.",
+    })
+
+
+@app.route("/api/kiwoom_raw_holdings")
+def api_kiwoom_raw_holdings():
+    data = read_json(KIWOOM_RAW_HOLDINGS_FILE, {"ok": False, "message": "아직 저장된 키움 RAW 보유응답이 없습니다. /api/holdings 또는 실보유 새로고침을 먼저 실행하세요."})
+    return jsonify(data)
 
 
 @app.route("/api/refresh_holdings")
