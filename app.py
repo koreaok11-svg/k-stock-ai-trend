@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v166 MOBILE UI INTEGRATED
-파일명: app_kiwoom_real_auto_scalping_v166_mobile_ui_integrated.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v167 PROFIT OPTIMIZATION ENGINE
+파일명: app_kiwoom_real_auto_scalping_v167_profit_optimization_engine.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v166"
+APP_VERSION = "v167"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v166_mobile_ui_integrated.py"
-APP_PATCH_NAME = "MOBILE_UI_ANALYSIS_CENTER_STABLE"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v167_profit_optimization_engine.py"
+APP_PATCH_NAME = "PROFIT_OPTIMIZATION_ENGINE"
 UPDATE_HISTORY = [
+    {"version": "v167", "title": "AI 수익률 최적화 엔진", "items": ["AI 실전 복기센터", "AI 후보 진화엔진", "AI 시장온도계 PRO", "AI 동적 익절률", "AI 강도변화 알림", "수익률 최적화 진단 API"]},
     {"version": "v166", "title": "모바일 UI 통합/키움 안정화", "items": ["가로 스크롤 메뉴 제거", "3열 카드형 메뉴와 기능 설명 추가", "AI분석센터 개념 통합", "키움 진단센터 PRO 안내 강화", "AI시장온도계와 TOP3 비교 개선", "실보유/진단/후보 핵심 기능 접근성 개선"]},
     {"version": "v164", "title": "등록 IP 변수 누락 수정", "items": ["KIWOOM_REGISTERED_IPS 미정의 오류 수정", "Render/키움 등록 IP 비교 안전처리", "진단센터 오류가 나도 앱 화면 유지"]},
     {"version": "v163", "title": "키움 오류코드 자동해석/자가진단", "items": ["8050 등 키움 오류코드 자동 해석", "Render 현재 IP 표시", "키움 연동 건강도 점수", "원클릭 전체 진단 결과를 사용자 문장으로 변환", "진단 로그 자동 저장"]},
@@ -162,6 +163,23 @@ DEFAULT_STATE = {
     "rebuy_cooldown_minutes": 30,
     "last_sell_times": {},
     "index_risk_mode": "NORMAL",
+    # v167: 수익률 최적화 엔진
+    "profit_optimization_enabled": True,
+    "market_temperature_pro_enabled": True,
+    "candidate_evolution_enabled": True,
+    "trade_review_enabled": True,
+    "strength_alert_enabled": True,
+    "strength_drop_alert_threshold": 12,
+    "dynamic_take_profit_enabled": True,
+    "dynamic_take_profit_normal": 0.027,
+    "dynamic_take_profit_strong": 0.045,
+    "dynamic_take_profit_super": 0.070,
+    "dynamic_take_profit_limitup": 0.100,
+    "market_temp_stop_buy_below": 25,
+    "market_temp_reduce_buy_below": 45,
+    "last_market_temperature": 0,
+    "last_market_temperature_label": "대기",
+    "last_review_summary": "",
 }
 
 
@@ -1232,7 +1250,8 @@ def get_market_candidates(limit=8, min_score=None):
         c["buyZone"] = int(p * 0.995)
         c["amountText"] = f"{safe_float(c.get('amount'), 0) / 100000000:.1f}억"
         c = enrich_candidate_risk(c, idx_risk)
-        c["comment"] = "화면 후보는 KRX/캐시 기준입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
+        c = v167_apply_candidate_evolution(c)
+        c["comment"] = "v167 수익률 최적화 후보입니다. 실제 매수 직전에는 키움 현재가·주문가능금액·수수료 버퍼를 다시 확인합니다. " + c.get('riskComment','')
         enriched.append(c)
     candidates = sorted(enriched, key=lambda x: safe_float(x.get('riskAdjustedScore', x.get('score',0))), reverse=True)[:limit]
     # v159: KRX 종가/캐시와 실제 주식앱 현재가 차이를 줄이기 위해 표시 직전 현재가 보정
@@ -1241,6 +1260,9 @@ def get_market_candidates(limit=8, min_score=None):
     state = read_state()
     state['index_risk_mode']=idx_risk.get('mode','UNKNOWN')
     state['recommended_strategy'] = candidates[0].get('strategy','AI후보형') if candidates else state.get('recommended_strategy','AI후보형')
+    temp_data = v167_market_temperature_data(candidates)
+    state['last_market_temperature'] = temp_data.get('temperature', 0)
+    state['last_market_temperature_label'] = temp_data.get('label', '대기')
     state['last_candidate_scan_time'] = scan_time
     state['last_candidate_price_time'] = scan_time
     state['last_candidate_scan_count'] = len(candidates)
@@ -1278,13 +1300,15 @@ def auto_sell_holding(reason, holding, cur_price=None):
     if KIWOOM_DRY_RUN:
         event = append_trade_event({'side':'sell','dry_run':True,'code':code,'name':h.get('name'), 'qty':qty,'fill_price':sell_price,'buy_price':h.get('buyPrice'), 'pnl':int(pnl),'return_pct':round((pnl/buy_value*100) if buy_value else 0,2),'strategy':strategy,'reason':reason})
         record_strategy_result(strategy, pnl, buy_value, reason, code, h.get('name'))
-        return {"ok": True, "message": "DRY_RUN: 실제 매도 전송 없이 성과/원장 기록", "dry_run": True, "review": ai_loss_review(event)}
+        v167_review_trade_event(event)
+        return {"ok": True, "message": "DRY_RUN: 실제 매도 전송 없이 성과/원장 기록", "dry_run": True, "review": ai_loss_review(event), "v167_review": read_state().get('last_review_summary','')}
     try:
         res = kiwoom_order("sell", code, qty)
         if res.get("ok"):
             remove_holding(code)
             event = append_trade_event({'side':'sell','code':code,'name':h.get('name'),'qty':qty,'fill_price':sell_price,'buy_price':h.get('buyPrice'),'pnl':int(pnl),'return_pct':round((pnl/buy_value*100) if buy_value else 0,2),'strategy':strategy,'reason':reason,'order_response':res})
             record_strategy_result(strategy, pnl, buy_value, reason, code, h.get('name'))
+            v167_review_trade_event(event)
             state = read_state(); state.setdefault('last_sell_times',{})[code]=time.time(); write_state(state)
             send_telegram(f"매도 요청: {h['name']} {qty}주 / 사유 {reason} / 손익 {int(pnl):,}원")
         return res
@@ -1299,6 +1323,151 @@ def kiwoom_order(side, code, qty):
     return {"ok": st == 200 and str(data.get("return_code", "0")) in ["0", ""], "status": st, "response": data}
 
 
+
+
+def v167_market_temperature_data(picks=None):
+    """v167: 후보 품질/시장역행/지수위험을 점수화해 시장온도와 매수모드를 산출합니다."""
+    try:
+        picks = list(picks or cached_candidates()[:8])
+    except Exception:
+        picks = []
+    avg_score = sum(safe_float(x.get('riskAdjustedScore', x.get('score')), 0) for x in picks) / max(1, len(picks))
+    avg_reverse = sum(safe_float(x.get('marketReverseScore'), 0) for x in picks) / max(1, len(picks))
+    avg_theme = sum(safe_float(x.get('themeStrengthScore'), 0) for x in picks) / max(1, len(picks))
+    avg_overheat = sum(safe_float(x.get('overheatPenalty'), 0) for x in picks) / max(1, len(picks))
+    state = read_state()
+    index_mode = state.get('index_risk_mode', 'NORMAL')
+    temp = avg_score * 0.58 + avg_reverse * 0.16 + avg_theme * 0.18 - avg_overheat * 0.8
+    if index_mode == 'WEAK':
+        temp -= 12
+    elif index_mode == 'DANGER':
+        temp -= 22
+    elif index_mode == 'STRONG':
+        temp += 8
+    temp = max(0, min(100, temp))
+    if temp >= 82:
+        label, mode, guide = '초강세', '공격 가능', '강한 후보는 목표가를 더 길게 끌고 가되, 고점 대비 되돌림 매도로 수익을 보호합니다.'
+    elif temp >= 65:
+        label, mode, guide = '강세', '선별 매수', 'TOP3 후보 중심으로 진입하고 거래대금 유지율을 확인합니다.'
+    elif temp >= 45:
+        label, mode, guide = '중립', '보수 매수', '후보 점수가 높아도 과열/슬리피지 감점을 더 강하게 봅니다.'
+    elif temp >= 25:
+        label, mode, guide = '약세', '신규매수 축소', '기존 보유 리스크 관리와 빠른 손실 차단이 우선입니다.'
+    else:
+        label, mode, guide = '위험', '신규매수 중지', '시장온도가 낮아 자동 신규매수보다 관망/진단/보유관리 우선입니다.'
+    return {'temperature': round(temp, 1), 'label': label, 'mode': mode, 'guide': guide, 'avg_score': round(avg_score,1), 'avg_reverse': round(avg_reverse,1), 'avg_theme': round(avg_theme,1), 'avg_overheat': round(avg_overheat,1), 'index_mode': index_mode, 'count': len(picks)}
+
+
+def v167_dynamic_target_rate_for_candidate(c):
+    """v167: 후보 강도에 따라 익절 목표를 동적으로 산출합니다."""
+    state = read_state()
+    base = safe_float(state.get('target_rate'), 0.027)
+    if not state.get('dynamic_take_profit_enabled', True):
+        return base, '기본 익절률'
+    score = safe_float(c.get('riskAdjustedScore', c.get('score')), 0)
+    reverse = safe_float(c.get('marketReverseScore'), 0)
+    day = safe_float(c.get('dayChange'), 0)
+    amount = safe_float(c.get('amount'), 0)
+    temp = safe_float(state.get('last_market_temperature'), 0)
+    if score >= 96 and reverse >= 15 and day >= 7 and amount >= 30_000_000_000 and temp >= 70:
+        return safe_float(state.get('dynamic_take_profit_limitup'), 0.10), '초강세/상한가 패턴 후보'
+    if score >= 92 and reverse >= 10 and day >= 4 and temp >= 60:
+        return safe_float(state.get('dynamic_take_profit_super'), 0.07), '초강세 추세 후보'
+    if score >= 85 and day >= 2.5:
+        return safe_float(state.get('dynamic_take_profit_strong'), 0.045), '강세 후보'
+    return safe_float(state.get('dynamic_take_profit_normal'), base), '일반 후보'
+
+
+def v167_apply_candidate_evolution(c):
+    """v167: 최근 성과가 좋은 전략/테마에 보수적 가중치를 더합니다."""
+    c = dict(c or {})
+    if not read_state().get('candidate_evolution_enabled', True):
+        c['evolutionNote'] = '후보 진화엔진 OFF'
+        return c
+    try:
+        ranks = strategy_rankings(7)
+        best = ranks[0]['strategy'] if ranks else ''
+    except Exception:
+        best = ''
+    bonus = 0
+    notes = []
+    if best and best in str(c.get('strategy','')):
+        bonus += 3
+        notes.append(f'최근 7일 우세전략({best}) 보너스')
+    theme = str(c.get('theme',''))
+    if any(x in theme for x in ['AI반도체', '전력설비', '데이터센터']):
+        bonus += 2
+        notes.append('최근 주도테마 관찰 보너스')
+    if safe_float(c.get('overheatPenalty'), 0) >= 8:
+        bonus -= 4
+        notes.append('과열위험 감점')
+    base = safe_float(c.get('riskAdjustedScore', c.get('score')), 0)
+    c['v167EvolutionBonus'] = bonus
+    c['riskAdjustedScore'] = round(max(0, min(120, base + bonus)), 2)
+    c['evolutionNote'] = ' · '.join(notes) if notes else '성과 누적 대기: 기본 점수 유지'
+    target_rate, reason = v167_dynamic_target_rate_for_candidate(c)
+    p = safe_float(c.get('price'), 0)
+    if p > 0:
+        c['v167DynamicTargetRate'] = round(target_rate * 100, 2)
+        c['target'] = int(p * (1 + target_rate))
+        c['v167DynamicTargetReason'] = reason
+    return c
+
+
+def v167_review_trade_event(event):
+    """v167: 매도 완료 이벤트를 AI 복기 문장으로 저장합니다."""
+    try:
+        pnl = safe_float(event.get('pnl'), 0)
+        ret = safe_float(event.get('return_pct'), 0)
+        reason = str(event.get('reason',''))
+        name = event.get('name') or event.get('code') or '종목'
+        if pnl > 0:
+            summary = f'{name} 수익 확정 {ret:.2f}% · {reason} 매도. 강한 후보는 AI 고점추적/동적익절이 유효했는지 확인하세요.'
+        else:
+            summary = f'{name} 손실/본전 매도 {ret:.2f}% · 원인 후보: 진입지연, 시장온도 하락, 거래대금 유지율 약화, 과열 진입 여부 확인 필요.'
+        review = {'time': now_text(), 'event': event, 'summary': summary, 'score': max(0, min(100, 60 + ret * 5))}
+        reviews = read_json(REVIEW_FILE, [])
+        if not isinstance(reviews, list):
+            reviews = []
+        reviews.insert(0, review)
+        write_json(REVIEW_FILE, reviews[:100])
+        state = read_state()
+        state['last_review_summary'] = summary
+        write_state(state)
+        return review
+    except Exception as e:
+        return {'time': now_text(), 'summary': '복기 저장 실패: ' + str(e)[:120]}
+
+
+def v167_strength_alert_for_holding(h):
+    """v167: 보유종목 강도 하락 알림. 중복 알림을 줄이기 위해 종목별 최근 강도 캐시를 사용합니다."""
+    try:
+        state = read_state()
+        if not state.get('strength_alert_enabled', True):
+            return
+        code = str(h.get('code','')).zfill(6)
+        prev_map = state.get('holding_strength_map', {})
+        if not isinstance(prev_map, dict):
+            prev_map = {}
+        cur_rate = safe_float(h.get('profitRate'), 0)
+        # 수익률과 고점 대비 위치를 단순 강도로 사용
+        high = safe_float(h.get('highestPrice'), 0)
+        cur = safe_float(h.get('lastPrice'), 0)
+        high_drop = ((high-cur)/high*100) if high else 0
+        strength = max(0, min(100, 70 + cur_rate*4 - high_drop*5))
+        prev = safe_float(prev_map.get(code), strength)
+        drop = prev - strength
+        threshold = safe_float(state.get('strength_drop_alert_threshold'), 12)
+        if drop >= threshold:
+            msg = f"⚠ AI 강도하락 감지: {h.get('name', code)} {prev:.1f}→{strength:.1f}. 고점 대비 {high_drop:.2f}% 밀림. 트레일링/익절 조건 확인"
+            add_alert(msg)
+            send_telegram(msg)
+        prev_map[code] = round(strength, 1)
+        state['holding_strength_map'] = prev_map
+        write_state(state)
+    except Exception:
+        pass
+
 def watch_loop():
     while WATCH_STATE.get("running"):
         try:
@@ -1311,6 +1480,7 @@ def watch_loop():
                     h["priceSource"] = src
                     h["lastCheckedAt"] = now_text()
                 h = normalize_holding(h)
+                v167_strength_alert_for_holding(h)
                 if h["activeDynamicTarget"] and h["lastPrice"] >= h["baseTarget"]:
                     h["aiHoldMode"] = True
                     h["aiTargetReason"] = "목표 도달 후 강세로 판단되어 AI 상향익절/트레일링 감시 중"
@@ -1371,7 +1541,7 @@ def render_version_summary():
 
 
 def render_quick_status_bar():
-    """v166: 앱 상단에서 핵심 상태를 한눈에 확인합니다."""
+    """v167: 앱 상단에서 핵심 상태를 한눈에 확인합니다."""
     try:
         state = read_state()
         picks_data = read_json(CANDIDATE_FILE, {})
@@ -1382,7 +1552,7 @@ def render_quick_status_bar():
         trade_count = safe_int(state.get("trade_count_today"), 0)
         last_scan = state.get("last_candidate_scan_time") or "-"
         return f"""
-        <div class="status-bar-v166">
+        <div class="status-bar-v167">
           <div><span>🤖 후보</span><b>{pick_count}개</b></div>
           <div><span>💼 보유</span><b>{holdings_count}개</b></div>
           <div><span>💰 오늘손익</span><b>{profit}</b></div>
@@ -1391,13 +1561,14 @@ def render_quick_status_bar():
           <div><span>⏱ 스캔</span><b>{html_escape(last_scan)}</b></div>
         </div>"""
     except Exception as e:
-        return f"<div class='status-bar-v166'><div><span>상태</span><b>표시 오류 {html_escape(str(e))}</b></div></div>"
+        return f"<div class='status-bar-v167'><div><span>상태</span><b>표시 오류 {html_escape(str(e))}</b></div></div>"
 
 
 def render_mobile_menu_cards():
     """v166: 모바일에서 가로 드래그 없이 보이는 3열 카드형 메뉴입니다."""
     items = [
         ("#picks", "🤖", "AI후보", "실시간 후보·추천이유"),
+        ("#profit-optimization", "🚀", "수익최적화", "복기·동적익절·시장온도"),
         ("#conditions", "🧭", "매매조건", "익절·손절·재매수"),
         ("#ai-upgrade", "🧠", "AI조건", "추천조건 승인 적용"),
         ("#analysis-center", "📊", "AI분석센터", "시장리포트·투자평가"),
@@ -1408,10 +1579,10 @@ def render_mobile_menu_cards():
     for href, icon, title, desc in items:
         cards.append(f"<a href='{href}'><b>{icon} {html_escape(title)}</b><span>{html_escape(desc)}</span></a>")
     return f"""
-    <div class="menu-grid-v166">
+    <div class="menu-grid-v167">
       {''.join(cards)}
     </div>
-    <div class="menu-help-v166">
+    <div class="menu-help-v167">
       <b>사용 순서 추천</b> ① AI후보 확인 → ② 키움진단 정상 확인 → ③ 매매조건 점검 → ④ 최우선 후보 매수/자동매매 실행
     </div>"""
 
@@ -1441,13 +1612,13 @@ def render_market_temperature(picks=None):
         else:
             label, icon, msg = "위험", "🚨", "자동매매보다 관망/진단/보유관리 우선 구간입니다."
         return f"""
-        <div class="market-temp-v166">
-          <div><span>{icon}</span><b>AI 시장온도 {temp:.0f}점 · {label}</b></div>
+        <div class="market-temp-v167">
+          <div><span>{icon}</span><b>AI 시장온도 PRO {temp:.0f}점 · {label}</b></div>
           <p>{html_escape(msg)}</p>
           <small>지수위험 {html_escape(index_mode)} · 평균확신도 {avg_conf:.1f}% · 평균시장역행 {avg_reverse:.1f}</small>
         </div>"""
     except Exception as e:
-        return f"<div class='market-temp-v166'><b>AI 시장온도 표시 오류</b><p>{html_escape(str(e))}</p></div>"
+        return f"<div class='market-temp-v167'><b>AI 시장온도 표시 오류</b><p>{html_escape(str(e))}</p></div>"
 
 
 def render_holdings_section():
@@ -1530,6 +1701,8 @@ def render_candidate_card(c, idx):
         <div class="risk-tags">{render_badges(c.get('aiRisks'), '⚠')}</div>
         <div class="ai-verdict">종합판단: {html_escape(c.get('aiVerdict','AI 감시 후보입니다.'))}</div>
         <div class="mini-line">진입타입 <b>{html_escape(c.get('entryType','AI감시'))}</b> · AI확신도 <b>{safe_float(c.get('aiConfidence')):.1f}%</b></div>
+        <div class="mini-line">v167 동적익절 <b>{safe_float(c.get('v167DynamicTargetRate'), safe_float(read_state().get('target_rate'),0.027)*100):.2f}%</b> · {html_escape(c.get('v167DynamicTargetReason','기본 익절률'))}</div>
+        <div class="mini-line">후보진화: {html_escape(c.get('evolutionNote','성과 누적 대기'))}</div>
         <div class="mini-line">거래대금 {html_escape(c.get('amountText','-'))} · 매수관찰 {money(c.get('buyZone'))}</div>
         <div class="mini-line">시장역행 {safe_float(c.get('marketReverseScore')):.1f} · 테마강도 {safe_float(c.get('themeStrengthScore')):.0f} · 과열감점 {safe_float(c.get('overheatPenalty')):.0f} · 슬리피지감점 {safe_float(c.get('slippagePenalty')):.0f}</div>
         <div class="mini-line">{html_escape(c.get('priceRefreshNote',''))}</div>
@@ -1553,6 +1726,7 @@ def render_top3_comparison(picks):
             <div><span>현재가/출처</span><b>{money(c.get('price'))}</b><small>{html_escape(c.get('priceSource') or c.get('source','-'))}</small></div>
             <div><span>시장역행</span><b>{safe_float(c.get('marketReverseScore')):.1f}</b></div>
             <div><span>테마/전략</span><b>{html_escape(c.get('theme','-'))}</b><small>{html_escape(c.get('strategy','AI후보형'))}</small></div>
+            <div><span>동적익절</span><b>{safe_float(c.get('v167DynamicTargetRate'), safe_float(read_state().get('target_rate'),0.027)*100):.2f}%</b><small>{html_escape(c.get('v167DynamicTargetReason','기본'))}</small></div>
           </div>
           <div class="mini-line">추천: {html_escape(' · '.join((c.get('aiReasons') or [])[:2]) or c.get('aiVerdict','AI후보'))}</div>
           <div class="mini-line">위험: {html_escape(' · '.join((c.get('aiRisks') or [])[:2]) or '특이 위험 낮음')}</div>
@@ -1647,6 +1821,8 @@ def render_conditions_section():
         <div><span>최소 AI 점수</span><b>{safe_float(state.get('min_ai_score'),60):.1f}</b></div>
         <div><span>최소 거래대금</span><b>{safe_int(state.get('min_amount'),3000000000)/100000000:.0f}억</b></div>
         <div><span>재매수 제한</span><b>{safe_float(state.get('rebuy_cooldown_minutes'),30):.0f}분</b></div>
+        <div><span>시장온도</span><b>{safe_float(state.get('last_market_temperature'),0):.0f}점 · {html_escape(state.get('last_market_temperature_label','대기'))}</b></div>
+        <div><span>동적 익절률</span><b>{'ON' if state.get('dynamic_take_profit_enabled', True) else 'OFF'} · 강세/초강세 자동상향</b></div>
       </div>
       <details>
         <summary>✍️ 매매조건 수정하기 / 접기</summary>
@@ -1657,6 +1833,10 @@ def render_conditions_section():
             <label>수익보호 되돌림(%)<input name="profit_guard_rate" value="{safe_float(state.get('profit_guard_rate'),0.012)*100:.2f}"></label>
             <label>트레일링 되돌림(%)<input name="trailing_stop_rate" value="{safe_float(state.get('trailing_stop_rate'),0.011)*100:.2f}"></label>
             <label>AI 상향익절 추가 목표(%)<input name="dynamic_target_boost_rate" value="{safe_float(state.get('dynamic_target_boost_rate'),0.012)*100:.2f}"><small>예: 1.20 = 목표 도달 후 현재가 대비 +1.2% 상향</small></label>
+            <label>v167 일반 동적익절(%)<input name="dynamic_take_profit_normal" value="{safe_float(state.get('dynamic_take_profit_normal'),0.027)*100:.2f}"><small>일반 후보 기본 목표</small></label>
+            <label>v167 강세 동적익절(%)<input name="dynamic_take_profit_strong" value="{safe_float(state.get('dynamic_take_profit_strong'),0.045)*100:.2f}"><small>강한 후보 목표</small></label>
+            <label>v167 초강세 동적익절(%)<input name="dynamic_take_profit_super" value="{safe_float(state.get('dynamic_take_profit_super'),0.070)*100:.2f}"><small>초강세 후보 목표</small></label>
+            <label>v167 상한가패턴 목표(%)<input name="dynamic_take_profit_limitup" value="{safe_float(state.get('dynamic_take_profit_limitup'),0.100)*100:.2f}"><small>매우 강한 추세 후보 목표</small></label>
             <label>상향익절 시작 수익률(%)<input name="dynamic_target_min_profit_rate" value="{safe_float(state.get('dynamic_target_min_profit_rate'),0.027)*100:.2f}"><small>이 수익률 이상이면 AI가 목표가를 끌어올릴 수 있습니다.</small></label>
             <label>고점추적 1단계 수익률(%)<input name="ai_peak_stage1_profit_rate" value="{safe_float(state.get('ai_peak_stage1_profit_rate'),0.045)*100:.2f}"><small>예: 4.50 = 수익 4.5%부터 되돌림 기준을 조금 좁힘</small></label>
             <label>고점추적 2단계 수익률(%)<input name="ai_peak_stage2_profit_rate" value="{safe_float(state.get('ai_peak_stage2_profit_rate'),0.070)*100:.2f}"><small>예: 7.00 = 강세구간</small></label>
@@ -1994,6 +2174,39 @@ def render_investment_review_section_safe():
         </section>"""
 
 
+
+
+def render_v167_profit_center():
+    """v167: 수익률 최적화 엔진 요약 카드."""
+    try:
+        state = read_state()
+        picks = cached_candidates()[:8]
+        temp = v167_market_temperature_data(picks)
+        reviews = read_json(REVIEW_FILE, [])
+        last_review = reviews[0].get('summary') if isinstance(reviews, list) and reviews else state.get('last_review_summary','복기 데이터 대기중')
+        top = picks[0] if picks else {}
+        top_rate = safe_float(top.get('v167DynamicTargetRate'), safe_float(state.get('target_rate'),0.027)*100)
+        return f"""
+        <section class="card" id="profit-optimization">
+          <h2>🚀 v167 수익률 최적화 엔진</h2>
+          <p class="muted">실전 복기, 후보 진화, 시장온도계 PRO, 동적 익절률, 강도변화 알림을 한 화면에서 확인합니다.</p>
+          <div class="summary-grid">
+            <div><span>시장온도 PRO</span><b>{temp['temperature']:.0f}점 · {html_escape(temp['label'])}</b><small>{html_escape(temp['mode'])}</small></div>
+            <div><span>TOP1 동적익절</span><b>{top_rate:.2f}%</b><small>{html_escape(top.get('name','후보 대기'))}</small></div>
+            <div><span>후보진화</span><b>{'ON' if state.get('candidate_evolution_enabled', True) else 'OFF'}</b><small>성과 좋은 전략/테마 가중</small></div>
+            <div><span>강도변화 알림</span><b>{'ON' if state.get('strength_alert_enabled', True) else 'OFF'}</b><small>{safe_float(state.get('strength_drop_alert_threshold'),12):.0f}점 하락시 알림</small></div>
+          </div>
+          <div class="notice small"><b>AI 시장판단</b><br>{html_escape(temp['guide'])}<br>평균AI {temp['avg_score']} · 시장역행 {temp['avg_reverse']} · 테마강도 {temp['avg_theme']} · 지수위험 {html_escape(temp['index_mode'])}</div>
+          <div class="notice small"><b>최근 실전복기</b><br>{html_escape(last_review)}</div>
+          <div class="btn-row">
+            <a class="button" href="/api/v167_profit_optimization">수익률 엔진 JSON</a>
+            <a class="button dark" href="/api/v167_review_center">실전 복기센터</a>
+          </div>
+        </section>"""
+    except Exception as e:
+        return f"<section class='card'><h2>🚀 v167 수익률 최적화 엔진</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+
+
 def _diag_color(ok):
     if ok is True:
         return "🟢"
@@ -2029,7 +2242,7 @@ def render_kiwoom_diagnosis_section():
 
         return f"""
         <section class="card" id="kiwoom-diagnosis">
-          <h2>🔧 키움 진단센터 PRO v166</h2>
+          <h2>🔧 키움 진단센터 PRO v167</h2>
           <p class="muted">APP KEY·SECRET·ACCOUNT·TOKEN·지정단말기·추가인증·계좌조회를 한 화면에서 확인하고, 오류코드를 자동 해석합니다.</p>
           <div class="notice small"><b>키움 연동 건강도: {health}점</b><br>{ip_line}</div>
           <div class="summary-grid">
@@ -2075,6 +2288,7 @@ def render_page():
         holdings=render_holdings_section(),
         trade=render_trade_section(),
         candidates=render_candidates(),
+        profit_center=render_v167_profit_center(),
         conditions=render_conditions_section(),
         daily_report=render_daily_report_section_safe(),
         my_review=render_investment_review_section_safe(),
@@ -2099,7 +2313,7 @@ TEMPLATE = """
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(90deg,#eaf5e6,#fff9db);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);font-size:16px;line-height:1.45}
 .wrap{max-width:760px;margin:0 auto;padding:18px 14px 80px}.hero{padding:16px 4px 8px}.badge{display:inline-block;background:var(--pale);border-radius:999px;padding:8px 14px;font-weight:800;color:#3d6b43}.hero h1{font-size:34px;line-height:1.05;margin:16px 0 10px}.hero p{font-size:17px;color:var(--muted);margin:0}
 .version-summary{margin-top:12px;background:rgba(255,255,255,.72);border:1px solid #dbe8d5;border-radius:18px;padding:12px;color:#33523c}.version-summary details summary{margin-top:8px;padding:10px;border-radius:14px}.version-row{display:flex;gap:10px;align-items:center;margin:6px 0}.version-row b{min-width:48px;color:#2d6cdf}.version-row span{color:#4b5563}
-.status-bar-v166{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.status-bar-v166 div{background:#fff;border:1px solid #dbe8d5;border-radius:16px;padding:10px;text-align:center}.status-bar-v166 span{display:block;color:var(--muted);font-size:12px}.status-bar-v166 b{font-size:15px;color:#183b2a}.menu-grid-v166{position:sticky;top:0;z-index:50;background:rgba(244,250,237,.94);backdrop-filter:blur(10px);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 0 12px;border-bottom:1px solid #dbe8d5}.menu-grid-v166 a{text-decoration:none;color:#285139;background:var(--pale);border:1px solid #d5e5ce;border-radius:18px;padding:10px 8px;min-height:68px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.menu-grid-v166 b{font-size:14px}.menu-grid-v166 span{font-size:11px;color:#64748b;margin-top:4px;line-height:1.25}.menu-help-v166{background:#f4f8ff;border:1px solid #dbeafe;border-radius:16px;padding:12px;margin:10px 0;color:#334155;font-size:13px}.market-temp-v166{background:linear-gradient(90deg,#f0fff4,#fff7dc);border:1px solid #dbe8d5;border-radius:20px;padding:15px;margin:12px 0}.market-temp-v166 div{display:flex;gap:8px;align-items:center}.market-temp-v166 span{font-size:24px}.market-temp-v166 b{font-size:19px}.market-temp-v166 p{margin:8px 0;color:#385c42}.market-temp-v166 small{color:#667085}.nav{display:none}.nav a{display:none}
+.status-bar-v167{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.status-bar-v167 div{background:#fff;border:1px solid #dbe8d5;border-radius:16px;padding:10px;text-align:center}.status-bar-v167 span{display:block;color:var(--muted);font-size:12px}.status-bar-v167 b{font-size:15px;color:#183b2a}.menu-grid-v167{position:sticky;top:0;z-index:50;background:rgba(244,250,237,.94);backdrop-filter:blur(10px);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 0 12px;border-bottom:1px solid #dbe8d5}.menu-grid-v167 a{text-decoration:none;color:#285139;background:var(--pale);border:1px solid #d5e5ce;border-radius:18px;padding:10px 8px;min-height:68px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.menu-grid-v167 b{font-size:14px}.menu-grid-v167 span{font-size:11px;color:#64748b;margin-top:4px;line-height:1.25}.menu-help-v167{background:#f4f8ff;border:1px solid #dbeafe;border-radius:16px;padding:12px;margin:10px 0;color:#334155;font-size:13px}.market-temp-v167{background:linear-gradient(90deg,#f0fff4,#fff7dc);border:1px solid #dbe8d5;border-radius:20px;padding:15px;margin:12px 0}.market-temp-v167 div{display:flex;gap:8px;align-items:center}.market-temp-v167 span{font-size:24px}.market-temp-v167 b{font-size:19px}.market-temp-v167 p{margin:8px 0;color:#385c42}.market-temp-v167 small{color:#667085}.nav{display:none}.nav a{display:none}
 .card{background:rgba(255,255,255,.93);border:1px solid #dbe8d5;border-radius:28px;padding:22px;margin:16px 0;box-shadow:0 8px 24px rgba(32,59,45,.06)}.card h2{font-size:27px;margin:0 0 14px}.muted{color:var(--muted);font-size:16px}.notice{background:var(--cream);border-radius:20px;padding:16px;margin:12px 0;color:#6a5938}.notice.small{font-size:14px}
 .btn-row{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}button,.button{border:0;border-radius:18px;padding:13px 18px;background:var(--green);color:white;font-weight:900;font-size:16px;text-decoration:none}button.dark{background:var(--dark)}button.brown{background:var(--brown)}button.sell{background:#cf3d35;width:100%;margin-top:10px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid2>div{background:#fff8e9;border-radius:18px;padding:13px;text-align:center;min-width:0}.grid2 label{display:block;color:var(--muted);font-size:13px}.grid2 b{font-size:20px}.grid2 small{display:block;color:var(--muted);font-size:12px}.red{color:var(--red)}.blue{color:var(--blue)}
@@ -2110,7 +2324,9 @@ details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
 .scan-status{background:#f4f8ff;border:1px dashed #bfd3ef;border-radius:20px;padding:15px;margin:12px 0;color:#334155;font-weight:700}.scan-status b{color:#0f172a}
 .summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.summary-grid div{background:#f8fbff;border:1px solid #e3ebf4;border-radius:16px;padding:12px}.summary-grid span{display:block;color:var(--muted);font-size:12px}.summary-grid b{font-size:20px}.upgrade-box{border:1px solid #dce8dc;border-radius:22px;padding:16px;margin:12px 0;background:#fbfffb}.strategy-card{border:1px solid #dfe8f2;border-radius:20px;padding:14px;margin:10px 0;background:#fff}.strategy-card.best{border-color:#9bd4ad;background:#f4fff6}.strategy-card .tag{float:right;border-radius:999px;background:#eaf2ff;color:#2d6cdf;padding:5px 10px;font-weight:900;font-size:12px}.reason-list{color:#667085}.reason-list li{margin:6px 0}.pill-warn{display:inline-block;border-radius:999px;background:#fff4d5;color:#8a5a00;padding:6px 10px;font-weight:900}.pill-ok{display:inline-block;border-radius:999px;background:#e8fff0;color:#10803d;padding:6px 10px;font-weight:900}.price-meta{margin-top:10px;padding:10px 12px;border-radius:14px;background:#eef8e9;color:#385c42;font-size:13px;font-weight:800}.price-meta.stale{background:#fff4d5;color:#8a5a00}
-@media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.menu-grid-v166{grid-template-columns:repeat(3,1fr);gap:6px}.menu-grid-v166 a{padding:9px 4px;min-height:64px}.menu-grid-v166 b{font-size:13px}.menu-grid-v166 span{font-size:10.5px}.status-bar-v166{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.menu-grid-v167{grid-template-columns:repeat(3,1fr);gap:6px}.menu-grid-v167 a{padding:9px 4px;min-height:64px}.menu-grid-v167 b{font-size:13px}.menu-grid-v167 span{font-size:10.5px}.status-bar-v167{grid-template-columns:repeat(2,1fr)}}
+
+.status-bar-v167{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.status-bar-v167 div{background:#fff;border:1px solid #dce7d6;border-radius:14px;padding:10px}.status-bar-v167 span{display:block;color:var(--muted);font-size:12px}.status-bar-v167 b{font-size:15px}.menu-grid-v167{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 14px}.menu-grid-v167 a{text-decoration:none;color:var(--ink);background:var(--pale);border-radius:16px;padding:11px 8px;text-align:center;border:1px solid #dce7d6}.menu-grid-v167 b{display:block;font-size:14px}.menu-grid-v167 span{display:block;color:var(--muted);font-size:11px;margin-top:3px}.menu-help-v167,.market-temp-v167{background:#eef8e9;border:1px solid #d8ead4;border-radius:18px;padding:12px;margin:10px 0;color:var(--ink)}.market-temp-v167 b{font-size:18px}.market-temp-v167 p{margin:6px 0}.market-temp-v167 small{color:var(--muted)}
 </style>
 <script>
 function toggleDetail(id){const el=document.getElementById(id); if(el){el.classList.toggle('open')}}
@@ -2632,6 +2848,10 @@ def api_update_conditions():
     state["trailing_stop_rate"] = pct_to_rate("trailing_stop_rate", 0.011)
     state["dynamic_target_boost_rate"] = pct_to_rate("dynamic_target_boost_rate", 0.012)
     state["dynamic_target_min_profit_rate"] = pct_to_rate("dynamic_target_min_profit_rate", 0.027)
+    state["dynamic_take_profit_normal"] = pct_to_rate("dynamic_take_profit_normal", 0.027)
+    state["dynamic_take_profit_strong"] = pct_to_rate("dynamic_take_profit_strong", 0.045)
+    state["dynamic_take_profit_super"] = pct_to_rate("dynamic_take_profit_super", 0.070)
+    state["dynamic_take_profit_limitup"] = pct_to_rate("dynamic_take_profit_limitup", 0.100)
     state["ai_peak_stage1_profit_rate"] = pct_to_rate("ai_peak_stage1_profit_rate", 0.045)
     state["ai_peak_stage2_profit_rate"] = pct_to_rate("ai_peak_stage2_profit_rate", 0.070)
     state["ai_peak_stage3_profit_rate"] = pct_to_rate("ai_peak_stage3_profit_rate", 0.100)
@@ -2648,6 +2868,7 @@ def api_update_conditions():
     state["volume_keep_filter"] = safe_float(request.form.get("volume_keep_filter"), 0.55)
     state["index_weak_buy_scale"] = safe_float(request.form.get("index_weak_buy_scale"), 0.5)
     state["dynamic_target_enabled"] = bool(request.form.get("dynamic_target_enabled"))
+    state["dynamic_take_profit_enabled"] = bool(request.form.get("dynamic_take_profit_enabled"))
     state["ai_peak_sell_enabled"] = bool(request.form.get("ai_peak_sell_enabled"))
     state["ai_peak_tight_trailing_enabled"] = bool(request.form.get("ai_peak_tight_trailing_enabled"))
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
@@ -2658,7 +2879,7 @@ def api_update_conditions():
 @app.route("/api/reset_conditions")
 def api_reset_conditions():
     state = read_state()
-    for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","ai_peak_sell_enabled","ai_peak_tight_trailing_enabled","ai_peak_stage1_profit_rate","ai_peak_stage2_profit_rate","ai_peak_stage3_profit_rate","ai_peak_trailing_stage1","ai_peak_trailing_stage2","ai_peak_trailing_stage3","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled"]:
+    for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","ai_peak_sell_enabled","ai_peak_tight_trailing_enabled","ai_peak_stage1_profit_rate","ai_peak_stage2_profit_rate","ai_peak_stage3_profit_rate","ai_peak_trailing_stage1","ai_peak_trailing_stage2","ai_peak_trailing_stage3","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled","profit_optimization_enabled","market_temperature_pro_enabled","candidate_evolution_enabled","trade_review_enabled","strength_alert_enabled","strength_drop_alert_threshold","dynamic_take_profit_enabled","dynamic_take_profit_normal","dynamic_take_profit_strong","dynamic_take_profit_super","dynamic_take_profit_limitup","market_temp_stop_buy_below","market_temp_reduce_buy_below"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
     set_status("기본조건 복원", "매매조건을 v159 기본값으로 복원했습니다.")
@@ -2733,6 +2954,36 @@ def api_telegram_test():
     write_state(state)
     return jsonify({"ok": ok, "message": msg})
 
+
+
+
+@app.route("/api/v167_profit_optimization")
+def api_v167_profit_optimization():
+    picks = cached_candidates()[:8]
+    temp = v167_market_temperature_data(picks)
+    top3 = []
+    for c in picks[:3]:
+        rate, reason = v167_dynamic_target_rate_for_candidate(c)
+        top3.append({
+            "code": c.get("code"), "name": c.get("name"),
+            "score": safe_float(c.get("riskAdjustedScore", c.get("score")),0),
+            "dynamic_target_rate_pct": round(rate*100,2),
+            "dynamic_target_reason": reason,
+            "evolution_note": c.get("evolutionNote",""),
+            "market_reverse_score": c.get("marketReverseScore",0),
+            "theme": c.get("theme",""),
+        })
+    state = read_state()
+    return jsonify({"ok": True, "version": APP_VERSION, "market_temperature": temp, "top3": top3, "settings": {
+        "dynamic_take_profit_enabled": state.get("dynamic_take_profit_enabled", True),
+        "candidate_evolution_enabled": state.get("candidate_evolution_enabled", True),
+        "strength_alert_enabled": state.get("strength_alert_enabled", True),
+    }})
+
+@app.route("/api/v167_review_center")
+def api_v167_review_center():
+    reviews = read_json(REVIEW_FILE, [])
+    return jsonify({"ok": True, "version": APP_VERSION, "reviews": reviews[:50], "last_summary": read_state().get("last_review_summary", "")})
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
