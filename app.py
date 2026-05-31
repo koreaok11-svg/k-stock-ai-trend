@@ -41,11 +41,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v163"
+APP_VERSION = "v164"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v163_kiwoom_auto_interpreter.py"
-APP_PATCH_NAME = "KIWOOM_DIAGNOSIS_AUTO_INTERPRETER"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v164_kiwoom_registered_ips_fix.py"
+APP_PATCH_NAME = "KIWOOM_REGISTERED_IPS_FIX"
 UPDATE_HISTORY = [
+    {"version": "v164", "title": "등록 IP 변수 누락 수정", "items": ["KIWOOM_REGISTERED_IPS 미정의 오류 수정", "Render/키움 등록 IP 비교 안전처리", "진단센터 오류가 나도 앱 화면 유지"]},
     {"version": "v163", "title": "키움 오류코드 자동해석/자가진단", "items": ["8050 등 키움 오류코드 자동 해석", "Render 현재 IP 표시", "키움 연동 건강도 점수", "원클릭 전체 진단 결과를 사용자 문장으로 변환", "진단 로그 자동 저장"]},
     {"version": "v162", "title": "키움 진단센터 PRO", "items": ["APP KEY/SECRET/ACCOUNT/TOKEN 상태 분리 표시", "지정단말기/추가인증/계좌조회/주문가능/실보유 조회 진단", "토큰 재발급/실보유 강제조회/전체 진단 실행 버튼", "최종 진단 결과와 조치 가이드 표시"]},
     {"version": "v161", "title": "실보유 파싱/진단센터/TOP3 후보비교", "items": ["키움 보유응답 다중 구조 파싱 강화", "키움 진단센터 화면 추가", "현재가 출처/시간/가격나이 표시 강화", "TOP3 후보 비교 카드 추가"]},
@@ -91,6 +92,18 @@ KIWOOM_SECRET_KEY = (
 KIWOOM_REAL_TRADING = os.getenv("KIWOOM_REAL_TRADING", "false").lower() == "true"
 KIWOOM_DRY_RUN = os.getenv("KIWOOM_DRY_RUN", "true").lower() == "true"
 KIWOOM_ACCOUNT = (os.getenv("KIWOOM_ACCOUNT", "") or os.getenv("KIWOOM_ACCOUNT_NO", "") or os.getenv("ACCOUNT_NO", "")).strip()
+
+# v164: 키움 REST 사이트에 등록한 허용 IP 목록(선택 환경변수)
+# Render Environment에 KIWOOM_REGISTERED_IPS=74.220.49.11,74.220.49.246 형태로 넣으면
+# 진단센터에서 현재 Render IP와 등록 IP 일치 여부를 비교합니다. 없으면 비교만 건너뜁니다.
+def _parse_registered_ips_env():
+    raw = (os.getenv("KIWOOM_REGISTERED_IPS", "") or os.getenv("KIWOOM_ALLOWED_IPS", "") or "").strip()
+    if not raw:
+        return []
+    parts = re.split(r"[,;\s]+", raw)
+    return [p.strip() for p in parts if p.strip()]
+
+KIWOOM_REGISTERED_IPS = _parse_registered_ips_env()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
