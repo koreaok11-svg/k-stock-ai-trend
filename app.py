@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v163 KIWOOM DIAGNOSIS AUTO INTERPRETER
-파일명: app_kiwoom_real_auto_scalping_v163_kiwoom_auto_interpreter.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v165 MOBILE UI INTEGRATED
+파일명: app_kiwoom_real_auto_scalping_v165_mobile_ui_integrated.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v164"
+APP_VERSION = "v165"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v164_kiwoom_registered_ips_fix.py"
-APP_PATCH_NAME = "KIWOOM_REGISTERED_IPS_FIX"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v165_mobile_ui_integrated.py"
+APP_PATCH_NAME = "MOBILE_UI_ANALYSIS_CENTER_STABLE"
 UPDATE_HISTORY = [
+    {"version": "v165", "title": "모바일 UI 통합/키움 안정화", "items": ["가로 스크롤 메뉴 제거", "3열 카드형 메뉴와 기능 설명 추가", "AI분석센터 개념 통합", "키움 진단센터 PRO 안내 강화", "AI시장온도계와 TOP3 비교 개선", "실보유/진단/후보 핵심 기능 접근성 개선"]},
     {"version": "v164", "title": "등록 IP 변수 누락 수정", "items": ["KIWOOM_REGISTERED_IPS 미정의 오류 수정", "Render/키움 등록 IP 비교 안전처리", "진단센터 오류가 나도 앱 화면 유지"]},
     {"version": "v163", "title": "키움 오류코드 자동해석/자가진단", "items": ["8050 등 키움 오류코드 자동 해석", "Render 현재 IP 표시", "키움 연동 건강도 점수", "원클릭 전체 진단 결과를 사용자 문장으로 변환", "진단 로그 자동 저장"]},
     {"version": "v162", "title": "키움 진단센터 PRO", "items": ["APP KEY/SECRET/ACCOUNT/TOKEN 상태 분리 표시", "지정단말기/추가인증/계좌조회/주문가능/실보유 조회 진단", "토큰 재발급/실보유 강제조회/전체 진단 실행 버튼", "최종 진단 결과와 조치 가이드 표시"]},
@@ -1333,6 +1334,87 @@ def render_version_summary():
         return f"<div class='version-summary'><b>{APP_TITLE}</b></div>"
 
 
+
+def render_quick_status_bar():
+    """v165: 앱 상단에서 핵심 상태를 한눈에 확인합니다."""
+    try:
+        state = read_state()
+        picks_data = read_json(CANDIDATE_FILE, {})
+        pick_count = len(picks_data.get("items", [])) if isinstance(picks_data, dict) else 0
+        holdings_count = len(read_holdings())
+        auto_txt = "ON" if state.get("auto_trade_enabled") else "OFF"
+        profit = money(state.get("daily_realized_pnl", 0))
+        trade_count = safe_int(state.get("trade_count_today"), 0)
+        last_scan = state.get("last_candidate_scan_time") or "-"
+        return f"""
+        <div class="status-bar-v165">
+          <div><span>🤖 후보</span><b>{pick_count}개</b></div>
+          <div><span>💼 보유</span><b>{holdings_count}개</b></div>
+          <div><span>💰 오늘손익</span><b>{profit}</b></div>
+          <div><span>🔁 거래</span><b>{trade_count}회</b></div>
+          <div><span>⚙️ 자동</span><b>{auto_txt}</b></div>
+          <div><span>⏱ 스캔</span><b>{html_escape(last_scan)}</b></div>
+        </div>"""
+    except Exception as e:
+        return f"<div class='status-bar-v165'><div><span>상태</span><b>표시 오류 {html_escape(str(e))}</b></div></div>"
+
+
+def render_mobile_menu_cards():
+    """v165: 모바일에서 가로 드래그 없이 보이는 3열 카드형 메뉴입니다."""
+    items = [
+        ("#picks", "🤖", "AI후보", "실시간 후보·추천이유"),
+        ("#conditions", "🧭", "매매조건", "익절·손절·재매수"),
+        ("#ai-upgrade", "🧠", "AI조건", "추천조건 승인 적용"),
+        ("#analysis-center", "📊", "AI분석센터", "시장리포트·투자평가"),
+        ("#kiwoom-diagnosis", "🔧", "키움진단", "토큰·계좌·지정단말기"),
+        ("#holdings", "💼", "보유종목", "실보유·매도·AI판단"),
+    ]
+    cards = []
+    for href, icon, title, desc in items:
+        cards.append(f"<a href='{href}'><b>{icon} {html_escape(title)}</b><span>{html_escape(desc)}</span></a>")
+    return f"""
+    <div class="menu-grid-v165">
+      {''.join(cards)}
+    </div>
+    <div class="menu-help-v165">
+      <b>사용 순서 추천</b> ① AI후보 확인 → ② 키움진단 정상 확인 → ③ 매매조건 점검 → ④ 최우선 후보 매수/자동매매 실행
+    </div>"""
+
+
+def render_market_temperature(picks=None):
+    """v165: 후보 품질과 지수위험을 합쳐 시장온도계를 표시합니다."""
+    try:
+        picks = list(picks or [])
+        state = read_state()
+        avg_conf = sum(safe_float(x.get("aiConfidence"), 0) for x in picks[:5]) / max(1, min(len(picks), 5))
+        avg_reverse = sum(safe_float(x.get("marketReverseScore"), 0) for x in picks[:5]) / max(1, min(len(picks), 5))
+        index_mode = state.get("index_risk_mode", "UNKNOWN")
+        temp = avg_conf * 0.65 + min(30, avg_reverse * 0.35)
+        if index_mode == "DANGER":
+            temp -= 18
+        elif index_mode == "WEAK":
+            temp -= 8
+        temp = max(0, min(100, temp))
+        if temp >= 80:
+            label, icon, msg = "매수 우호", "🔥", "강한 후보가 많습니다. 단, 추격매수는 금지하고 눌림·재돌파를 확인하세요."
+        elif temp >= 65:
+            label, icon, msg = "강세", "😊", "후보 품질이 양호합니다. TOP3 중심으로 감시하는 구간입니다."
+        elif temp >= 45:
+            label, icon, msg = "중립", "😐", "선별 진입이 필요합니다. 키움 가격확인과 거래대금 유지율을 확인하세요."
+        elif temp >= 30:
+            label, icon, msg = "약세", "⚠️", "신규매수 비중을 줄이고 실보유 리스크 관리가 우선입니다."
+        else:
+            label, icon, msg = "위험", "🚨", "자동매매보다 관망/진단/보유관리 우선 구간입니다."
+        return f"""
+        <div class="market-temp-v165">
+          <div><span>{icon}</span><b>AI 시장온도 {temp:.0f}점 · {label}</b></div>
+          <p>{html_escape(msg)}</p>
+          <small>지수위험 {html_escape(index_mode)} · 평균확신도 {avg_conf:.1f}% · 평균시장역행 {avg_reverse:.1f}</small>
+        </div>"""
+    except Exception as e:
+        return f"<div class='market-temp-v165'><b>AI 시장온도 표시 오류</b><p>{html_escape(str(e))}</p></div>"
+
+
 def render_holdings_section():
     res = fetch_kiwoom_holdings()
     items = res.get("holdings") or read_holdings()
@@ -1471,6 +1553,7 @@ def render_candidates():
         <button class="brown" onclick="location.href='/api/buy_best'">최우선 후보 매수</button>
       </div>
       <div class="notice small">표시가격은 NAVER/KIWOOM 보정값입니다. 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 검증합니다.</div>
+      {render_market_temperature(picks)}
       {render_top3_comparison(picks)}
       {cards}
     </section>"""
@@ -1896,7 +1979,7 @@ def render_kiwoom_diagnosis_section():
 
         return f"""
         <section class="card" id="kiwoom-diagnosis">
-          <h2>🧪 키움 진단센터 PRO v163</h2>
+          <h2>🔧 키움 진단센터 PRO v165</h2>
           <p class="muted">APP KEY·SECRET·ACCOUNT·TOKEN·지정단말기·추가인증·계좌조회를 한 화면에서 확인하고, 오류코드를 자동 해석합니다.</p>
           <div class="notice small"><b>키움 연동 건강도: {health}점</b><br>{ip_line}</div>
           <div class="summary-grid">
@@ -1950,6 +2033,8 @@ def render_page():
         alerts=render_alert_center(),
         auto_on=state.get("auto_trade_enabled"),
         version_summary=render_version_summary(),
+        quick_status_bar=render_quick_status_bar(),
+        menu_cards=render_mobile_menu_cards(),
         kiwoom_diagnosis=render_kiwoom_diagnosis_section(),
     )
 
@@ -1964,7 +2049,7 @@ TEMPLATE = """
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(90deg,#eaf5e6,#fff9db);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);font-size:16px;line-height:1.45}
 .wrap{max-width:760px;margin:0 auto;padding:18px 14px 80px}.hero{padding:16px 4px 8px}.badge{display:inline-block;background:var(--pale);border-radius:999px;padding:8px 14px;font-weight:800;color:#3d6b43}.hero h1{font-size:34px;line-height:1.05;margin:16px 0 10px}.hero p{font-size:17px;color:var(--muted);margin:0}
 .version-summary{margin-top:12px;background:rgba(255,255,255,.72);border:1px solid #dbe8d5;border-radius:18px;padding:12px;color:#33523c}.version-summary details summary{margin-top:8px;padding:10px;border-radius:14px}.version-row{display:flex;gap:10px;align-items:center;margin:6px 0}.version-row b{min-width:48px;color:#2d6cdf}.version-row span{color:#4b5563}
-.nav{position:sticky;top:0;z-index:50;background:rgba(244,250,237,.92);backdrop-filter:blur(10px);display:flex;gap:8px;overflow-x:auto;padding:10px 2px 12px;border-bottom:1px solid #dbe8d5}.nav a{flex:0 0 auto;text-decoration:none;color:#285139;background:var(--pale);border-radius:999px;padding:10px 14px;font-weight:800;white-space:nowrap}
+.status-bar-v165{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.status-bar-v165 div{background:#fff;border:1px solid #dbe8d5;border-radius:16px;padding:10px;text-align:center}.status-bar-v165 span{display:block;color:var(--muted);font-size:12px}.status-bar-v165 b{font-size:15px;color:#183b2a}.menu-grid-v165{position:sticky;top:0;z-index:50;background:rgba(244,250,237,.94);backdrop-filter:blur(10px);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 0 12px;border-bottom:1px solid #dbe8d5}.menu-grid-v165 a{text-decoration:none;color:#285139;background:var(--pale);border:1px solid #d5e5ce;border-radius:18px;padding:10px 8px;min-height:68px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.menu-grid-v165 b{font-size:14px}.menu-grid-v165 span{font-size:11px;color:#64748b;margin-top:4px;line-height:1.25}.menu-help-v165{background:#f4f8ff;border:1px solid #dbeafe;border-radius:16px;padding:12px;margin:10px 0;color:#334155;font-size:13px}.market-temp-v165{background:linear-gradient(90deg,#f0fff4,#fff7dc);border:1px solid #dbe8d5;border-radius:20px;padding:15px;margin:12px 0}.market-temp-v165 div{display:flex;gap:8px;align-items:center}.market-temp-v165 span{font-size:24px}.market-temp-v165 b{font-size:19px}.market-temp-v165 p{margin:8px 0;color:#385c42}.market-temp-v165 small{color:#667085}.nav{display:none}.nav a{display:none}
 .card{background:rgba(255,255,255,.93);border:1px solid #dbe8d5;border-radius:28px;padding:22px;margin:16px 0;box-shadow:0 8px 24px rgba(32,59,45,.06)}.card h2{font-size:27px;margin:0 0 14px}.muted{color:var(--muted);font-size:16px}.notice{background:var(--cream);border-radius:20px;padding:16px;margin:12px 0;color:#6a5938}.notice.small{font-size:14px}
 .btn-row{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}button,.button{border:0;border-radius:18px;padding:13px 18px;background:var(--green);color:white;font-weight:900;font-size:16px;text-decoration:none}button.dark{background:var(--dark)}button.brown{background:var(--brown)}button.sell{background:#cf3d35;width:100%;margin-top:10px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid2>div{background:#fff8e9;border-radius:18px;padding:13px;text-align:center;min-width:0}.grid2 label{display:block;color:var(--muted);font-size:13px}.grid2 b{font-size:20px}.grid2 small{display:block;color:var(--muted);font-size:12px}.red{color:var(--red)}.blue{color:var(--blue)}
@@ -1975,7 +2060,7 @@ details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
 .scan-status{background:#f4f8ff;border:1px dashed #bfd3ef;border-radius:20px;padding:15px;margin:12px 0;color:#334155;font-weight:700}.scan-status b{color:#0f172a}
 .summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.summary-grid div{background:#f8fbff;border:1px solid #e3ebf4;border-radius:16px;padding:12px}.summary-grid span{display:block;color:var(--muted);font-size:12px}.summary-grid b{font-size:20px}.upgrade-box{border:1px solid #dce8dc;border-radius:22px;padding:16px;margin:12px 0;background:#fbfffb}.strategy-card{border:1px solid #dfe8f2;border-radius:20px;padding:14px;margin:10px 0;background:#fff}.strategy-card.best{border-color:#9bd4ad;background:#f4fff6}.strategy-card .tag{float:right;border-radius:999px;background:#eaf2ff;color:#2d6cdf;padding:5px 10px;font-weight:900;font-size:12px}.reason-list{color:#667085}.reason-list li{margin:6px 0}.pill-warn{display:inline-block;border-radius:999px;background:#fff4d5;color:#8a5a00;padding:6px 10px;font-weight:900}.pill-ok{display:inline-block;border-radius:999px;background:#e8fff0;color:#10803d;padding:6px 10px;font-weight:900}.price-meta{margin-top:10px;padding:10px 12px;border-radius:14px;background:#eef8e9;color:#385c42;font-size:13px;font-weight:800}.price-meta.stale{background:#fff4d5;color:#8a5a00}
-@media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.nav a{font-size:14px;padding:9px 12px}}
+@media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.menu-grid-v165{grid-template-columns:repeat(3,1fr);gap:6px}.menu-grid-v165 a{padding:9px 4px;min-height:64px}.menu-grid-v165 b{font-size:13px}.menu-grid-v165 span{font-size:10.5px}.status-bar-v165{grid-template-columns:repeat(2,1fr)}}
 </style>
 <script>
 function toggleDetail(id){const el=document.getElementById(id); if(el){el.classList.toggle('open')}}
@@ -2002,18 +2087,21 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
     <p>키움 REST API 연동 · AI후보 감시 · 추천이유 설명 · 목표/손절/트레일링 · 전략성과 학습</p>
     {{version_summary|safe}}
   </div>
-  <div class="nav">
-    <a href="#picks">🤖 AI후보</a><a href="#kiwoom-diagnosis">🧪 키움진단</a><a href="#daily-report">📰 AI일일리포트</a><a href="#my-review">🧾 AI내투자평가</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
-  </div>
-  {{kiwoom_diagnosis|safe}}
+  {{quick_status_bar|safe}}
+  {{menu_cards|safe}}
   {{candidates|safe}}
-  {{daily_report|safe}}
-  {{my_review|safe}}
   {{conditions|safe}}
   {{ai_upgrade|safe}}
+  <section class="card" id="analysis-center">
+    <h2>📊 AI분석센터</h2>
+    <p class="muted">전일 시장리포트, 내 투자평가, 전략랭킹을 한 곳에서 확인합니다.</p>
+    <details open><summary>📰 시장리포트</summary>{{daily_report|safe}}</details>
+    <details><summary>🧾 내투자평가</summary>{{my_review|safe}}</details>
+    <details><summary>📊 전략랭킹</summary>{{performance|safe}}</details>
+  </section>
+  {{kiwoom_diagnosis|safe}}
   {{holdings|safe}}
   {{trade|safe}}
-  {{performance|safe}}
   <div id="alerts">{{alerts|safe}}</div>
 </div>
 </body></html>
