@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v160 KIWOOM DIAG HOLDINGS PARSER
-파일명: app_kiwoom_real_auto_scalping_v160_kiwoom_diag_holdings_parser.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v161 HOLDINGS DIAG TOP3 PRICE SOURCE
+파일명: app_kiwoom_real_auto_scalping_v161_holdings_diag_top3_price_source.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
 - 패치노트/업데이트 이력을 앱 화면과 API에서 확인
 - AI후보 감시, AI일일리포트, AI내투자평가, 매매조건, 전략성과 학습 유지
 - 실전 매매 조건은 사용자 승인 후 적용하는 안전장치 유지
+
+v161 보강:
+- 실보유 파싱 복구 강화
+- 키움 진단센터 화면 추가
+- 현재가 출처/시간/가격나이 표시 강화
+- TOP3 후보 비교 추가
 
 v159 보강:
 - 코드 상단 주석/파일명/상단 UI/상태 메시지 버전 불일치 해결
@@ -35,11 +41,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v160"
+APP_VERSION = "v161"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v160_kiwoom_diag_holdings_parser.py"
-APP_PATCH_NAME = "KIWOOM_DIAG_HOLDINGS_PARSER"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v161_holdings_diag_top3_price_source.py"
+APP_PATCH_NAME = "HOLDINGS_DIAG_TOP3_PRICE_SOURCE"
 UPDATE_HISTORY = [
+    {"version": "v161", "title": "실보유 파싱/진단센터/TOP3 후보비교", "items": ["키움 보유응답 다중 구조 파싱 강화", "키움 진단센터 화면 추가", "현재가 출처/시간/가격나이 표시 강화", "TOP3 후보 비교 카드 추가"]},
     {"version": "v160", "title": "키움 진단/보유 파싱 복구", "items": ["/api/auth_status 추가", "/api/status 500 오류 방지", "키움 보유종목 RAW 저장", "보유종목 응답구조 자동 파싱 강화", "상태 진단 API 추가"]},
     {"version": "v159", "title": "버전 통합관리", "items": ["코드/화면/로그 버전 표기 통일", "패치노트 화면 표시", "버전 확인 API 추가"]},
     {"version": "v158", "title": "AI리포트 런타임 안정화", "items": ["AI일일리포트 저장 오류 방어", "AI내투자평가 저장 오류 방어"]},
@@ -535,52 +542,105 @@ def _numeric_from_row(row, keys):
     return deep_find_number(row, keys)
 
 
+
+def _is_probable_holding_row(row):
+    """키움 응답 안에서 실제 보유종목 행인지 점수화해 판단합니다."""
+    if not isinstance(row, dict):
+        return False
+    code = _code_from_row(row)
+    if not code:
+        return False
+    qty = _numeric_from_row(row, [
+        "rmnd_qty", "hldg_qty", "hold_qty", "jan_qty", "bal_qty", "qty", "quantity",
+        "ord_psbl_qty", "trde_psbl_qty", "sell_qty", "poss_qty",
+        "보유수량", "잔고수량", "평가수량", "가능수량", "매도가능수량", "주문가능수량"
+    ])
+    buy = _numeric_from_row(row, [
+        "pchs_avg_pric", "pchs_avg_price", "pchs_avg_prc", "avg_prc", "avg_price", "buyPrice",
+        "매입평균가격", "평균단가", "매입가", "매수가", "매입단가"
+    ])
+    cur = _numeric_from_row(row, [
+        "cur_prc", "now_pric", "prpr", "stck_prpr", "lastPrice", "currentPrice", "price",
+        "현재가", "평가가격", "기준가"
+    ])
+    pchs_amt = _numeric_from_row(row, ["pchs_amt", "pchs_amt_smtl", "buy_amt", "purchaseAmount", "매입금액", "매수금액"])
+    evlt_amt = _numeric_from_row(row, ["evlt_amt", "evlt_amt_smtl", "evalAmount", "평가금액", "평가액"])
+    # 종목코드가 있고, 수량 또는 매입/평가 관련 숫자가 있으면 보유 행으로 본다.
+    return qty > 0 or buy > 0 or cur > 0 or pchs_amt > 0 or evlt_amt > 0
+
+
+def _extract_possible_holding_rows(data):
+    """output1/output2/data/list/응답 전체에서 보유 후보 행을 폭넓게 수집합니다."""
+    rows = []
+    if isinstance(data, dict):
+        preferred_keys = [
+            "output1", "output2", "output", "data", "list", "items", "acnt_evlt_remn_indv_tot",
+            "stk_acnt_evlt_remn_indv_tot", "stk_acnt_evlt_remn", "account_eval", "holdings", "잔고", "보유"
+        ]
+        for key in preferred_keys:
+            v = data.get(key)
+            if isinstance(v, list):
+                rows.extend([x for x in v if isinstance(x, dict)])
+            elif isinstance(v, dict):
+                rows.extend([v])
+    for row in _walk_dicts(data, max_depth=10):
+        if isinstance(row, dict):
+            rows.append(row)
+    # 중복 제거
+    unique = []
+    seen = set()
+    for r in rows:
+        raw = json.dumps(r, ensure_ascii=False, sort_keys=True)[:5000]
+        if raw not in seen:
+            seen.add(raw)
+            unique.append(r)
+    return unique
+
+
 def parse_holdings(data):
-    """키움 보유종목 응답 파서 v160.
-    기존 output1/output2 고정 구조 대신 전체 응답에서 종목코드·보유수량을 가진 행을 자동 탐색합니다.
+    """키움 보유종목 응답 파서 v161.
+    키움 REST 응답 구조가 output1/output2/data/list 등으로 달라져도 코드·수량·매입가를 자동 탐색합니다.
     """
     if not isinstance(data, (dict, list)):
         return []
     out = []
-    seen_rows = set()
-    for row in _walk_dicts(data):
-        if not isinstance(row, dict):
+    for row in _extract_possible_holding_rows(data):
+        if not _is_probable_holding_row(row):
             continue
         code = _code_from_row(row)
         if not code:
             continue
-        raw = json.dumps(row, ensure_ascii=False, sort_keys=True)
-        if raw in seen_rows:
-            continue
-        seen_rows.add(raw)
         qty = _numeric_from_row(row, [
-            "rmnd_qty", "hldg_qty", "poss_qty", "ord_psbl_qty", "qty", "quantity",
-            "보유수량", "잔고수량", "평가수량", "가능수량", "보유잔고수량"
+            "rmnd_qty", "hldg_qty", "hold_qty", "jan_qty", "bal_qty", "qty", "quantity",
+            "ord_psbl_qty", "trde_psbl_qty", "sell_qty", "poss_qty",
+            "보유수량", "잔고수량", "평가수량", "가능수량", "매도가능수량", "주문가능수량"
         ])
-        # 일부 응답은 수량 필드가 없고 매입/평가금액만 있을 수 있습니다.
         buy = _numeric_from_row(row, [
-            "pchs_avg_pric", "pchs_avg_price", "avg_prc", "avg_price", "pchs_avg", "buyPrice",
+            "pchs_avg_pric", "pchs_avg_price", "pchs_avg_prc", "avg_prc", "avg_price", "buyPrice",
             "매입평균가격", "평균단가", "매입가", "매수가", "매입단가"
         ])
         cur = _numeric_from_row(row, [
-            "cur_prc", "now_pric", "prpr", "stck_prpr", "lastPrice", "currentPrice",
+            "cur_prc", "now_pric", "prpr", "stck_prpr", "lastPrice", "currentPrice", "price",
             "현재가", "평가가격", "기준가"
         ])
-        pchs_amt = _numeric_from_row(row, ["pchs_amt", "purchaseAmount", "매입금액", "매수금액"])
-        evlt_amt = _numeric_from_row(row, ["evlt_amt", "evalAmount", "평가금액"])
+        pchs_amt = _numeric_from_row(row, ["pchs_amt", "pchs_amt_smtl", "buy_amt", "purchaseAmount", "매입금액", "매수금액"])
+        evlt_amt = _numeric_from_row(row, ["evlt_amt", "evlt_amt_smtl", "evalAmount", "평가금액", "평가액"])
+        pnl = _numeric_from_row(row, ["evltv_prft", "evlt_pfls_amt", "profit", "pnl", "평가손익", "손익"])
+        name = _name_from_row(row, code)
         if qty <= 0 and buy > 0 and pchs_amt > 0:
-            qty = int(pchs_amt // buy)
+            qty = max(1, int(pchs_amt // buy))
         if qty <= 0 and cur > 0 and evlt_amt > 0:
-            qty = int(evlt_amt // cur)
+            qty = max(1, int(evlt_amt // cur))
         if qty <= 0:
             continue
-        name = _name_from_row(row, code)
+        src = "KIWOOM"
         if cur <= 0:
             cur, src = get_trade_price(code, fallback=True)
-        else:
-            src = "KIWOOM"
         if buy <= 0:
-            buy = cur
+            if pchs_amt > 0 and qty > 0:
+                buy = pchs_amt / qty
+            else:
+                buy = cur
         if cur <= 0:
             cur = buy
             src = "CACHE"
@@ -592,14 +652,52 @@ def parse_holdings(data):
             "lastPrice": int(cur or buy),
             "priceSource": src,
             "lastCheckedAt": now_text(),
-            "target": int((buy or cur) * 1.027),
-            "stop": int((buy or cur) * 0.982),
+            "target": int((buy or cur) * (1 + safe_float(read_state().get('target_rate', 0.027), 0.027))),
+            "stop": int((buy or cur) * (1 + safe_float(read_state().get('stop_rate', -0.018), -0.018))),
+            "pnl": int(pnl) if pnl else None,
+            "rawParseHint": "v161_auto_parser",
         })
         out.append(h)
     unique = {}
     for h in out:
-        unique[h["code"]] = h
+        unique[str(h.get("code")).zfill(6)] = h
     return list(unique.values())
+
+
+def kiwoom_raw_structure_summary(raw):
+    """키움 RAW 응답 구조를 사용자가 이해하기 쉽게 요약합니다."""
+    summary = {"top_keys": [], "list_paths": [], "probable_rows": 0, "codes_found": []}
+    try:
+        data = raw.get('raw') if isinstance(raw, dict) and 'raw' in raw else raw
+        if isinstance(data, dict):
+            summary['top_keys'] = list(data.keys())[:30]
+        rows = _extract_possible_holding_rows(data)
+        codes = []
+        probable = 0
+        for r in rows:
+            c = _code_from_row(r)
+            if c:
+                codes.append(c)
+            if _is_probable_holding_row(r):
+                probable += 1
+        summary['probable_rows'] = probable
+        summary['codes_found'] = sorted(list(set(codes)))[:20]
+        def walk_paths(obj, path='', depth=0):
+            if depth > 5:
+                return
+            if isinstance(obj, dict):
+                for k,v in obj.items():
+                    p = f"{path}.{k}" if path else str(k)
+                    if isinstance(v, list):
+                        summary['list_paths'].append({"path": p, "len": len(v)})
+                    walk_paths(v, p, depth+1)
+            elif isinstance(obj, list):
+                for i,x in enumerate(obj[:3]):
+                    walk_paths(x, f"{path}[{i}]", depth+1)
+        walk_paths(data)
+    except Exception as e:
+        summary['error'] = str(e)
+    return summary
 
 
 def holdings_fail_reason(raw_text, last_status=0):
@@ -1236,6 +1334,33 @@ def render_candidate_card(c, idx):
     </div>"""
 
 
+
+def render_top3_comparison(picks):
+    top3 = list(picks or [])[:3]
+    if not top3:
+        return '<div class="notice small">TOP3 후보 비교 대기중입니다.</div>'
+    rows = []
+    for i, c in enumerate(top3, 1):
+        rows.append(f"""
+        <div class="strategy-card {'best' if i==1 else ''}">
+          <span class="tag">TOP {i}</span>
+          <h3>{html_escape(c.get('name'))}</h3>
+          <div class="summary-grid">
+            <div><span>AI점수</span><b>{safe_float(c.get('riskAdjustedScore', c.get('score'))):.1f}</b></div>
+            <div><span>현재가/출처</span><b>{money(c.get('price'))}</b><small>{html_escape(c.get('priceSource') or c.get('source','-'))}</small></div>
+            <div><span>시장역행</span><b>{safe_float(c.get('marketReverseScore')):.1f}</b></div>
+            <div><span>테마/전략</span><b>{html_escape(c.get('theme','-'))}</b><small>{html_escape(c.get('strategy','AI후보형'))}</small></div>
+          </div>
+          <div class="mini-line">추천: {html_escape(' · '.join((c.get('aiReasons') or [])[:2]) or c.get('aiVerdict','AI후보'))}</div>
+          <div class="mini-line">위험: {html_escape(' · '.join((c.get('aiRisks') or [])[:2]) or '특이 위험 낮음')}</div>
+        </div>""")
+    return f"""
+    <details open class="top3-box">
+      <summary>🏆 TOP3 후보 비교 보기 / 접기</summary>
+      <div class="notice small">AI점수, 시장역행, 가격출처, 테마강도를 한 번에 비교합니다. 최우선 매수는 TOP1을 기준으로 하되 주문 직전 키움 현재가를 다시 확인합니다.</div>
+      {''.join(rows)}
+    </details>"""
+
 def render_candidates():
     data = read_json(CANDIDATE_FILE, {})
     picks = (data.get("items") if isinstance(data, dict) else None) or cached_candidates()[:8]
@@ -1265,6 +1390,7 @@ def render_candidates():
         <button class="brown" onclick="location.href='/api/buy_best'">최우선 후보 매수</button>
       </div>
       <div class="notice small">표시가격은 NAVER/KIWOOM 보정값입니다. 실제 주문 직전에는 키움 현재가와 주문가능금액을 다시 검증합니다.</div>
+      {render_top3_comparison(picks)}
       {cards}
     </section>"""
 
@@ -1653,6 +1779,45 @@ def render_investment_review_section_safe():
           <div class="btn-row"><button onclick="location.href='/api/refresh_investment_review'">내투자평가 새로작성</button></div>
         </section>"""
 
+
+def render_kiwoom_diagnosis_section():
+    try:
+        auth = build_auth_status(check_token=False)
+        raw = read_json(KIWOOM_RAW_HOLDINGS_FILE, {})
+        summary = kiwoom_raw_structure_summary(raw) if raw else {}
+        cached = get_cached_holdings()
+        token_badge = '🟢 토큰 캐시 정상' if auth.get('token_ok') else '🟡 토큰 미확인'
+        key_badge = '🟢 KEY 입력' if auth.get('env',{}).get('KIWOOM_APP_KEY') else '🔴 KEY 없음'
+        secret_badge = '🟢 SECRET 입력' if auth.get('env',{}).get('KIWOOM_APP_SECRET') else '🔴 SECRET 없음'
+        account_badge = '🟢 계좌번호 입력' if auth.get('env',{}).get('KIWOOM_ACCOUNT') else '🟠 계좌번호 없음'
+        raw_rows = summary.get('probable_rows', 0) if isinstance(summary, dict) else 0
+        codes = ', '.join(summary.get('codes_found', [])[:6]) if isinstance(summary, dict) else ''
+        return f"""
+        <section class="card" id="kiwoom-diagnosis">
+          <h2>🧪 키움 진단센터</h2>
+          <p class="muted">키움 연동이 안 될 때 인증/계좌/보유 파싱 상태를 한 화면에서 확인합니다.</p>
+          <div class="summary-grid">
+            <div><span>App Key</span><b>{key_badge}</b></div>
+            <div><span>Secret</span><b>{secret_badge}</b></div>
+            <div><span>계좌번호</span><b>{account_badge}</b></div>
+            <div><span>토큰</span><b>{token_badge}</b></div>
+            <div><span>보유 캐시</span><b>{len(cached)}종목</b></div>
+            <div><span>RAW 후보행</span><b>{raw_rows}개</b></div>
+          </div>
+          <div class="notice small">
+            최근 키움 메시지: {html_escape(auth.get('token_message','-'))}<br>
+            RAW에서 찾은 코드: {html_escape(codes or '없음')}<br>
+            계좌번호가 없거나 토큰이 실패하면 실보유 조회가 EMPTY로 나올 수 있습니다.
+          </div>
+          <div class="btn-row">
+            <a class="button" href="/api/auth_status?check=1">토큰 진단</a>
+            <a class="button dark" href="/api/kiwoom_status">키움 상태 JSON</a>
+            <a class="button brown" href="/api/kiwoom_raw_holdings">RAW 보유응답</a>
+          </div>
+        </section>"""
+    except Exception as e:
+        return f"<section class='card' id='kiwoom-diagnosis'><h2>🧪 키움 진단센터</h2><div class='notice'>진단센터 표시 오류: {html_escape(str(e))}</div></section>"
+
 def render_page():
     state = read_state()
     return render_template_string(TEMPLATE,
@@ -1669,6 +1834,7 @@ def render_page():
         alerts=render_alert_center(),
         auto_on=state.get("auto_trade_enabled"),
         version_summary=render_version_summary(),
+        kiwoom_diagnosis=render_kiwoom_diagnosis_section(),
     )
 
 
@@ -1721,8 +1887,9 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
     {{version_summary|safe}}
   </div>
   <div class="nav">
-    <a href="#picks">🤖 AI후보</a><a href="#daily-report">📰 AI일일리포트</a><a href="#my-review">🧾 AI내투자평가</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
+    <a href="#picks">🤖 AI후보</a><a href="#kiwoom-diagnosis">🧪 키움진단</a><a href="#daily-report">📰 AI일일리포트</a><a href="#my-review">🧾 AI내투자평가</a><a href="#conditions">🧭 매매조건</a><a href="#ai-upgrade">🧠 AI조건</a><a href="#holdings">💼 보유</a><a href="#trade">⚙️ 자동</a><a href="#performance">📊 AI전략</a><a href="#alerts">📨 알림</a>
   </div>
+  {{kiwoom_diagnosis|safe}}
   {{candidates|safe}}
   {{daily_report|safe}}
   {{my_review|safe}}
@@ -1839,7 +2006,8 @@ def api_kiwoom_status():
         "raw_holdings_debug_saved": raw_exists,
         "raw_holdings_debug_file": str(KIWOOM_RAW_HOLDINGS_FILE),
         "last_kiwoom_debug": read_state().get("last_kiwoom_debug", {}),
-        "guide": "token_ok가 true인데 holdings가 EMPTY이면 보유종목 파싱/계좌번호/조회구분 문제일 가능성이 큽니다.",
+        "raw_structure_summary": kiwoom_raw_structure_summary(read_json(KIWOOM_RAW_HOLDINGS_FILE, {})),
+        "guide": "token_ok가 true인데 holdings가 EMPTY이면 보유종목 파싱/계좌번호/조회구분 문제일 가능성이 큽니다. v161은 RAW 구조 요약과 후보행 개수를 함께 표시합니다.",
     })
 
 
@@ -2031,7 +2199,7 @@ def api_update_conditions():
     state["dynamic_target_enabled"] = bool(request.form.get("dynamic_target_enabled"))
     state["switch_buy_enabled"] = bool(request.form.get("switch_buy_enabled"))
     write_state(state)
-    set_status("매매조건 저장", "v159 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
+    set_status("매매조건 저장", "v161 매매조건 탭에서 수정한 조건을 저장했습니다. 다음 AI후보 검색과 주문 판단부터 반영됩니다.")
     return render_page()
 
 @app.route("/api/reset_conditions")
