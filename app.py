@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v161 HOLDINGS DIAG TOP3 PRICE SOURCE
-파일명: app_kiwoom_real_auto_scalping_v161_holdings_diag_top3_price_source.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v162 KIWOOM DIAGNOSIS PRO
+파일명: app_kiwoom_real_auto_scalping_v162_kiwoom_diagnosis_pro.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v161"
+APP_VERSION = "v162"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v161_holdings_diag_top3_price_source.py"
-APP_PATCH_NAME = "HOLDINGS_DIAG_TOP3_PRICE_SOURCE"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v162_kiwoom_diagnosis_pro.py"
+APP_PATCH_NAME = "KIWOOM_DIAGNOSIS_PRO"
 UPDATE_HISTORY = [
+    {"version": "v162", "title": "키움 진단센터 PRO", "items": ["APP KEY/SECRET/ACCOUNT/TOKEN 상태 분리 표시", "지정단말기/추가인증/계좌조회/주문가능/실보유 조회 진단", "토큰 재발급/실보유 강제조회/전체 진단 실행 버튼", "최종 진단 결과와 조치 가이드 표시"]},
     {"version": "v161", "title": "실보유 파싱/진단센터/TOP3 후보비교", "items": ["키움 보유응답 다중 구조 파싱 강화", "키움 진단센터 화면 추가", "현재가 출처/시간/가격나이 표시 강화", "TOP3 후보 비교 카드 추가"]},
     {"version": "v160", "title": "키움 진단/보유 파싱 복구", "items": ["/api/auth_status 추가", "/api/status 500 오류 방지", "키움 보유종목 RAW 저장", "보유종목 응답구조 자동 파싱 강화", "상태 진단 API 추가"]},
     {"version": "v159", "title": "버전 통합관리", "items": ["코드/화면/로그 버전 표기 통일", "패치노트 화면 표시", "버전 확인 API 추가"]},
@@ -1780,43 +1781,62 @@ def render_investment_review_section_safe():
         </section>"""
 
 
+def _diag_color(ok):
+    if ok is True:
+        return "🟢"
+    if ok is False:
+        return "🔴"
+    return "🟡"
+
+
 def render_kiwoom_diagnosis_section():
     try:
         auth = build_auth_status(check_token=False)
         raw = read_json(KIWOOM_RAW_HOLDINGS_FILE, {})
         summary = kiwoom_raw_structure_summary(raw) if raw else {}
         cached = get_cached_holdings()
-        token_badge = '🟢 토큰 캐시 정상' if auth.get('token_ok') else '🟡 토큰 미확인'
-        key_badge = '🟢 KEY 입력' if auth.get('env',{}).get('KIWOOM_APP_KEY') else '🔴 KEY 없음'
-        secret_badge = '🟢 SECRET 입력' if auth.get('env',{}).get('KIWOOM_APP_SECRET') else '🔴 SECRET 없음'
-        account_badge = '🟢 계좌번호 입력' if auth.get('env',{}).get('KIWOOM_ACCOUNT') else '🟠 계좌번호 없음'
+        last_debug = auth.get('last_kiwoom_debug') or {}
+        token_ok = auth.get('token_ok')
+        designated = auth.get('designated_device_ok')
+        additional = auth.get('additional_auth_ok')
+        account_ok = auth.get('env',{}).get('KIWOOM_ACCOUNT')
         raw_rows = summary.get('probable_rows', 0) if isinstance(summary, dict) else 0
         codes = ', '.join(summary.get('codes_found', [])[:6]) if isinstance(summary, dict) else ''
+
+        final_status = '정상 사용 가능' if (auth.get('env',{}).get('KIWOOM_APP_KEY') and auth.get('env',{}).get('KIWOOM_APP_SECRET') and account_ok and token_ok and cached) else '확인 필요'
+        final_class = 'ok-pill' if final_status == '정상 사용 가능' else 'warn-pill'
+
         return f"""
         <section class="card" id="kiwoom-diagnosis">
-          <h2>🧪 키움 진단센터</h2>
-          <p class="muted">키움 연동이 안 될 때 인증/계좌/보유 파싱 상태를 한 화면에서 확인합니다.</p>
+          <h2>🧪 키움 진단센터 PRO</h2>
+          <p class="muted">키움 연동이 안 될 때 APP KEY·SECRET·ACCOUNT·TOKEN·지정단말기·추가인증·계좌조회를 한 화면에서 확인합니다.</p>
           <div class="summary-grid">
-            <div><span>App Key</span><b>{key_badge}</b></div>
-            <div><span>Secret</span><b>{secret_badge}</b></div>
-            <div><span>계좌번호</span><b>{account_badge}</b></div>
-            <div><span>토큰</span><b>{token_badge}</b></div>
-            <div><span>보유 캐시</span><b>{len(cached)}종목</b></div>
+            <div><span>APP KEY</span><b>🟢 입력 완료</b></div>
+            <div><span>APP SECRET</span><b>{'🟢 입력 완료' if auth.get('env',{}).get('KIWOOM_APP_SECRET') else '🔴 없음'}</b></div>
+            <div><span>ACCOUNT</span><b>{'🟢 ' + html_escape(auth.get('env',{}).get('KIWOOM_ACCOUNT_DISPLAY','')) if account_ok else '🔴 KIWOOM_ACCOUNT 없음'}</b></div>
+            <div><span>TOKEN</span><b>{'🟢 발급/캐시 정상' if token_ok else '🟡 미확인 또는 실패'}</b></div>
+            <div><span>지정단말기</span><b>{_diag_color(designated)} {'정상' if designated is True else '확인필요' if designated is False else '미확인'}</b></div>
+            <div><span>추가인증</span><b>{_diag_color(additional)} {'정상' if additional is True else '확인필요' if additional is False else '미확인'}</b></div>
+            <div><span>계좌조회/주문가능</span><b>{'🟢 확인가능' if token_ok and account_ok else '🔴 확인필요'}</b></div>
+            <div><span>실보유조회</span><b>{'🟢 ' + str(len(cached)) + '종목 캐시' if cached else '🟡 보유/파싱 확인필요'}</b></div>
             <div><span>RAW 후보행</span><b>{raw_rows}개</b></div>
+            <div><span>최종판정</span><b class="{final_class}">{final_status}</b></div>
           </div>
           <div class="notice small">
-            최근 키움 메시지: {html_escape(auth.get('token_message','-'))}<br>
+            최근 키움 메시지: {html_escape(last_debug.get('message') or auth.get('token_message','-'))}<br>
             RAW에서 찾은 코드: {html_escape(codes or '없음')}<br>
-            계좌번호가 없거나 토큰이 실패하면 실보유 조회가 EMPTY로 나올 수 있습니다.
+            조치 가이드: {html_escape(auth.get('account_warning') or '토큰 실패 시 Render IP 등록, App Key/Secret 재입력, 영웅문S# 지정단말기/추가인증을 확인하세요.')}
           </div>
           <div class="btn-row">
-            <a class="button" href="/api/auth_status?check=1">토큰 진단</a>
-            <a class="button dark" href="/api/kiwoom_status">키움 상태 JSON</a>
-            <a class="button brown" href="/api/kiwoom_raw_holdings">RAW 보유응답</a>
+            <a class="button" href="/api/auth_status?check=1">토큰 재발급/진단</a>
+            <a class="button dark" href="/api/v162_full_diagnosis">전체 진단 실행</a>
+            <a class="button brown" href="/api/holdings?force=1">실보유 강제조회</a>
+            <a class="button light" href="/api/kiwoom_raw_holdings">RAW 보유응답</a>
           </div>
         </section>"""
     except Exception as e:
-        return f"<section class='card' id='kiwoom-diagnosis'><h2>🧪 키움 진단센터</h2><div class='notice'>진단센터 표시 오류: {html_escape(str(e))}</div></section>"
+        return f"<section class='card' id='kiwoom-diagnosis'><h2>🧪 키움 진단센터 PRO</h2><div class='notice'>진단센터 표시 오류: {html_escape(str(e))}</div></section>"
+
 
 def render_page():
     state = read_state()
@@ -1919,37 +1939,171 @@ def safe_watch_state():
     }
 
 
+def _mask_account_for_display(acc):
+    a = str(acc or "").strip()
+    if not a:
+        return ""
+    digits = re.sub(r"\D", "", a)
+    if len(digits) >= 8:
+        return digits[:4] + "-" + digits[4:]
+    return a
+
+
+def _diag_badge(ok, label_ok, label_bad):
+    return ("🟢 " + label_ok) if ok else ("🔴 " + label_bad)
+
+
+def _classify_kiwoom_problem(message):
+    m = str(message or "")
+    if "8050" in m or "지정단말기" in m or "지정단말" in m:
+        return "designated_device"
+    if "추가인증" in m or "보안" in m or "인증에 실패" in m:
+        return "additional_auth"
+    if "App Key" in m or "Secret" in m or "8001" in m or "8002" in m:
+        return "key_secret"
+    if "계좌" in m and ("없" in m or "누락" in m):
+        return "account_missing"
+    return "unknown"
+
+
 def build_auth_status(check_token=False):
     env = {
         "KIWOOM_APP_KEY": bool(KIWOOM_APP_KEY),
         "KIWOOM_APP_SECRET": bool(KIWOOM_SECRET_KEY),
         "KIWOOM_ACCOUNT": bool(KIWOOM_ACCOUNT),
+        "KIWOOM_ACCOUNT_DISPLAY": _mask_account_for_display(KIWOOM_ACCOUNT),
         "KIWOOM_REAL_TRADING": KIWOOM_REAL_TRADING,
         "KIWOOM_DRY_RUN": KIWOOM_DRY_RUN,
     }
     token_ok = False
     token_message = TOKEN_CACHE.get("last_error", "") or "토큰 미확인"
+    token_problem = "unknown"
     if check_token:
         try:
             get_kiwoom_token()
             token_ok = True
             token_message = "키움 토큰 정상"
+            token_problem = "none"
         except Exception as e:
             token_message = auth_message(str(e))
+            token_problem = _classify_kiwoom_problem(token_message)
     elif TOKEN_CACHE.get("token") and time.time() < TOKEN_CACHE.get("expires", 0):
         token_ok = True
         token_message = "캐시 토큰 정상"
-    account_warning = "" if KIWOOM_ACCOUNT else "KIWOOM_ACCOUNT 환경변수가 없으면 일부 계좌/보유 조회가 EMPTY로 나올 수 있습니다."
+        token_problem = "none"
+    else:
+        token_problem = _classify_kiwoom_problem(token_message)
+
+    last_debug = read_state().get("last_kiwoom_debug", {})
+    last_msg = last_debug.get("message", token_message)
+    problem = _classify_kiwoom_problem(last_msg or token_message)
+    account_warning = "" if KIWOOM_ACCOUNT else "KIWOOM_ACCOUNT 환경변수가 없으면 계좌조회/보유조회/주문이 EMPTY 또는 실패로 나올 수 있습니다."
+
+    # v162 PRO 상태 분리: token 상태를 기반으로 지정단말기/추가인증을 추정 표시합니다.
+    designated_device_ok = None
+    additional_auth_ok = None
+    if token_ok:
+        designated_device_ok = True
+        additional_auth_ok = True
+    elif problem == "designated_device":
+        designated_device_ok = False
+        additional_auth_ok = None
+    elif problem == "additional_auth":
+        designated_device_ok = None
+        additional_auth_ok = False
+
     return {
         "ok": bool(KIWOOM_APP_KEY and KIWOOM_SECRET_KEY),
         "authenticated": token_ok,
         "token_ok": token_ok,
         "token_message": token_message,
+        "token_problem": token_problem,
         "env": env,
         "account_warning": account_warning,
-        "last_kiwoom_debug": read_state().get("last_kiwoom_debug", {}),
+        "last_kiwoom_debug": last_debug,
+        "designated_device_ok": designated_device_ok,
+        "additional_auth_ok": additional_auth_ok,
         "version": APP_VERSION,
     }
+
+
+def run_kiwoom_full_diagnosis():
+    """v162: 키움 상태를 한 번에 점검. 실주문은 하지 않습니다."""
+    result = {
+        "version": APP_VERSION,
+        "time": now_text(),
+        "checks": {},
+        "final_status": "UNKNOWN",
+        "summary": "진단 대기",
+        "action": "",
+    }
+    result["checks"]["app_key"] = {"ok": bool(KIWOOM_APP_KEY), "label": "APP KEY", "message": "입력 완료" if KIWOOM_APP_KEY else "Render 환경변수 KIWOOM_APP_KEY 누락"}
+    result["checks"]["secret"] = {"ok": bool(KIWOOM_SECRET_KEY), "label": "APP SECRET", "message": "입력 완료" if KIWOOM_SECRET_KEY else "Render 환경변수 KIWOOM_APP_SECRET 누락"}
+    result["checks"]["account"] = {"ok": bool(KIWOOM_ACCOUNT), "label": "ACCOUNT", "message": _mask_account_for_display(KIWOOM_ACCOUNT) if KIWOOM_ACCOUNT else "Render 환경변수 KIWOOM_ACCOUNT 누락"}
+
+    token_ok = False
+    token_msg = ""
+    try:
+        get_kiwoom_token()
+        token_ok = True
+        token_msg = "토큰 발급 성공"
+    except Exception as e:
+        token_msg = auth_message(str(e))
+    result["checks"]["token"] = {"ok": token_ok, "label": "TOKEN", "message": token_msg}
+
+    problem = _classify_kiwoom_problem(token_msg)
+    if token_ok:
+        result["checks"]["designated_device"] = {"ok": True, "label": "지정단말기", "message": "토큰 발급 성공 기준 정상"}
+        result["checks"]["additional_auth"] = {"ok": True, "label": "추가인증", "message": "토큰 발급 성공 기준 정상"}
+    elif problem == "designated_device":
+        result["checks"]["designated_device"] = {"ok": False, "label": "지정단말기", "message": "8050/지정단말기 인증 실패 가능성"}
+        result["checks"]["additional_auth"] = {"ok": None, "label": "추가인증", "message": "토큰 실패로 확인 불가"}
+    elif problem == "additional_auth":
+        result["checks"]["designated_device"] = {"ok": None, "label": "지정단말기", "message": "토큰 실패로 확인 불가"}
+        result["checks"]["additional_auth"] = {"ok": False, "label": "추가인증", "message": "영웅문S# 추가인증/보안 설정 확인 필요"}
+    else:
+        result["checks"]["designated_device"] = {"ok": None, "label": "지정단말기", "message": "토큰 실패로 확인 불가"}
+        result["checks"]["additional_auth"] = {"ok": None, "label": "추가인증", "message": "토큰 실패로 확인 불가"}
+
+    cash_info = {"ok": False, "message": "토큰 또는 계좌번호 확인 후 점검"}
+    holdings_info = {"ok": False, "holdings": [], "message": "토큰 또는 계좌번호 확인 후 점검"}
+    if token_ok:
+        try:
+            cash_info = get_cash_info()
+        except Exception as e:
+            cash_info = {"ok": False, "message": auth_message(str(e))}
+        try:
+            holdings_info = fetch_kiwoom_holdings()
+        except Exception as e:
+            holdings_info = {"ok": False, "holdings": [], "message": auth_message(str(e))}
+
+    result["checks"]["cash"] = {"ok": bool(cash_info.get("ok")), "label": "계좌조회/주문가능", "message": cash_info.get("message") or f"주문가능금액 {format_won(cash_info.get('cash',0))}"}
+    result["checks"]["holdings"] = {"ok": bool(holdings_info.get("ok")), "label": "실보유조회", "message": holdings_info.get("message") or f"{len(holdings_info.get('holdings',[]))}종목"}
+
+    all_required = ["app_key", "secret", "account", "token", "cash", "holdings"]
+    if all(result["checks"].get(k, {}).get("ok") is True for k in all_required):
+        result["final_status"] = "NORMAL"
+        result["summary"] = "키움 인증/계좌/보유조회 정상"
+        result["action"] = "AI 자동매매 사용 가능"
+    else:
+        result["final_status"] = "NEED_CHECK"
+        if not KIWOOM_ACCOUNT:
+            result["summary"] = "계좌번호 환경변수 누락"
+            result["action"] = "Render Environment에 KIWOOM_ACCOUNT를 추가하세요. 예: 66476264"
+        elif not token_ok:
+            result["summary"] = "토큰 발급 실패"
+            result["action"] = "App Key/Secret, Render IP 등록, 지정단말기/추가인증 상태를 확인하세요."
+        elif not cash_info.get("ok"):
+            result["summary"] = "계좌조회/주문가능금액 조회 실패"
+            result["action"] = "계좌번호 형식, API 권한, 키움 응답 메시지를 확인하세요."
+        elif not holdings_info.get("ok"):
+            result["summary"] = "실보유 조회 또는 파싱 실패"
+            result["action"] = "RAW 보유응답을 확인해 파싱 구조를 보정하세요."
+        else:
+            result["summary"] = "일부 항목 확인 필요"
+            result["action"] = "아래 상세 진단을 확인하세요."
+    return result
+
 
 
 @app.route("/api/status")
@@ -2009,6 +2163,18 @@ def api_kiwoom_status():
         "raw_structure_summary": kiwoom_raw_structure_summary(read_json(KIWOOM_RAW_HOLDINGS_FILE, {})),
         "guide": "token_ok가 true인데 holdings가 EMPTY이면 보유종목 파싱/계좌번호/조회구분 문제일 가능성이 큽니다. v161은 RAW 구조 요약과 후보행 개수를 함께 표시합니다.",
     })
+
+
+
+@app.route("/api/v162_full_diagnosis")
+def api_v162_full_diagnosis():
+    return jsonify(run_kiwoom_full_diagnosis())
+
+
+@app.route("/api/v162_token_refresh")
+def api_v162_token_refresh():
+    TOKEN_CACHE.update({"token": "", "expires": 0, "last_error": ""})
+    return jsonify(build_auth_status(check_token=True))
 
 
 @app.route("/api/kiwoom_raw_holdings")
