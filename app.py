@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v173 AI AUTONOMOUS FUND MANAGER
-파일명: app_kiwoom_real_auto_scalping_v173_ai_autonomous_fund_manager.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v174 STOCK NAME AUTO REPAIR
+파일명: app_kiwoom_real_auto_scalping_v174_stock_name_auto_repair.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,12 +41,13 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v173"
+APP_VERSION = "v174"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v173_ai_autonomous_fund_manager.py"
-APP_PATCH_NAME = "AI_AUTONOMOUS_FUND_MANAGER"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v174_stock_name_auto_repair.py"
+APP_PATCH_NAME = "AI_AUTONOMOUS_FUND_MANAGER_NAME_FIX"
 UPDATE_HISTORY = [
-    {"version": "v173", "title": "AI Autonomous Fund Manager / 자율운용센터 통합", "items": ["V169~V172 화면 흔적 정리", "AI 자율운용센터 통합", "메뉴 약 30% 재정리", "보유종목 카드 UI 개선", "AI 보유유지 점수 추가", "AI 운용일지 추가", "AI 매도판단 강화", "모바일 카드형 디자인 개선", "매수·보유·매도 이유 설명 강화"]},
+    {"version": "v174", "title": "종목명 자동복구 엔진 / 보유카드 실데이터 보강", "items": ["001440처럼 코드만 보이는 보유종목을 자동으로 대한전선 등 한글 종목명으로 복구", "종목명 조회 우선순위 개선: 현재값 → 내장DB → 후보DB → 보유캐시 → FinanceDataReader KRX", "실보유 동기화·캐시·백업파일에 저장된 코드형 이름까지 자동 보정", "보유종목 카드에 코드/시장/이름출처/가격출처 표시 강화", "AI 보유점수와 매도위험 점수 계산 시 데이터품질·손익·보호선·고점되돌림을 더 반영", "V174부터 이후 업데이트는 V175, V176처럼 정수 버전 순차 적용"]},
+    {"version": "v173", "title": "AI Autonomous Fund Manager / 자율운용센터 통합 + 종목명 표시 보정", "items": ["V169~V172 화면 흔적 정리", "AI 자율운용센터 통합", "메뉴 약 30% 재정리", "보유종목 카드 UI 개선", "AI 보유유지 점수 추가", "AI 운용일지 추가", "AI 매도판단 강화", "모바일 카드형 디자인 개선", "매수·보유·매도 이유 설명 강화", "키움 보유응답이 코드만 줄 때 한글 종목명 자동 보정"]},
     {"version": "v172", "title": "클린 통합 UI / 이전버전 노출 정리", "items": ["v169/v170 섹션명을 v171 이하 버전명 없이 통합", "AI 자율운용 매니저 중심 화면 정리", "AI 자산운용/매도AI/AI후보/키움진단 메뉴를 보기 좋게 재배치", "모바일 카드 간격·글자 크기·색상 정리", "이전 기능은 유지하되 화면에는 현재버전 기준으로 표시"]},
     {"version": "v171", "title": "AI 자동매수·자동매도 실행 엔진", "items": ["AI 자동매수 유지", "AI 자동부분익절 실행", "AI 전량매도 자동실행", "AI 고점위험/강도하락 자동매도", "자동매도 ON/OFF 안전장치", "텔레그램 자동매도 알림", "자동교체매수는 승인 유지"]},
     {"version": "v170", "title": "AI Exit Engine PRO", "items": ["보유유지/추가매수/부분매도/전량매도/고점위험 점수", "AI 부분익절 엔진", "AI 실보유 분석센터 PRO", "AI 고점매도 PRO+", "매도판단 API/화면 추가", "실전 매도는 사용자 승인 버튼 유지"]},
@@ -255,6 +256,12 @@ DEFAULT_STATE = {
     "v173_exit_score_warning": 75,
     "v173_exit_score_full_sell": 88,
     "v173_last_fund_manager_report": {},
+    # v174: 종목명 자동복구 / 보유카드 실데이터 보강
+    "v174_stock_name_auto_repair_enabled": True,
+    "v174_repair_holdings_cache_enabled": True,
+    "v174_show_name_source_enabled": True,
+    "v174_real_holding_card_enabled": True,
+    "v174_last_name_repair_report": {},
 }
 
 
@@ -266,6 +273,195 @@ THEME_MAP = {
     "HD현대일렉트릭": "전력설비/데이터센터", "LS ELECTRIC": "전력설비/데이터센터",
     "삼성전기": "전력설비/데이터센터", "이수페타시스": "AI서버/PCB",
 }
+
+# v173.1: 종목코드만 표시되는 문제 보정용 기본 종목명 맵
+# 키움 보유응답에서 종목명이 비어 있거나 숫자코드로만 내려오는 경우
+# 앱 화면에서는 resolve_stock_name()으로 한글 종목명을 우선 표시합니다.
+STOCK_NAME_MAP = {
+    "001440": "대한전선",
+    "005930": "삼성전자",
+    "000660": "SK하이닉스",
+    "009150": "삼성전기",
+    "010140": "삼성중공업",
+    "080220": "제주반도체",
+    "042700": "한미반도체",
+    "089030": "테크윙",
+    "036930": "주성엔지니어링",
+    "383220": "F&F",
+    "000270": "기아",
+    "005380": "현대차",
+    "035420": "NAVER",
+    "035720": "카카오",
+    "373220": "LG에너지솔루션",
+    "006400": "삼성SDI",
+    "247540": "에코프로비엠",
+    "086520": "에코프로",
+}
+_STOCK_LISTING_CACHE = {"ts": 0, "map": {}}
+
+
+def _is_code_like_name(name, code=""):
+    name = str(name or "").strip()
+    code = str(code or "").zfill(6) if code else ""
+    if not name:
+        return True
+    only_num = re.sub(r"[^0-9]", "", name)
+    if code and only_num == code:
+        return True
+    if re.fullmatch(r"[A-Za-z]*\d{5,6}", name):
+        return True
+    if name in ("종목명미확인", "종목", "-"):
+        return True
+    return False
+
+
+def resolve_stock_name(code, current_name=""):
+    """종목명이 비어 있거나 001440처럼 코드로만 보일 때 한글 종목명으로 보정합니다.
+
+    1순위: 현재 이름이 정상 한글/문자 이름이면 그대로 사용
+    2순위: 내장 STOCK_NAME_MAP
+    3순위: FinanceDataReader KRX 종목리스트 캐시
+    4순위: 기존값 또는 코드
+    """
+    code = str(code or "").zfill(6)
+    current_name = str(current_name or "").strip()
+    if current_name and not _is_code_like_name(current_name, code):
+        return current_name
+    if code in STOCK_NAME_MAP:
+        return STOCK_NAME_MAP[code]
+    try:
+        if fdr is not None:
+            now_ts = time.time()
+            if not _STOCK_LISTING_CACHE.get("map") or now_ts - safe_float(_STOCK_LISTING_CACHE.get("ts"), 0) > 86400:
+                df = fdr.StockListing("KRX")
+                name_map = {}
+                if df is not None and not df.empty:
+                    cols = list(df.columns)
+                    code_col = "Code" if "Code" in cols else ("Symbol" if "Symbol" in cols else "")
+                    name_col = "Name" if "Name" in cols else ("NameKo" if "NameKo" in cols else "")
+                    if code_col and name_col:
+                        for _, row in df[[code_col, name_col]].dropna().iterrows():
+                            c = re.sub(r"[^0-9]", "", str(row[code_col])).zfill(6)
+                            n = str(row[name_col]).strip()
+                            if c and n:
+                                name_map[c] = n
+                _STOCK_LISTING_CACHE.update({"ts": now_ts, "map": name_map})
+            nm = _STOCK_LISTING_CACHE.get("map", {}).get(code, "")
+            if nm:
+                STOCK_NAME_MAP[code] = nm
+                return nm
+    except Exception:
+        pass
+    return current_name or code
+
+
+def stock_name_source(code, current_name=""):
+    """V174: 화면/JSON에서 종목명이 어디서 복구되었는지 표시합니다."""
+    code = str(code or "").zfill(6)
+    current_name = str(current_name or "").strip()
+    if current_name and not _is_code_like_name(current_name, code):
+        return "KIWOOM/캐시"
+    if code in STOCK_NAME_MAP:
+        return "내장 종목DB"
+    if _STOCK_LISTING_CACHE.get("map", {}).get(code):
+        return "KRX 종목DB"
+    return "코드표시"
+
+
+def infer_market_from_code(code):
+    """정확한 시장 정보가 없을 때 UI 표시용으로 보수적으로 추정합니다."""
+    code = str(code or "").zfill(6)
+    if code in ("001440", "005930", "000660", "009150", "010140", "000270", "005380", "035420", "035720", "373220", "006400"):
+        return "코스피"
+    return "코스닥/기타"
+
+
+def collect_stock_name_candidates_from_cache():
+    """V174: 기존 후보/보유/백업 캐시에서 코드-종목명 사전을 회수합니다."""
+    name_map = {}
+    def add(code, name):
+        code = re.sub(r"[^0-9]", "", str(code or "")).zfill(6)
+        name = str(name or "").strip()
+        if code and len(code) == 6 and name and not _is_code_like_name(name, code):
+            name_map[code] = name
+    try:
+        data = read_json(CANDIDATE_FILE, {})
+        if isinstance(data, dict):
+            for c in data.get("items", []) or []:
+                add(c.get("code"), c.get("name"))
+        elif isinstance(data, list):
+            for c in data:
+                add(c.get("code"), c.get("name"))
+    except Exception:
+        pass
+    for path in (HOLDINGS_FILE, HOLDINGS_BACKUP_FILE):
+        try:
+            data = read_json(path, [] if path == HOLDINGS_FILE else {})
+            rows = data.get("items", []) if isinstance(data, dict) else data
+            for h in rows or []:
+                if isinstance(h, dict):
+                    add(h.get("code"), h.get("name"))
+        except Exception:
+            pass
+    return name_map
+
+
+def resolve_stock_name_v174(code, current_name=""):
+    """V174 종목명 자동복구 엔진.
+
+    우선순위:
+    1) 정상 current_name
+    2) 내장 STOCK_NAME_MAP
+    3) AI후보/보유 캐시에서 회수한 이름
+    4) FinanceDataReader KRX 종목리스트
+    5) 최종 코드 표시
+    """
+    code = str(code or "").zfill(6)
+    current_name = str(current_name or "").strip()
+    if current_name and not _is_code_like_name(current_name, code):
+        return current_name
+    if code in STOCK_NAME_MAP:
+        return STOCK_NAME_MAP[code]
+    cached = collect_stock_name_candidates_from_cache().get(code, "")
+    if cached:
+        STOCK_NAME_MAP[code] = cached
+        return cached
+    return resolve_stock_name(code, current_name)
+
+
+def repair_holding_names(items, persist=False):
+    """V174: 보유종목 리스트의 코드형/빈 종목명을 한글명으로 일괄 보정합니다."""
+    repaired = []
+    changed = 0
+    for h in items or []:
+        if not isinstance(h, dict):
+            continue
+        row = dict(h)
+        code = str(row.get("code", "")).zfill(6)
+        old = str(row.get("name") or "").strip()
+        new = resolve_stock_name_v174(code, old)
+        if new and new != old:
+            row["name"] = new
+            row["nameSource"] = stock_name_source(code, old)
+            row["nameAutoRepaired"] = True
+            changed += 1
+        else:
+            row.setdefault("nameSource", stock_name_source(code, old))
+            row.setdefault("nameAutoRepaired", False)
+        row.setdefault("marketLabel", infer_market_from_code(code))
+        repaired.append(row)
+    if persist and changed:
+        try:
+            write_json(HOLDINGS_FILE, repaired)
+            if repaired:
+                write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": repaired, "name_repaired": changed, "version": APP_VERSION})
+            st = read_state()
+            st["v174_last_name_repair_report"] = {"time": now_text(), "changed": changed, "count": len(repaired)}
+            write_state(st)
+        except Exception:
+            pass
+    return repaired
+
 FALLBACK_CANDIDATES = [
     {"market": "KOSDAQ", "code": "080220", "name": "제주반도체", "theme": "AI반도체/HBM", "price": 122800, "dayChange": 4.24, "amount": 93040000000, "score": 92.5},
     {"market": "KOSPI", "code": "010140", "name": "삼성중공업", "theme": "조선/방산", "price": 29550, "dayChange": 2.73, "amount": 110870000000, "score": 88.3},
@@ -716,9 +912,7 @@ def _code_from_row(row):
 def _name_from_row(row, code=""):
     val = _first_value(row, ["stk_nm", "stk_name", "name", "종목명", "prdt_name", "item_nm", "isu_nm", "hts_kor_isnm"])
     name = str(val or "").strip()
-    if name and name != code:
-        return name
-    return code or "종목명미확인"
+    return resolve_stock_name_v174(code, name)
 
 
 def _numeric_from_row(row, keys):
@@ -924,7 +1118,7 @@ def fetch_kiwoom_holdings():
                     write_json(KIWOOM_RAW_HOLDINGS_FILE, {"time": now_text(), "api_id": api_id, "body": body, "http_status": st, "raw": data, "attempts": attempts})
                 except Exception:
                     pass
-                items = parse_holdings(data)
+                items = repair_holding_names(parse_holdings(data), persist=False)
                 if st == 200 and items:
                     write_json(HOLDINGS_FILE, items)
                     write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": items, "raw_source": api_id})
@@ -993,7 +1187,9 @@ def normalize_holding(h):
 
     h.update({
         "code": str(h.get("code", "")).zfill(6),
-        "name": h.get("name") or h.get("code", ""),
+        "name": resolve_stock_name_v174(str(h.get("code", "")).zfill(6), h.get("name") or h.get("code", "")),
+        "nameSource": stock_name_source(str(h.get("code", "")).zfill(6), h.get("name") or ""),
+        "marketLabel": h.get("marketLabel") or infer_market_from_code(str(h.get("code", "")).zfill(6)),
         "qty": qty,
         "buyPrice": int(buy),
         "lastPrice": int(cur),
@@ -1013,11 +1209,12 @@ def normalize_holding(h):
 
 
 def read_holdings():
-    return [normalize_holding(h) for h in get_cached_holdings()]
+    return [normalize_holding(h) for h in repair_holding_names(get_cached_holdings(), persist=False)]
 
 
 def write_holdings(items):
-    items = [normalize_holding(h) for h in (items or []) if safe_int(h.get("qty"), 0) > 0]
+    items = repair_holding_names(items or [], persist=False)
+    items = [normalize_holding(h) for h in items if safe_int(h.get("qty"), 0) > 0]
     write_json(HOLDINGS_FILE, items)
     if items:
         write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": items})
@@ -2421,7 +2618,7 @@ def render_market_temperature(picks=None):
 
 def render_holdings_section():
     res = fetch_kiwoom_holdings()
-    items = res.get("holdings") or read_holdings()
+    items = repair_holding_names(res.get("holdings") or read_holdings(), persist=True)
     if not items:
         msg = res.get("message") or "표시 가능한 보유 캐시가 없습니다."
         return f"""
@@ -2468,6 +2665,7 @@ def render_holdings_section():
       <p class="muted">표시 보유 {len(items)}종목 · 출처 {html_escape(res.get('source','CACHE'))}</p>
       <div class="btn-row">
         <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
+        <button onclick="location.href='/api/v174_repair_holding_names'">종목명 자동복구</button>
         <button class="dark" onclick="location.href='/api/status'">API 확인</button>
       </div>
       {''.join(cards)}
@@ -3353,7 +3551,14 @@ def v173_ai_holding_score(h):
     if trail and cur <= trail * 1.004:
         volatility -= 8
 
-    score = volume_keep + strength + market_power + money_flow + volatility
+    data_quality = 0
+    if h.get("nameAutoRepaired") or not _is_code_like_name(h.get("name"), h.get("code")):
+        data_quality += 3
+    if buy > 0 and cur > 0 and abs(cur - buy) > 0:
+        data_quality += 4
+    if h.get("lastCheckedAt"):
+        data_quality += 2
+    score = volume_keep + strength + market_power + money_flow + volatility + data_quality
     score = max(0, min(100, score))
     grade = v173_grade_from_score(score)
 
@@ -3399,6 +3604,7 @@ def v173_ai_holding_score(h):
             "시장대비강도": round(market_power, 1),
             "수급지속": round(money_flow, 1),
             "변동성안정": round(volatility, 1),
+            "데이터품질": round(data_quality, 1),
         }
     }
 
@@ -3413,6 +3619,8 @@ def v173_ai_exit_score(h):
     stop = safe_float(h.get("stop"), 0)
     score = 20
     reasons = []
+    if _is_code_like_name(h.get("name"), h.get("code")):
+        score += 5; reasons.append("종목명 미확인 데이터 보정 필요")
 
     if profit <= -2.0:
         score += 28; reasons.append("손실폭 확대")
@@ -3579,7 +3787,7 @@ def render_v173_autonomous_fund_manager():
         risk_rows=''.join(f"<span>{html_escape(x.get('name','-'))} {html_escape(x.get('decision',''))}</span>" for x in journal.get('risks',[])) or '<span>위험 종목 제한적</span>'
         return f"""
         <section class="v168-center v173-center" id="autonomous-fund-manager">
-          <div class="v168-title"><h2>🤖 AI Autonomous Fund Manager</h2><span class="v168-tag">V173 자율운용</span></div>
+          <div class="v168-title"><h2>🤖 AI Autonomous Fund Manager</h2><span class="v168-tag">V174 자율운용</span></div>
           <p class="muted">AI가 계좌상태·시장온도·보유점수·매도위험을 통합해 매수/보유/매도 이유를 설명합니다.</p>
           <div class="v168-grid">
             <div><span>운용모드</span><b>{html_escape(r.get('mode','-'))}</b><small>{html_escape(r.get('opinion',''))}</small></div>
@@ -3589,11 +3797,11 @@ def render_v173_autonomous_fund_manager():
             <div><span>AI 보유점수</span><b>{summary.get('avg_hold_score',0)}점</b><small>80점 이상 보유 우세</small></div>
             <div><span>AI 매도위험</span><b>{summary.get('avg_exit_score',0)}점</b><small>75점 이상 매도 경계</small></div>
           </div>
-          <div class="v168-warn">V173 핵심: 기능 추가보다 수익률 최적화, AI 매도판단, 모바일 UI 가독성에 집중했습니다.</div>
+          <div class="v168-warn">V174 핵심: 종목명 자동복구, 보유카드 실데이터 보강, AI 보유/매도판단 안정화에 집중했습니다.</div>
           <details open><summary>🏆 TOP5 매수대기 / 집중감시</summary><div class="v168-list">{focus_rows(focus)}</div></details>
           <details open><summary>💼 보유종목 AI 판단</summary><div class="v168-list">{holding_rows(holdings)}</div></details>
           <details><summary>📘 AI 운용일지</summary><div class="chips">{buy_rows}{sell_rows}{risk_rows}</div><div class="notice small">{html_escape(journal.get('comment','운용일지 대기'))}</div></details>
-          <div class="btn-row"><button onclick="callAndReload('/api/v173_refresh_fund_manager')">AI 자율운용 재분석</button><a class="button dark" href="/api/v173_fund_manager">JSON 확인</a></div>
+          <div class="btn-row"><button onclick="callAndReload('/api/v174_refresh_fund_manager')">AI 자율운용 재분석</button><a class="button dark" href="/api/v174_fund_manager">JSON 확인</a></div>
         </section>"""
     except Exception as e:
         return f"<section class='v168-center v173-center' id='autonomous-fund-manager'><h2>🤖 AI Autonomous Fund Manager</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
@@ -3602,7 +3810,7 @@ def render_v173_autonomous_fund_manager():
 def render_holdings_section():
     """v173: 보유종목 카드를 AI 보유유지 점수/매도위험 중심으로 재구성합니다."""
     res = fetch_kiwoom_holdings()
-    items = res.get("holdings") or read_holdings()
+    items = repair_holding_names(res.get("holdings") or read_holdings(), persist=True)
     if not items:
         msg = res.get("message") or "표시 가능한 보유 캐시가 없습니다."
         return f"""
@@ -3628,7 +3836,7 @@ def render_holdings_section():
         score_cls = 'pill-ok' if hold.get('score',0) >= 80 and ex.get('score',0) < 75 else 'pill-warn'
         cards.append(f"""
         <div class="holding-card v173-holding-card">
-          <div class="topline"><b>{html_escape(h['name'])}</b><span>{h['code']} · AI등급 {html_escape(hold.get('grade','-'))}</span></div>
+          <div class="topline"><b>{html_escape(h['name'])}</b><span>{h['code']} · {html_escape(h.get('marketLabel','-'))} · AI등급 {html_escape(hold.get('grade','-'))}</span></div>
           <div class="grid2">
             <div><label>현재수익률</label><b class="{'red' if h.get('profitRate',0)>=0 else 'blue'}">{pct(h['profitRate'])}</b><small>{money(h['pnl'])}</small></div>
             <div><label>AI 추천행동</label><b class="{score_cls}">{html_escape(dec.get('decision','-'))}</b><small>{html_escape(dec.get('summary',''))}</small></div>
@@ -3641,7 +3849,7 @@ def render_holdings_section():
           </div>
           <div class="reason-title">🤖 AI 보유 이유</div><div class="reason-tags">{reason_tags}</div>
           <div class="reason-title">🎯 AI 매도 판단 이유</div><div class="risk-tags">{risk_tags}</div>
-          <div class="comment">{html_escape(h.get('aiSellPlan',''))}<br>최근확인 {html_escape(h.get('lastCheckedAt','-'))} · {html_escape(h.get('priceSource','-'))}</div>
+          <div class="comment">{html_escape(h.get('aiSellPlan',''))}<br>종목명 {html_escape(h.get('nameSource','-'))} · 최근확인 {html_escape(h.get('lastCheckedAt','-'))} · 가격 {html_escape(h.get('priceSource','-'))}</div>
           <button class="sell" onclick="manualSell('{h['code']}')">시장가 매도</button>
         </div>""")
     return f"""
@@ -3650,6 +3858,7 @@ def render_holdings_section():
       <p class="muted">표시 보유 {len(items)}종목 · 출처 {html_escape(res.get('source','CACHE'))} · AI 보유유지 점수와 매도위험을 우선 표시합니다.</p>
       <div class="btn-row">
         <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
+        <button onclick="location.href='/api/v174_repair_holding_names'">종목명 자동복구</button>
         <button class="dark" onclick="location.href='/api/status'">API 확인</button>
       </div>
       {''.join(cards)}
@@ -3657,7 +3866,7 @@ def render_holdings_section():
 
 
 def render_mobile_menu_cards():
-    """v173: 메뉴 약 30% 정리. 자율운용센터 중심."""
+    """v174: 메뉴 약 30% 정리. 자율운용센터 중심."""
     items = [
         ("#autonomous-fund-manager", "🤖", "AI 자율운용", "보유·매도·일지"),
         ("#picks", "🏆", "AI후보100", "TOP10·TOP5"),
@@ -3674,7 +3883,7 @@ def render_mobile_menu_cards():
       {''.join(cards)}
     </div>
     <div class="menu-help-v167">
-      <b>V173 사용순서</b> AI 자율운용 → 보유종목 AI카드 → 매도AI → AI후보100 → 키움진단 순서로 보면 가장 깔끔합니다.
+      <b>V174 사용순서</b> AI 자율운용 → 보유종목 AI카드 → 매도AI → AI후보100 → 키움진단 순서로 보면 가장 깔끔합니다.
     </div>"""
 
 def render_page():
@@ -4528,12 +4737,12 @@ def api_v171_run_auto_exit_once():
     return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "results": results})
 
 
-@app.route("/api/v173_fund_manager")
+@app.route("/api/v174_fund_manager")
 def api_v173_fund_manager():
     return jsonify(v173_build_fund_manager_report(force=False))
 
 
-@app.route("/api/v173_refresh_fund_manager")
+@app.route("/api/v174_refresh_fund_manager")
 def api_v173_refresh_fund_manager():
     report = v173_build_fund_manager_report(force=True)
     add_alert("V173 AI 자율운용센터 재분석 완료")
@@ -4542,6 +4751,35 @@ def api_v173_refresh_fund_manager():
 
 @app.route("/api/v173_holding_ai/<code>")
 def api_v173_holding_ai(code):
+    code = str(code).zfill(6)
+    for h in read_holdings():
+        if str(h.get("code","")).zfill(6) == code:
+            return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "result": v173_explain_decision(h)})
+    return jsonify({"ok": False, "version": APP_VERSION, "message": "해당 보유종목을 찾지 못했습니다."})
+
+
+@app.route("/api/v174_fund_manager")
+def api_v174_fund_manager():
+    return jsonify(v173_build_fund_manager_report(force=False))
+
+
+@app.route("/api/v174_refresh_fund_manager")
+def api_v174_refresh_fund_manager():
+    report = v173_build_fund_manager_report(force=True)
+    add_alert("V174 AI 자율운용센터 재분석 완료")
+    return jsonify({"ok": True, "version": APP_VERSION, "message": "V174 AI 자율운용센터 재분석 완료", "report": report})
+
+
+@app.route("/api/v174_repair_holding_names")
+def api_v174_repair_holding_names():
+    before = get_cached_holdings()
+    after = repair_holding_names(before, persist=True)
+    changed = sum(1 for x in after if x.get("nameAutoRepaired"))
+    return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "changed": changed, "items": after})
+
+
+@app.route("/api/v174_holding_ai/<code>")
+def api_v174_holding_ai(code):
     code = str(code).zfill(6)
     for h in read_holdings():
         if str(h.get("code","")).zfill(6) == code:
