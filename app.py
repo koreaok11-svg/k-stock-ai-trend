@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v167 PROFIT OPTIMIZATION ENGINE
-파일명: app_kiwoom_real_auto_scalping_v167_profit_optimization_engine.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v169 CLEAN ASSET CENTER
+파일명: app_kiwoom_real_auto_scalping_v169_clean_asset_center.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,13 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v167"
+APP_VERSION = "v169"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v167_profit_optimization_engine.py"
-APP_PATCH_NAME = "PROFIT_OPTIMIZATION_ENGINE"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v169_clean_asset_center.py"
+APP_PATCH_NAME = "CLEAN_ASSET_CENTER"
 UPDATE_HISTORY = [
+    {"version": "v169", "title": "AI 자산운용센터 정리/경량화", "items": ["AI투자비서·헤지펀드·포트폴리오·자율운용을 AI 자산운용센터로 통합", "메뉴 약 30% 정리", "TOP3 비교 UI 축소 및 TOP5 집중감시 중심", "실보유 AI 분석센터 추가", "AI 펀드매니저/자산배분 제안", "매매복기 2.0 요약", "v168 API 호환 유지"]},
+    {"version": "v168", "title": "AI 자산운용사 Ultimate", "items": ["AI후보100/집중감시10", "세력유입탐지", "시장온도계 PRO+", "급등10분전 탐지", "후보진화엔진2.0", "AI헤지펀드센터/투자비서/포트폴리오", "AI고점매도예측/수익극대화/자율운용매니저"]},
     {"version": "v167", "title": "AI 수익률 최적화 엔진", "items": ["AI 실전 복기센터", "AI 후보 진화엔진", "AI 시장온도계 PRO", "AI 동적 익절률", "AI 강도변화 알림", "수익률 최적화 진단 API"]},
     {"version": "v166", "title": "모바일 UI 통합/키움 안정화", "items": ["가로 스크롤 메뉴 제거", "3열 카드형 메뉴와 기능 설명 추가", "AI분석센터 개념 통합", "키움 진단센터 PRO 안내 강화", "AI시장온도계와 TOP3 비교 개선", "실보유/진단/후보 핵심 기능 접근성 개선"]},
     {"version": "v164", "title": "등록 IP 변수 누락 수정", "items": ["KIWOOM_REGISTERED_IPS 미정의 오류 수정", "Render/키움 등록 IP 비교 안전처리", "진단센터 오류가 나도 앱 화면 유지"]},
@@ -75,6 +77,7 @@ PERFORMANCE_FILE = BASE_DIR / "sungil_strategy_performance_v159.json"
 TRADE_LEDGER_FILE = BASE_DIR / "sungil_trade_ledger_v159.json"
 DAILY_REPORT_FILE = BASE_DIR / "sungil_ai_daily_report_v159.json"
 INVESTMENT_REVIEW_FILE = BASE_DIR / "sungil_ai_investment_review_v159.json"
+V168_ULTIMATE_FILE = BASE_DIR / "sungil_v168_ultimate_report.json"
 BACKUP_DIR = BASE_DIR / "sungil_backups_v159"
 try:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -180,6 +183,30 @@ DEFAULT_STATE = {
     "last_market_temperature": 0,
     "last_market_temperature_label": "대기",
     "last_review_summary": "",
+    # v168: AI 자산운용사 Ultimate
+    "v168_ultimate_enabled": True,
+    "v168_watch_candidate_count": 100,
+    "v168_focus_candidate_count": 10,
+    "v168_pump_predict_enabled": True,
+    "v168_money_flow_enabled": True,
+    "v168_hedge_fund_center_enabled": True,
+    "v168_ai_assistant_enabled": True,
+    "v168_portfolio_manager_enabled": True,
+    "v168_peak_sell_predict_enabled": True,
+    "v168_profit_maximizer_enabled": True,
+    "v168_autonomous_manager_enabled": False,
+    "v168_auto_rotation_enabled": False,
+    "v168_require_user_approval": True,
+    "v168_last_ultimate_report": {},
+    # v169: 메뉴 정리 / AI 자산운용센터 통합
+    "v169_clean_asset_center_enabled": True,
+    "v169_focus_candidate_count": 5,
+    "v169_hide_duplicate_menus": True,
+    "v169_unified_diagnosis_enabled": True,
+    "v169_holdings_ai_analysis_enabled": True,
+    "v169_fund_manager_enabled": True,
+    "v169_review_2_enabled": True,
+    "v169_last_asset_center_report": {},
 }
 
 
@@ -1514,6 +1541,266 @@ def html_escape(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+
+# ==============================
+# v168 AI 자산운용사 Ultimate
+# ==============================
+
+def v168_market_temperature_pro_plus(picks=None):
+    """시장온도계 PRO+: 후보 품질/역행강도/테마강도/과열감점/지수위험을 0~100점으로 환산합니다."""
+    try:
+        picks = list(picks or cached_candidates() or [])[:20]
+        base = v167_market_temperature_data(picks)
+        avg_money = sum(safe_float(x.get('amount'), 0) for x in picks[:10]) / max(1, min(10, len(picks)))
+        money_bonus = min(8, avg_money / 100_000_000_000 * 2)
+        top_conf = max([safe_float(x.get('aiConfidence'), 0) for x in picks[:10]] or [0])
+        conf_bonus = min(8, top_conf / 100 * 8)
+        temp = max(0, min(100, safe_float(base.get('temperature'), 0) + money_bonus + conf_bonus))
+        if temp >= 90:
+            label, mode = "초공격", "강한 후보는 고점추적 ON, 단 추격매수 금지"
+        elif temp >= 80:
+            label, mode = "공격", "TOP3/TOP10 중심 선별 진입"
+        elif temp >= 60:
+            label, mode = "중립강세", "매수 가능하지만 과열감점 확인"
+        elif temp >= 40:
+            label, mode = "방어", "신규매수 축소, 보유관리 우선"
+        else:
+            label, mode = "매수금지", "신규매수 중지, 키움/시장 진단 우선"
+        return {
+            "temperature": round(temp, 1),
+            "label": label,
+            "mode": mode,
+            "base": base,
+            "money_bonus": round(money_bonus, 1),
+            "confidence_bonus": round(conf_bonus, 1),
+            "guide": mode,
+        }
+    except Exception as e:
+        return {"temperature": 0, "label": "진단오류", "mode": str(e)[:120], "guide": "시장온도 산출 오류"}
+
+
+def v168_candidate_universe(limit=100):
+    """AI후보100: 무거운 현재가 조회 없이 KRX/FDR 기반으로 넓은 후보군을 빠르게 구성합니다."""
+    state = read_state()
+    limit = max(10, min(150, safe_int(limit, 100)))
+    rows = []
+    if fdr and pd:
+        try:
+            df = fdr.StockListing("KRX")
+            df = df[df["Market"].isin(["KOSPI", "KOSDAQ"])].copy()
+            for col in ["Close", "Volume", "Amount", "Marcap"]:
+                df[col] = pd.to_numeric(df.get(col, 0), errors="coerce").fillna(0)
+            ch_col = "ChagesRatio" if "ChagesRatio" in df.columns else ("Change" if "Change" in df.columns else None)
+            df["dayChange"] = pd.to_numeric(df[ch_col], errors="coerce").fillna(0) if ch_col else 0
+            df["Code"] = df["Code"].astype(str).str.zfill(6)
+            df["Name"] = df["Name"].astype(str)
+            bad = ["ETF", "ETN", "스팩", "SPAC", "KODEX", "TIGER", "인버스", "레버리지"]
+            df = df[~df["Name"].str.upper().apply(lambda n: any(x.upper() in n for x in bad))]
+            df = df[(df["Close"] >= 1000) & (df["Amount"] >= 1_000_000_000) & (df["dayChange"] >= -2.0) & (df["dayChange"] <= safe_float(state.get("max_day_change", 12), 12) + 5)].copy()
+            if not df.empty:
+                df["theme"] = df["Name"].apply(classify_theme)
+                df["amountRank"] = df["Amount"].rank(pct=True) * 100
+                df["volumeRank"] = df["Volume"].rank(pct=True) * 100
+                df["sweet"] = (100 - (df["dayChange"] - 3.2).abs() * 6).clip(lower=20, upper=100)
+                df["baseScore"] = (df["amountRank"] * .42 + df["volumeRank"] * .25 + df["sweet"] * .33)
+                df = df.sort_values("baseScore", ascending=False).head(limit)
+                idx = get_index_risk(df)
+                for _, r in df.iterrows():
+                    c = {
+                        "market": str(r.get("Market","")),
+                        "code": str(r["Code"]).zfill(6),
+                        "name": str(r["Name"]),
+                        "theme": str(r["theme"]),
+                        "price": int(safe_float(r["Close"], 0)),
+                        "dayChange": round(safe_float(r["dayChange"], 0), 2),
+                        "amount": int(safe_float(r["Amount"], 0)),
+                        "score": round(safe_float(r["baseScore"], 0), 2),
+                        "source": "KRX_WATCH_100",
+                    }
+                    c = enrich_candidate_risk(c, idx)
+                    c = v168_enrich_candidate(c)
+                    rows.append(c)
+        except Exception:
+            rows = []
+    if not rows:
+        base = cached_candidates() or get_market_candidates(limit=8)
+        rows = [v168_enrich_candidate(dict(x)) for x in base]
+    return sorted(rows, key=lambda x: safe_float(x.get("v168UltimateScore", x.get("riskAdjustedScore", x.get("score", 0))), 0), reverse=True)[:limit]
+
+
+def v168_enrich_candidate(c):
+    """세력유입/급등10분전/후보진화 2.0/고점매도 예상 점수를 후보에 추가합니다."""
+    c = dict(c or {})
+    day = safe_float(c.get("dayChange"), 0)
+    amount = safe_float(c.get("amount"), 0)
+    score = safe_float(c.get("riskAdjustedScore", c.get("score")), 0)
+    reverse = safe_float(c.get("marketReverseScore"), 0)
+    theme = str(c.get("theme",""))
+    overheat = safe_float(c.get("overheatPenalty"), 0)
+    slippage = safe_float(c.get("slippagePenalty"), 0)
+
+    money_flow = min(100, amount / 100_000_000_000 * 18 + max(0, day) * 5 + (10 if any(k in theme for k in ["AI","반도체","전력","데이터센터","광통신"]) else 3))
+    pump_10m = min(100, score * 0.45 + reverse * 0.22 + money_flow * 0.24 - overheat * 0.7 - slippage * 0.5)
+    evolution2 = min(100, safe_float(c.get("v167EvolutionBonus"),0) * 4 + score * 0.65 + money_flow * 0.18)
+    peak_sell = max(0, min(100, 45 + day * 5 + reverse * 0.5 - slippage * 0.8))
+    ultimate = max(0, min(150, score * 0.52 + money_flow * 0.20 + pump_10m * 0.18 + evolution2 * 0.10 - overheat * 0.4))
+
+    c.update({
+        "v168MoneyFlowScore": round(money_flow, 1),
+        "v168Pump10mScore": round(pump_10m, 1),
+        "v168Evolution2Score": round(evolution2, 1),
+        "v168PeakSellPredictScore": round(peak_sell, 1),
+        "v168UltimateScore": round(ultimate, 2),
+        "v168MoneyFlowNote": "세력유입 강함" if money_flow >= 80 else ("수급 관심" if money_flow >= 55 else "수급 대기"),
+        "v168PumpNote": "10분 급등 전조 강함" if pump_10m >= 80 else ("급등 가능성 관찰" if pump_10m >= 60 else "급등 전조 약함"),
+    })
+    return c
+
+
+def v168_build_ultimate_report(force=False):
+    """v168 Ultimate 종합 리포트. 실전 주문은 하지 않고 분석/추천/승인대기만 수행합니다."""
+    cached = read_json(V168_ULTIMATE_FILE, {})
+    if isinstance(cached, dict) and cached.get("time") and not force:
+        try:
+            dt = datetime.strptime(cached["time"][:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST)
+            if (now_kst() - dt).total_seconds() < 60:
+                return cached
+        except Exception:
+            pass
+
+    watch_count = safe_int(read_state().get("v168_watch_candidate_count", 100), 100)
+    focus_count = safe_int(read_state().get("v168_focus_candidate_count", 10), 10)
+    universe = v168_candidate_universe(watch_count)
+    focus = universe[:focus_count]
+    top3 = universe[:3]
+    money_flow_top5 = sorted(universe, key=lambda x: safe_float(x.get("v168MoneyFlowScore"),0), reverse=True)[:5]
+    pump_top5 = sorted(universe, key=lambda x: safe_float(x.get("v168Pump10mScore"),0), reverse=True)[:5]
+    temp = v168_market_temperature_pro_plus(focus or universe[:10])
+    portfolio = v168_portfolio_manager_report()
+    assistant = v168_ai_assistant_report(portfolio, temp, focus)
+    autonomous = v168_autonomous_manager_report(temp, focus, portfolio)
+    report = {
+        "ok": True,
+        "version": APP_VERSION,
+        "time": now_text(),
+        "watch_count": len(universe),
+        "focus_count": len(focus),
+        "top3": top3,
+        "focus10": focus,
+        "money_flow_top5": money_flow_top5,
+        "pump_10m_top5": pump_top5,
+        "market_temperature": temp,
+        "portfolio": portfolio,
+        "assistant": assistant,
+        "autonomous_manager": autonomous,
+        "safety": "자동교체매수/자율운용은 기본 승인대기입니다. 실제 주문은 사용자 승인 및 기존 실전매매 안전장치를 통과해야 합니다.",
+    }
+    write_json(V168_ULTIMATE_FILE, report)
+    st = read_state()
+    st["v168_last_ultimate_report"] = {"time": report["time"], "top": top3[0].get("name") if top3 else "", "temperature": temp.get("temperature"), "label": temp.get("label")}
+    write_state(st)
+    return report
+
+
+def v168_portfolio_manager_report():
+    holdings = read_holdings()
+    total_eval = sum(safe_float(h.get("lastPrice"),0) * safe_float(h.get("qty"),0) for h in holdings)
+    total_buy = sum(safe_float(h.get("buyPrice"),0) * safe_float(h.get("qty"),0) for h in holdings)
+    pnl = total_eval - total_buy
+    rate = (pnl / total_buy * 100) if total_buy else 0
+    cash = get_cash_info()
+    cash_amt = safe_float(cash.get("cash"), 0) if cash.get("ok") else 0
+    total_asset = total_eval + cash_amt
+    cash_ratio = (cash_amt / total_asset * 100) if total_asset else 0
+    stock_ratio = 100 - cash_ratio if total_asset else 0
+    target_cash = 25
+    if read_state().get("index_risk_mode") in ["WEAK","DANGER"]:
+        target_cash = 40
+    elif safe_float(read_state().get("last_market_temperature"),0) >= 80:
+        target_cash = 15
+    opinion = "현금비중 적정" if abs(cash_ratio-target_cash) <= 8 else ("현금비중 과다: 강한 TOP3만 선별" if cash_ratio > target_cash else "주식비중 높음: 신규매수 축소 및 보유 리스크 점검")
+    return {"holdings_count": len(holdings), "total_eval": int(total_eval), "total_buy": int(total_buy), "pnl": int(pnl), "rate": round(rate,2), "cash": int(cash_amt), "cash_ratio": round(cash_ratio,1), "stock_ratio": round(stock_ratio,1), "target_cash_ratio": target_cash, "opinion": opinion, "cash_status": cash}
+
+
+def v168_ai_assistant_report(portfolio=None, temp=None, focus=None):
+    portfolio = portfolio or v168_portfolio_manager_report()
+    temp = temp or v168_market_temperature_pro_plus()
+    focus = list(focus or [])
+    score = 70
+    if safe_float(temp.get("temperature"),0) >= 75: score += 10
+    if safe_float(portfolio.get("rate"),0) > 0: score += 8
+    if portfolio.get("holdings_count",0) <= safe_int(read_state().get("max_positions",3),3): score += 5
+    score = max(0,min(100,score))
+    weaknesses = []
+    if safe_float(portfolio.get("cash_ratio"),0) < 10:
+        weaknesses.append("현금비중이 낮아 급락 대응력이 약합니다.")
+    if not focus:
+        weaknesses.append("집중감시 후보가 부족합니다.")
+    if not weaknesses:
+        weaknesses.append("현재 큰 약점은 제한적입니다. 다만 추격매수는 금지합니다.")
+    strengths = ["AI후보/키움진단/고점추적 구조가 연결되어 있습니다.", "시장온도에 따라 신규매수 강도를 조절할 수 있습니다."]
+    direction = "TOP3와 급등예상 TOP5를 중심으로 선별하고, 실전주문 전 키움 현재가·주문가능금액을 재검증하세요."
+    return {"investment_score": score, "strengths": strengths, "weaknesses": weaknesses, "direction": direction}
+
+
+def v168_autonomous_manager_report(temp=None, focus=None, portfolio=None):
+    state = read_state()
+    temp = temp or v168_market_temperature_pro_plus(focus)
+    focus = list(focus or [])
+    portfolio = portfolio or v168_portfolio_manager_report()
+    allowed = bool(state.get("v168_autonomous_manager_enabled", False))
+    auto_rotation = bool(state.get("v168_auto_rotation_enabled", False))
+    best = focus[0] if focus else {}
+    action = "승인대기"
+    reason = "실전매매 영향 기능은 사용자 승인 후 적용합니다."
+    if safe_float(temp.get("temperature"),0) < safe_float(state.get("market_temp_stop_buy_below",25),25):
+        action = "신규매수 중지 권고"
+        reason = "시장온도가 낮아 신규매수보다 보유 리스크 관리가 우선입니다."
+    elif best:
+        action = "최우선 후보 감시"
+        reason = f"{best.get('name')} 후보가 상위입니다. 급등예상/세력유입/키움 현재가를 확인하세요."
+    return {"enabled": allowed, "auto_rotation_enabled": auto_rotation, "action": action, "reason": reason, "approval_required": bool(state.get("v168_require_user_approval", True)), "best_candidate": best}
+
+
+def render_v168_ultimate_center():
+    """v168: V168~V171 기능을 하나로 묶은 AI 자산운용사 Ultimate 요약 UI."""
+    try:
+        r = v168_build_ultimate_report()
+        temp = r.get("market_temperature", {})
+        top3 = r.get("top3", [])
+        money5 = r.get("money_flow_top5", [])
+        pump5 = r.get("pump_10m_top5", [])
+        pf = r.get("portfolio", {})
+        assistant = r.get("assistant", {})
+        auto = r.get("autonomous_manager", {})
+        def rows(items, key="v168UltimateScore"):
+            out = []
+            for i,x in enumerate(items,1):
+                out.append(f"<div class='v168-row'><div><b>{i}. {html_escape(x.get('name','-'))}</b><small>{html_escape(x.get('theme',''))} · {html_escape(x.get('code',''))}</small></div><div><b>{safe_float(x.get(key),0):.1f}</b><small>{html_escape(x.get('v168PumpNote',''))}</small></div></div>")
+            return ''.join(out) or "<div class='notice small'>데이터 대기중</div>"
+        return f"""
+        <section class="v168-center" id="v168-ultimate">
+          <div class="v168-title"><h2>🏦 V169 AI 자산운용센터</h2><span class="v168-tag">V171 기능 통합</span></div>
+          <p class="muted">AI후보100 · 집중감시10 · 세력유입 · 급등10분전 · 헤지펀드센터 · 고점매도예측 · 자율운용매니저를 통합 표시합니다.</p>
+          <div class="v168-grid">
+            <div><span>시장온도 PRO+</span><b>{safe_float(temp.get('temperature'),0):.0f}점 · {html_escape(temp.get('label','-'))}</b><small>{html_escape(temp.get('mode',''))}</small></div>
+            <div><span>감시/집중</span><b>{r.get('watch_count',0)}개 / {r.get('focus_count',0)}개</b><small>AI후보100 · TOP10 집중감시</small></div>
+            <div><span>총자산 추정</span><b>{money(pf.get('total_eval',0)+pf.get('cash',0))}</b><small>현금 {pf.get('cash_ratio',0)}% / 주식 {pf.get('stock_ratio',0)}%</small></div>
+            <div><span>AI 투자점수</span><b>{assistant.get('investment_score',0)}점</b><small>{html_escape(pf.get('opinion',''))}</small></div>
+          </div>
+          <div class="v168-warn">실전 주문 영향 기능(자동교체매수·자율운용·고점매도)은 기본 승인대기 구조입니다. 직접 승인 전 자동 적용되지 않습니다.</div>
+          <details open><summary>🏆 AI 추천 TOP3</summary><div class="v168-list">{rows(top3)}</div></details>
+          <details><summary>💸 세력유입 TOP5</summary><div class="v168-list">{rows(money5,'v168MoneyFlowScore')}</div></details>
+          <details><summary>🚀 급등 10분전 예상 TOP5</summary><div class="v168-list">{rows(pump5,'v168Pump10mScore')}</div></details>
+          <details><summary>🧭 AI 자율운용 매니저</summary><div class="notice small"><b>{html_escape(auto.get('action',''))}</b><br>{html_escape(auto.get('reason',''))}</div></details>
+          <div class="btn-row">
+            <button onclick="callAndReload('/api/v168_refresh_ultimate')">V168 재분석</button>
+            <a class="button dark" href="/api/v168_ultimate">JSON 확인</a>
+          </div>
+        </section>"""
+    except Exception as e:
+        return f"<section class='v168-center' id='v168-ultimate'><h2>🏦 V169 AI 자산운용센터</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+
 def render_version_summary():
     try:
         latest = UPDATE_HISTORY[0]
@@ -1567,6 +1854,7 @@ def render_quick_status_bar():
 def render_mobile_menu_cards():
     """v166: 모바일에서 가로 드래그 없이 보이는 3열 카드형 메뉴입니다."""
     items = [
+        ("#v168-ultimate", "🏦", "AI자산운용", "후보100·급등예측"),
         ("#picks", "🤖", "AI후보", "실시간 후보·추천이유"),
         ("#profit-optimization", "🚀", "수익최적화", "복기·동적익절·시장온도"),
         ("#conditions", "🧭", "매매조건", "익절·손절·재매수"),
@@ -2280,6 +2568,224 @@ def render_kiwoom_diagnosis_section():
         return f"<section class='card' id='kiwoom-diagnosis'><h2>🧪 키움 진단센터 PRO</h2><div class='notice'>진단센터 표시 오류: {html_escape(str(e))}</div></section>"
 
 
+
+# ==============================
+# v169 AI 자산운용센터 정리/경량화 패치
+# ==============================
+
+def v169_analyze_holding(h):
+    """보유종목별 보유/추가매수/매도 점수와 목표/손절 의견을 간단히 산출합니다."""
+    h = normalize_holding(h)
+    profit = safe_float(h.get("profitRate"), 0)
+    ai_stage = str(h.get("aiPeakStage", ""))
+    price_src = str(h.get("priceSource", "CACHE"))
+    hold_score = 55 + min(30, max(-20, profit * 4))
+    if "고점추적" in ai_stage:
+        hold_score += 10
+    if price_src == "KIWOOM":
+        hold_score += 5
+    sell_score = 35
+    if profit <= -2:
+        sell_score += 25
+    if h.get("trailingStopPrice") and safe_float(h.get("lastPrice"),0) <= safe_float(h.get("trailingStopPrice"),0) * 1.003:
+        sell_score += 25
+    add_score = max(0, min(100, hold_score - 15 if profit >= 0 else hold_score - 30))
+    hold_score = max(0, min(100, hold_score))
+    sell_score = max(0, min(100, sell_score))
+    if sell_score >= 70:
+        opinion = "매도/리스크 점검 우선"
+    elif hold_score >= 75:
+        opinion = "보유 유지 우세"
+    elif add_score >= 65:
+        opinion = "소액 추가매수는 가능하나 키움 현재가 확인 필요"
+    else:
+        opinion = "관망"
+    return {
+        "code": h.get("code"), "name": h.get("name"),
+        "profitRate": round(profit, 2),
+        "hold_score": round(hold_score, 1),
+        "add_score": round(add_score, 1),
+        "sell_score": round(sell_score, 1),
+        "target": h.get("activeDynamicTarget") or h.get("target"),
+        "stop": h.get("stop"),
+        "trailingStopPrice": h.get("trailingStopPrice", 0),
+        "opinion": opinion,
+        "stage": ai_stage,
+    }
+
+
+def v169_fund_manager_report(portfolio=None, temp=None, focus=None):
+    """성일 AI 펀드매니저: 현금/테마/종목수 기준 자산배분 제안."""
+    portfolio = portfolio or v168_portfolio_manager_report()
+    temp = temp or v168_market_temperature_pro_plus(focus)
+    holdings = read_holdings()
+    focus = list(focus or [])
+    temp_score = safe_float(temp.get("temperature"), 0)
+    if temp_score >= 80:
+        target_cash = 15
+        mode = "공격 운용"
+    elif temp_score >= 60:
+        target_cash = 25
+        mode = "균형 운용"
+    elif temp_score >= 40:
+        target_cash = 40
+        mode = "방어 운용"
+    else:
+        target_cash = 60
+        mode = "현금방어"
+    themes = {}
+    for x in list(focus[:5]) + holdings:
+        th = str(x.get("theme") or classify_theme(str(x.get("name",""))))
+        themes[th] = themes.get(th, 0) + 1
+    theme_rank = sorted(themes.items(), key=lambda kv: kv[1], reverse=True)[:4]
+    allocation = []
+    remain = max(0, 100 - target_cash)
+    if theme_rank:
+        base = max(10, int(remain / max(1, len(theme_rank))))
+        for th, _ in theme_rank:
+            allocation.append({"theme": th, "weight": base})
+    else:
+        allocation = [{"theme": "AI후보 TOP5", "weight": remain}]
+    return {
+        "mode": mode,
+        "target_cash_ratio": target_cash,
+        "current_cash_ratio": portfolio.get("cash_ratio", 0),
+        "allocation": allocation,
+        "opinion": f"시장온도 {temp_score:.0f}점 기준 {mode}. 목표 현금비중은 {target_cash}%입니다.",
+    }
+
+
+def v169_review_2_report():
+    """매매복기 2.0: 최근 거래를 요일/시간/전략 단위로 요약합니다."""
+    ledger = read_ledger()[-100:]
+    if not ledger:
+        return {"summary": "최근 매매기록이 부족합니다.", "by_strategy": [], "by_hour": [], "by_weekday": []}
+    by_strategy, by_hour, by_weekday = {}, {}, {}
+    for e in ledger:
+        pnl = safe_float(e.get("pnl"), 0)
+        strategy = str(e.get("strategy") or "AI후보형")
+        try:
+            dt = datetime.strptime(str(e.get("time",""))[:19], "%Y-%m-%d %H:%M:%S")
+            hour = f"{dt.hour:02d}시"
+            weekday = ["월","화","수","목","금","토","일"][dt.weekday()]
+        except Exception:
+            hour, weekday = "미확인", "미확인"
+        for box, key in [(by_strategy, strategy), (by_hour, hour), (by_weekday, weekday)]:
+            row = box.setdefault(key, {"trades":0,"wins":0,"pnl":0})
+            row["trades"] += 1
+            row["wins"] += 1 if pnl > 0 else 0
+            row["pnl"] += pnl
+    def pack(box):
+        out=[]
+        for k,v in box.items():
+            trades=max(1,v["trades"])
+            out.append({"name": k, "trades": v["trades"], "win_rate": round(v["wins"]/trades*100,1), "pnl": int(v["pnl"])})
+        return sorted(out, key=lambda x:(x["pnl"],x["win_rate"]), reverse=True)[:6]
+    return {"summary": f"최근 {len(ledger)}건 기준 복기입니다.", "by_strategy": pack(by_strategy), "by_hour": pack(by_hour), "by_weekday": pack(by_weekday)}
+
+
+def v169_build_asset_center_report(force=False):
+    """v169: v168의 여러 센터를 AI 자산운용센터 하나로 통합한 경량 리포트."""
+    base = v168_build_ultimate_report(force=force)
+    focus = (base.get("focus10") or [])[:safe_int(read_state().get("v169_focus_candidate_count",5),5)]
+    temp = base.get("market_temperature") or v168_market_temperature_pro_plus(focus)
+    portfolio = base.get("portfolio") or v168_portfolio_manager_report()
+    holdings_analysis = [v169_analyze_holding(h) for h in read_holdings()]
+    fund = v169_fund_manager_report(portfolio, temp, focus)
+    review2 = v169_review_2_report()
+    report = {
+        "ok": True,
+        "version": APP_VERSION,
+        "time": now_text(),
+        "watch_count": base.get("watch_count",0),
+        "focus_count": len(focus),
+        "focus_top5": focus,
+        "money_flow_top5": base.get("money_flow_top5", [])[:5],
+        "pump_10m_top5": base.get("pump_10m_top5", [])[:5],
+        "market_temperature": temp,
+        "portfolio": portfolio,
+        "fund_manager": fund,
+        "holdings_ai": holdings_analysis,
+        "review_2": review2,
+        "removed_or_hidden": ["AI투자비서 단독메뉴", "TOP3 비교 단독표시", "중복 진단 API 메뉴"],
+        "compatibility": "v168 API는 호환 유지, 화면은 v169 AI 자산운용센터 중심으로 정리",
+    }
+    st = read_state()
+    st["v169_last_asset_center_report"] = {"time": report["time"], "focus_count": report["focus_count"], "temperature": temp.get("temperature"), "label": temp.get("label")}
+    write_state(st)
+    return report
+
+
+def render_v168_ultimate_center():
+    """v169: 기존 v168 Ultimate 영역을 AI 자산운용센터로 통합 표시합니다."""
+    try:
+        r = v169_build_asset_center_report()
+        temp = r.get("market_temperature", {})
+        focus = r.get("focus_top5", [])
+        money5 = r.get("money_flow_top5", [])
+        pump5 = r.get("pump_10m_top5", [])
+        pf = r.get("portfolio", {})
+        fund = r.get("fund_manager", {})
+        holdings_ai = r.get("holdings_ai", [])
+        review2 = r.get("review_2", {})
+        def rows(items, key="v168UltimateScore"):
+            out = []
+            for i,x in enumerate(items,1):
+                out.append(f"<div class='v168-row'><div><b>{i}. {html_escape(x.get('name','-'))}</b><small>{html_escape(x.get('theme',''))} · {html_escape(x.get('code',''))}</small></div><div><b>{safe_float(x.get(key),0):.1f}</b><small>{html_escape(x.get('v168PumpNote') or x.get('v168MoneyFlowNote') or '')}</small></div></div>")
+            return ''.join(out) or "<div class='notice small'>데이터 대기중</div>"
+        holding_rows = ''.join(
+            f"<div class='v168-row'><div><b>{html_escape(x.get('name','-'))}</b><small>수익률 {safe_float(x.get('profitRate'),0):.2f}% · {html_escape(x.get('stage',''))}</small></div><div><b>보유 {x.get('hold_score',0)}</b><small>매도 {x.get('sell_score',0)} · {html_escape(x.get('opinion',''))}</small></div></div>"
+            for x in holdings_ai
+        ) or "<div class='notice small'>보유종목 분석 대기중</div>"
+        alloc_rows = ''.join(f"<span>{html_escape(a.get('theme'))} {a.get('weight')}%</span>" for a in fund.get('allocation', []))
+        review_rows = ''.join(f"<span>{html_escape(x.get('name'))} 승률 {x.get('win_rate')}% / {money(x.get('pnl'))}</span>" for x in review2.get('by_strategy', [])[:4]) or '<span>복기 데이터 대기</span>'
+        return f"""
+        <section class="v168-center" id="asset-center">
+          <div class="v168-title"><h2>🏦 V169 AI 자산운용센터</h2><span class="v168-tag">메뉴 30% 정리</span></div>
+          <p class="muted">AI투자비서·헤지펀드센터·포트폴리오관리·자율운용매니저를 하나로 통합했습니다. 화면은 TOP5 집중감시와 실보유 AI 판단 중심으로 정리했습니다.</p>
+          <div class="v168-grid">
+            <div><span>시장온도</span><b>{safe_float(temp.get('temperature'),0):.0f}점 · {html_escape(temp.get('label','-'))}</b><small>{html_escape(temp.get('mode',''))}</small></div>
+            <div><span>감시/집중</span><b>{r.get('watch_count',0)}개 / TOP{r.get('focus_count',0)}</b><small>후보100 유지 · 화면은 TOP5 중심</small></div>
+            <div><span>자산/현금</span><b>{money(pf.get('total_eval',0)+pf.get('cash',0))}</b><small>현금 {pf.get('cash_ratio',0)}% → 목표 {fund.get('target_cash_ratio',0)}%</small></div>
+            <div><span>펀드매니저</span><b>{html_escape(fund.get('mode','-'))}</b><small>{html_escape(fund.get('opinion',''))}</small></div>
+          </div>
+          <div class="v168-warn">중복 메뉴 정리: AI투자비서/TOP3 비교/중복 진단 메뉴는 숨김 처리하고, 기존 API 호환은 유지했습니다. 실전 주문 영향 기능은 승인대기 구조를 유지합니다.</div>
+          <details open><summary>🏆 집중감시 TOP5</summary><div class="v168-list">{rows(focus)}</div></details>
+          <details><summary>💸 세력유입 TOP5</summary><div class="v168-list">{rows(money5,'v168MoneyFlowScore')}</div></details>
+          <details><summary>🚀 급등 10분전 TOP5</summary><div class="v168-list">{rows(pump5,'v168Pump10mScore')}</div></details>
+          <details open><summary>💼 실보유 AI 분석센터</summary><div class="v168-list">{holding_rows}</div></details>
+          <details><summary>🧭 AI 펀드매니저 자산배분</summary><div class="chips">{alloc_rows}</div><div class="notice small">{html_escape(fund.get('opinion',''))}</div></details>
+          <details><summary>📘 매매복기 2.0</summary><div class="chips">{review_rows}</div><div class="notice small">{html_escape(review2.get('summary',''))}</div></details>
+          <div class="btn-row">
+            <button onclick="callAndReload('/api/v169_refresh_asset_center')">V169 재분석</button>
+            <a class="button dark" href="/api/v169_asset_center">JSON 확인</a>
+          </div>
+        </section>"""
+    except Exception as e:
+        return f"<section class='v168-center' id='asset-center'><h2>🏦 V169 AI 자산운용센터</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+
+
+def render_mobile_menu_cards():
+    """v169: 사용 빈도 중심으로 메뉴를 30% 줄인 카드형 메뉴."""
+    items = [
+        ("#asset-center", "🏦", "AI자산운용", "TOP5·실보유·펀드"),
+        ("#picks", "🤖", "AI후보", "추천이유·급등감시"),
+        ("#conditions", "🧭", "매매조건", "익절·손절·고점매도"),
+        ("#analysis-center", "📊", "AI분석", "리포트·복기·전략"),
+        ("#kiwoom-diagnosis", "🔧", "키움진단", "토큰·계좌·실보유"),
+        ("#holdings", "💼", "보유/매도", "실보유·수동매도"),
+    ]
+    cards = []
+    for href, icon, title, desc in items:
+        cards.append(f"<a href='{href}'><b>{icon} {html_escape(title)}</b><span>{html_escape(desc)}</span></a>")
+    return f"""
+    <div class="menu-grid-v167 menu-grid-v169">
+      {''.join(cards)}
+    </div>
+    <div class="menu-help-v167">
+      <b>v169 정리 방향</b> AI투자비서·헤지펀드·포트폴리오·자율운용은 <b>AI자산운용센터</b> 하나로 통합했습니다. 사용 순서: AI자산운용 → AI후보 → 키움진단 → 매매조건 → 보유/매도.
+    </div>"""
+
 def render_page():
     state = read_state()
     return render_template_string(TEMPLATE,
@@ -2300,6 +2806,7 @@ def render_page():
         quick_status_bar=render_quick_status_bar(),
         menu_cards=render_mobile_menu_cards(),
         kiwoom_diagnosis=render_kiwoom_diagnosis_section(),
+        v168_ultimate=render_v168_ultimate_center(),
     )
 
 
@@ -2324,9 +2831,17 @@ details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form-grid label{font-weight:900;color:#334155}.form-grid input{width:100%;margin-top:6px;border:1px solid #dbe8d5;border-radius:14px;padding:12px;font-size:15px;background:#fbfdff}.check{display:block;margin:12px 0;font-weight:900}.button.dark{background:var(--dark)}
 .scan-status{background:#f4f8ff;border:1px dashed #bfd3ef;border-radius:20px;padding:15px;margin:12px 0;color:#334155;font-weight:700}.scan-status b{color:#0f172a}
 .summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.summary-grid div{background:#f8fbff;border:1px solid #e3ebf4;border-radius:16px;padding:12px}.summary-grid span{display:block;color:var(--muted);font-size:12px}.summary-grid b{font-size:20px}.upgrade-box{border:1px solid #dce8dc;border-radius:22px;padding:16px;margin:12px 0;background:#fbfffb}.strategy-card{border:1px solid #dfe8f2;border-radius:20px;padding:14px;margin:10px 0;background:#fff}.strategy-card.best{border-color:#9bd4ad;background:#f4fff6}.strategy-card .tag{float:right;border-radius:999px;background:#eaf2ff;color:#2d6cdf;padding:5px 10px;font-weight:900;font-size:12px}.reason-list{color:#667085}.reason-list li{margin:6px 0}.pill-warn{display:inline-block;border-radius:999px;background:#fff4d5;color:#8a5a00;padding:6px 10px;font-weight:900}.pill-ok{display:inline-block;border-radius:999px;background:#e8fff0;color:#10803d;padding:6px 10px;font-weight:900}.price-meta{margin-top:10px;padding:10px 12px;border-radius:14px;background:#eef8e9;color:#385c42;font-size:13px;font-weight:800}.price-meta.stale{background:#fff4d5;color:#8a5a00}
+.menu-grid-v169{grid-template-columns:repeat(2,1fr)!important}.menu-grid-v169 a{min-height:72px}
 @media(max-width:430px){body{font-size:15px}.form-grid{grid-template-columns:1fr}.wrap{padding:10px 10px 70px}.hero h1{font-size:28px}.card{padding:18px;border-radius:24px}.card h2{font-size:24px}.grid2 b{font-size:18px}button{font-size:15px;padding:12px 15px}.menu-grid-v167{grid-template-columns:repeat(3,1fr);gap:6px}.menu-grid-v167 a{padding:9px 4px;min-height:64px}.menu-grid-v167 b{font-size:13px}.menu-grid-v167 span{font-size:10.5px}.status-bar-v167{grid-template-columns:repeat(2,1fr)}}
 
 .status-bar-v167{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.status-bar-v167 div{background:#fff;border:1px solid #dce7d6;border-radius:14px;padding:10px}.status-bar-v167 span{display:block;color:var(--muted);font-size:12px}.status-bar-v167 b{font-size:15px}.menu-grid-v167{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 14px}.menu-grid-v167 a{text-decoration:none;color:var(--ink);background:var(--pale);border-radius:16px;padding:11px 8px;text-align:center;border:1px solid #dce7d6}.menu-grid-v167 b{display:block;font-size:14px}.menu-grid-v167 span{display:block;color:var(--muted);font-size:11px;margin-top:3px}.menu-help-v167,.market-temp-v167{background:#eef8e9;border:1px solid #d8ead4;border-radius:18px;padding:12px;margin:10px 0;color:var(--ink)}.market-temp-v167 b{font-size:18px}.market-temp-v167 p{margin:6px 0}.market-temp-v167 small{color:var(--muted)}
+
+.v168-center{background:linear-gradient(135deg,#f7fff7,#fff9e8);border:1px solid #d7ead5;border-radius:28px;padding:20px;margin:16px 0;box-shadow:0 8px 24px rgba(32,59,45,.06)}
+.v168-title{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.v168-title h2{margin:0;font-size:26px}.v168-tag{border-radius:999px;background:#e8fff0;color:#0f7a3d;padding:7px 10px;font-weight:900;font-size:12px}
+.v168-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.v168-grid div{background:#fff;border:1px solid #e3eadf;border-radius:18px;padding:12px}.v168-grid span{display:block;color:#667085;font-size:12px}.v168-grid b{font-size:19px;color:#203b2d}
+.v168-list{display:grid;gap:8px}.v168-row{background:#fff;border:1px solid #e3eadf;border-radius:16px;padding:11px;display:flex;justify-content:space-between;gap:8px;align-items:center}.v168-row small{display:block;color:#667085}.v168-warn{background:#fff4d5;border:1px solid #ffd27b;border-radius:16px;padding:12px;margin:10px 0;color:#715100;font-weight:800}
+@media(max-width:430px){.v168-grid{grid-template-columns:1fr}.v168-title h2{font-size:23px}.v168-row{display:block}}
+
 </style>
 <script>
 function toggleDetail(id){const el=document.getElementById(id); if(el){el.classList.toggle('open')}}
@@ -2355,6 +2870,7 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
   </div>
   {{quick_status_bar|safe}}
   {{menu_cards|safe}}
+  {{v168_ultimate|safe}}
   {{candidates|safe}}
   {{conditions|safe}}
   {{ai_upgrade|safe}}
@@ -2879,7 +3395,7 @@ def api_update_conditions():
 @app.route("/api/reset_conditions")
 def api_reset_conditions():
     state = read_state()
-    for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","ai_peak_sell_enabled","ai_peak_tight_trailing_enabled","ai_peak_stage1_profit_rate","ai_peak_stage2_profit_rate","ai_peak_stage3_profit_rate","ai_peak_trailing_stage1","ai_peak_trailing_stage2","ai_peak_trailing_stage3","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled","profit_optimization_enabled","market_temperature_pro_enabled","candidate_evolution_enabled","trade_review_enabled","strength_alert_enabled","strength_drop_alert_threshold","dynamic_take_profit_enabled","dynamic_take_profit_normal","dynamic_take_profit_strong","dynamic_take_profit_super","dynamic_take_profit_limitup","market_temp_stop_buy_below","market_temp_reduce_buy_below"]:
+    for k in ["target_rate","stop_rate","profit_guard_rate","trailing_stop_rate","dynamic_target_enabled","dynamic_target_boost_rate","dynamic_target_min_profit_rate","ai_peak_sell_enabled","ai_peak_tight_trailing_enabled","ai_peak_stage1_profit_rate","ai_peak_stage2_profit_rate","ai_peak_stage3_profit_rate","ai_peak_trailing_stage1","ai_peak_trailing_stage2","ai_peak_trailing_stage3","candidate_scan_interval","min_ai_score","max_day_change","min_amount","min_order_cash","max_positions","rebuy_cooldown_minutes","volume_keep_filter","index_weak_buy_scale","switch_buy_enabled","profit_optimization_enabled","market_temperature_pro_enabled","candidate_evolution_enabled","trade_review_enabled","strength_alert_enabled","strength_drop_alert_threshold","dynamic_take_profit_enabled","dynamic_take_profit_normal","dynamic_take_profit_strong","dynamic_take_profit_super","dynamic_take_profit_limitup","market_temp_stop_buy_below","market_temp_reduce_buy_below","v168_ultimate_enabled","v168_watch_candidate_count","v168_focus_candidate_count","v168_pump_predict_enabled","v168_money_flow_enabled","v168_hedge_fund_center_enabled","v168_ai_assistant_enabled","v168_portfolio_manager_enabled","v168_peak_sell_predict_enabled","v168_profit_maximizer_enabled","v168_autonomous_manager_enabled","v168_auto_rotation_enabled","v168_require_user_approval"]:
         state[k] = DEFAULT_STATE[k]
     write_state(state)
     set_status("기본조건 복원", "매매조건을 v159 기본값으로 복원했습니다.")
@@ -2984,6 +3500,70 @@ def api_v167_profit_optimization():
 def api_v167_review_center():
     reviews = read_json(REVIEW_FILE, [])
     return jsonify({"ok": True, "version": APP_VERSION, "reviews": reviews[:50], "last_summary": read_state().get("last_review_summary", "")})
+
+
+@app.route("/api/v168_ultimate")
+def api_v168_ultimate():
+    return jsonify(v168_build_ultimate_report(force=str(request.args.get("force","0"))=="1"))
+
+
+@app.route("/api/v168_refresh_ultimate")
+def api_v168_refresh_ultimate():
+    r = v168_build_ultimate_report(force=True)
+    set_status("V168 Ultimate 재분석", f"감시 {r.get('watch_count',0)}개 / 집중 {r.get('focus_count',0)}개 / 시장온도 {r.get('market_temperature',{}).get('temperature',0)}점")
+    return render_page()
+
+
+@app.route("/api/v168_candidate_center")
+def api_v168_candidate_center():
+    r = v168_build_ultimate_report(force=str(request.args.get("force","0"))=="1")
+    return jsonify({"ok": True, "version": APP_VERSION, "watch100": r.get("top3", []) + r.get("focus10", [])[3:], "focus10": r.get("focus10", []), "money_flow_top5": r.get("money_flow_top5", []), "pump_10m_top5": r.get("pump_10m_top5", [])})
+
+
+@app.route("/api/v168_asset_manager")
+def api_v168_asset_manager():
+    r = v168_build_ultimate_report(force=str(request.args.get("force","0"))=="1")
+    return jsonify({"ok": True, "version": APP_VERSION, "portfolio": r.get("portfolio", {}), "assistant": r.get("assistant", {}), "market_temperature": r.get("market_temperature", {})})
+
+
+@app.route("/api/v168_autonomous_manager")
+def api_v168_autonomous_manager():
+    r = v168_build_ultimate_report(force=str(request.args.get("force","0"))=="1")
+    return jsonify({"ok": True, "version": APP_VERSION, "autonomous_manager": r.get("autonomous_manager", {}), "safety": r.get("safety")})
+
+
+@app.route("/api/v168_rotation_recommendation")
+def api_v168_rotation_recommendation():
+    """자동교체매수 추천만 제공합니다. 실제 교체매수는 사용자 승인과 별도 주문 안전장치가 필요합니다."""
+    r = v168_build_ultimate_report(force=True)
+    holdings = read_holdings()
+    best = (r.get("focus10") or [{}])[0]
+    holding_scores = []
+    for h in holdings:
+        holding_scores.append({"code": h.get("code"), "name": h.get("name"), "profitRate": h.get("profitRate"), "aiHoldMode": h.get("aiHoldMode", False)})
+    return jsonify({"ok": True, "version": APP_VERSION, "recommendation": {"best_new_candidate": best, "current_holdings": holding_scores, "action": "승인대기", "message": "신규후보가 보유종목보다 강할 때 교체매수를 추천합니다. 실전 주문은 자동 실행하지 않습니다."}})
+
+
+@app.route("/api/v169_asset_center")
+def api_v169_asset_center():
+    return jsonify(v169_build_asset_center_report(force=str(request.args.get("force","0"))=="1"))
+
+
+@app.route("/api/v169_refresh_asset_center")
+def api_v169_refresh_asset_center():
+    r = v169_build_asset_center_report(force=True)
+    set_status("V169 자산운용센터 재분석", f"집중 TOP{r.get('focus_count',0)} / 시장온도 {r.get('market_temperature',{}).get('temperature',0)}점 / {r.get('fund_manager',{}).get('mode','')}")
+    return render_page()
+
+
+@app.route("/api/v169_holdings_ai")
+def api_v169_holdings_ai():
+    return jsonify({"ok": True, "version": APP_VERSION, "holdings_ai": [v169_analyze_holding(h) for h in read_holdings()]})
+
+
+@app.route("/api/v169_review2")
+def api_v169_review2():
+    return jsonify({"ok": True, "version": APP_VERSION, "review_2": v169_review_2_report()})
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
