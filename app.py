@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v174 STOCK NAME AUTO REPAIR
-파일명: app_kiwoom_real_auto_scalping_v174_stock_name_auto_repair.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v175 SAFE STOCK NAME REPAIR
+파일명: app_kiwoom_real_auto_scalping_v175_safe_stock_name_repair.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,12 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v174"
+APP_VERSION = "v175"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v174_stock_name_auto_repair.py"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v175_safe_stock_name_repair.py"
 APP_PATCH_NAME = "AI_AUTONOMOUS_FUND_MANAGER_NAME_FIX"
 UPDATE_HISTORY = [
+    {"version": "v175", "title": "긴급 안정화 / 종목명 자동복구 경량화", "items": ["앱 실행 시 외부 KRX/FinanceDataReader 조회가 화면 로딩을 막지 않도록 제거", "종목명 자동복구는 내장DB·후보캐시·보유캐시만 우선 사용", "Render/Safari 네트워크 응답중단 방지를 위해 메인 화면에서 무거운 조회 차단", "V174 종목명 복구 기능은 유지하되 서버 시작 안정성을 우선 적용", "중복 V174 API 라우트 정리 및 V175 API 추가"]},
     {"version": "v174", "title": "종목명 자동복구 엔진 / 보유카드 실데이터 보강", "items": ["001440처럼 코드만 보이는 보유종목을 자동으로 대한전선 등 한글 종목명으로 복구", "종목명 조회 우선순위 개선: 현재값 → 내장DB → 후보DB → 보유캐시 → FinanceDataReader KRX", "실보유 동기화·캐시·백업파일에 저장된 코드형 이름까지 자동 보정", "보유종목 카드에 코드/시장/이름출처/가격출처 표시 강화", "AI 보유점수와 매도위험 점수 계산 시 데이터품질·손익·보호선·고점되돌림을 더 반영", "V174부터 이후 업데이트는 V175, V176처럼 정수 버전 순차 적용"]},
     {"version": "v173", "title": "AI Autonomous Fund Manager / 자율운용센터 통합 + 종목명 표시 보정", "items": ["V169~V172 화면 흔적 정리", "AI 자율운용센터 통합", "메뉴 약 30% 재정리", "보유종목 카드 UI 개선", "AI 보유유지 점수 추가", "AI 운용일지 추가", "AI 매도판단 강화", "모바일 카드형 디자인 개선", "매수·보유·매도 이유 설명 강화", "키움 보유응답이 코드만 줄 때 한글 종목명 자동 보정"]},
     {"version": "v172", "title": "클린 통합 UI / 이전버전 노출 정리", "items": ["v169/v170 섹션명을 v171 이하 버전명 없이 통합", "AI 자율운용 매니저 중심 화면 정리", "AI 자산운용/매도AI/AI후보/키움진단 메뉴를 보기 좋게 재배치", "모바일 카드 간격·글자 크기·색상 정리", "이전 기능은 유지하되 화면에는 현재버전 기준으로 표시"]},
@@ -261,7 +262,7 @@ DEFAULT_STATE = {
     "v174_repair_holdings_cache_enabled": True,
     "v174_show_name_source_enabled": True,
     "v174_real_holding_card_enabled": True,
-    "v174_last_name_repair_report": {},
+    "v175_last_name_repair_report": {},
 }
 
 
@@ -274,7 +275,7 @@ THEME_MAP = {
     "삼성전기": "전력설비/데이터센터", "이수페타시스": "AI서버/PCB",
 }
 
-# v173.1: 종목코드만 표시되는 문제 보정용 기본 종목명 맵
+# v175: 종목코드만 표시되는 문제 보정용 기본 종목명 맵
 # 키움 보유응답에서 종목명이 비어 있거나 숫자코드로만 내려오는 경우
 # 앱 화면에서는 resolve_stock_name()으로 한글 종목명을 우선 표시합니다.
 STOCK_NAME_MAP = {
@@ -296,6 +297,36 @@ STOCK_NAME_MAP = {
     "006400": "삼성SDI",
     "247540": "에코프로비엠",
     "086520": "에코프로",
+    "003490": "대한항공",
+    "000810": "삼성화재",
+    "030200": "KT",
+    "017670": "SK텔레콤",
+    "066570": "LG전자",
+    "051910": "LG화학",
+    "068270": "셀트리온",
+    "028260": "삼성물산",
+    "012330": "현대모비스",
+    "096770": "SK이노베이션",
+    "034020": "두산에너빌리티",
+    "042660": "한화오션",
+    "003670": "포스코퓨처엠",
+    "207940": "삼성바이오로직스",
+    "005490": "POSCO홀딩스",
+    "105560": "KB금융",
+    "055550": "신한지주",
+    "086790": "하나금융지주",
+    "316140": "우리금융지주",
+    "402340": "SK스퀘어",
+    "011200": "HMM",
+    "010130": "고려아연",
+    "032830": "삼성생명",
+    "018260": "삼성에스디에스",
+    "033780": "KT&G",
+    "009540": "HD한국조선해양",
+    "329180": "HD현대중공업",
+    "267260": "HD현대일렉트릭",
+    "047050": "포스코인터내셔널",
+    "064350": "현대로템",
 }
 _STOCK_LISTING_CACHE = {"ts": 0, "map": {}}
 
@@ -316,12 +347,16 @@ def _is_code_like_name(name, code=""):
 
 
 def resolve_stock_name(code, current_name=""):
-    """종목명이 비어 있거나 001440처럼 코드로만 보일 때 한글 종목명으로 보정합니다.
+    """V175 안전형 종목명 자동복구.
+
+    서버 시작/메인화면 로딩 중에는 외부 KRX/FinanceDataReader 조회를 하지 않습니다.
+    Render에서 외부 조회가 지연되면 Safari에 "서버 응답 중단"으로 보일 수 있어,
+    V175부터는 아래 경량 우선순위만 사용합니다.
 
     1순위: 현재 이름이 정상 한글/문자 이름이면 그대로 사용
     2순위: 내장 STOCK_NAME_MAP
-    3순위: FinanceDataReader KRX 종목리스트 캐시
-    4순위: 기존값 또는 코드
+    3순위: 후보/보유 캐시에서 회수한 이름
+    4순위: 최종 코드 표시
     """
     code = str(code or "").zfill(6)
     current_name = str(current_name or "").strip()
@@ -329,31 +364,7 @@ def resolve_stock_name(code, current_name=""):
         return current_name
     if code in STOCK_NAME_MAP:
         return STOCK_NAME_MAP[code]
-    try:
-        if fdr is not None:
-            now_ts = time.time()
-            if not _STOCK_LISTING_CACHE.get("map") or now_ts - safe_float(_STOCK_LISTING_CACHE.get("ts"), 0) > 86400:
-                df = fdr.StockListing("KRX")
-                name_map = {}
-                if df is not None and not df.empty:
-                    cols = list(df.columns)
-                    code_col = "Code" if "Code" in cols else ("Symbol" if "Symbol" in cols else "")
-                    name_col = "Name" if "Name" in cols else ("NameKo" if "NameKo" in cols else "")
-                    if code_col and name_col:
-                        for _, row in df[[code_col, name_col]].dropna().iterrows():
-                            c = re.sub(r"[^0-9]", "", str(row[code_col])).zfill(6)
-                            n = str(row[name_col]).strip()
-                            if c and n:
-                                name_map[c] = n
-                _STOCK_LISTING_CACHE.update({"ts": now_ts, "map": name_map})
-            nm = _STOCK_LISTING_CACHE.get("map", {}).get(code, "")
-            if nm:
-                STOCK_NAME_MAP[code] = nm
-                return nm
-    except Exception:
-        pass
     return current_name or code
-
 
 def stock_name_source(code, current_name=""):
     """V174: 화면/JSON에서 종목명이 어디서 복구되었는지 표시합니다."""
@@ -363,8 +374,6 @@ def stock_name_source(code, current_name=""):
         return "KIWOOM/캐시"
     if code in STOCK_NAME_MAP:
         return "내장 종목DB"
-    if _STOCK_LISTING_CACHE.get("map", {}).get(code):
-        return "KRX 종목DB"
     return "코드표시"
 
 
@@ -406,15 +415,14 @@ def collect_stock_name_candidates_from_cache():
     return name_map
 
 
-def resolve_stock_name_v174(code, current_name=""):
-    """V174 종목명 자동복구 엔진.
+def resolve_stock_name_v175(code, current_name=""):
+    """V175 안전형 종목명 자동복구 엔진.
 
     우선순위:
     1) 정상 current_name
     2) 내장 STOCK_NAME_MAP
     3) AI후보/보유 캐시에서 회수한 이름
-    4) FinanceDataReader KRX 종목리스트
-    5) 최종 코드 표시
+    4) 최종 코드 표시
     """
     code = str(code or "").zfill(6)
     current_name = str(current_name or "").strip()
@@ -430,7 +438,7 @@ def resolve_stock_name_v174(code, current_name=""):
 
 
 def repair_holding_names(items, persist=False):
-    """V174: 보유종목 리스트의 코드형/빈 종목명을 한글명으로 일괄 보정합니다."""
+    """V175: 보유종목 리스트의 코드형/빈 종목명을 한글명으로 일괄 보정합니다."""
     repaired = []
     changed = 0
     for h in items or []:
@@ -439,7 +447,7 @@ def repair_holding_names(items, persist=False):
         row = dict(h)
         code = str(row.get("code", "")).zfill(6)
         old = str(row.get("name") or "").strip()
-        new = resolve_stock_name_v174(code, old)
+        new = resolve_stock_name_v175(code, old)
         if new and new != old:
             row["name"] = new
             row["nameSource"] = stock_name_source(code, old)
@@ -456,7 +464,7 @@ def repair_holding_names(items, persist=False):
             if repaired:
                 write_json(HOLDINGS_BACKUP_FILE, {"time": now_text(), "items": repaired, "name_repaired": changed, "version": APP_VERSION})
             st = read_state()
-            st["v174_last_name_repair_report"] = {"time": now_text(), "changed": changed, "count": len(repaired)}
+            st["v175_last_name_repair_report"] = {"time": now_text(), "changed": changed, "count": len(repaired)}
             write_state(st)
         except Exception:
             pass
@@ -912,7 +920,7 @@ def _code_from_row(row):
 def _name_from_row(row, code=""):
     val = _first_value(row, ["stk_nm", "stk_name", "name", "종목명", "prdt_name", "item_nm", "isu_nm", "hts_kor_isnm"])
     name = str(val or "").strip()
-    return resolve_stock_name_v174(code, name)
+    return resolve_stock_name_v175(code, name)
 
 
 def _numeric_from_row(row, keys):
@@ -1187,7 +1195,7 @@ def normalize_holding(h):
 
     h.update({
         "code": str(h.get("code", "")).zfill(6),
-        "name": resolve_stock_name_v174(str(h.get("code", "")).zfill(6), h.get("name") or h.get("code", "")),
+        "name": resolve_stock_name_v175(str(h.get("code", "")).zfill(6), h.get("name") or h.get("code", "")),
         "nameSource": stock_name_source(str(h.get("code", "")).zfill(6), h.get("name") or ""),
         "marketLabel": h.get("marketLabel") or infer_market_from_code(str(h.get("code", "")).zfill(6)),
         "qty": qty,
@@ -2665,7 +2673,7 @@ def render_holdings_section():
       <p class="muted">표시 보유 {len(items)}종목 · 출처 {html_escape(res.get('source','CACHE'))}</p>
       <div class="btn-row">
         <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
-        <button onclick="location.href='/api/v174_repair_holding_names'">종목명 자동복구</button>
+        <button onclick="location.href='/api/v175_repair_holding_names'">종목명 자동복구</button>
         <button class="dark" onclick="location.href='/api/status'">API 확인</button>
       </div>
       {''.join(cards)}
@@ -3801,7 +3809,7 @@ def render_v173_autonomous_fund_manager():
           <details open><summary>🏆 TOP5 매수대기 / 집중감시</summary><div class="v168-list">{focus_rows(focus)}</div></details>
           <details open><summary>💼 보유종목 AI 판단</summary><div class="v168-list">{holding_rows(holdings)}</div></details>
           <details><summary>📘 AI 운용일지</summary><div class="chips">{buy_rows}{sell_rows}{risk_rows}</div><div class="notice small">{html_escape(journal.get('comment','운용일지 대기'))}</div></details>
-          <div class="btn-row"><button onclick="callAndReload('/api/v174_refresh_fund_manager')">AI 자율운용 재분석</button><a class="button dark" href="/api/v174_fund_manager">JSON 확인</a></div>
+          <div class="btn-row"><button onclick="callAndReload('/api/v175_refresh_fund_manager')">AI 자율운용 재분석</button><a class="button dark" href="/api/v175_fund_manager">JSON 확인</a></div>
         </section>"""
     except Exception as e:
         return f"<section class='v168-center v173-center' id='autonomous-fund-manager'><h2>🤖 AI Autonomous Fund Manager</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
@@ -3858,7 +3866,7 @@ def render_holdings_section():
       <p class="muted">표시 보유 {len(items)}종목 · 출처 {html_escape(res.get('source','CACHE'))} · AI 보유유지 점수와 매도위험을 우선 표시합니다.</p>
       <div class="btn-row">
         <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
-        <button onclick="location.href='/api/v174_repair_holding_names'">종목명 자동복구</button>
+        <button onclick="location.href='/api/v175_repair_holding_names'">종목명 자동복구</button>
         <button class="dark" onclick="location.href='/api/status'">API 확인</button>
       </div>
       {''.join(cards)}
@@ -4737,12 +4745,12 @@ def api_v171_run_auto_exit_once():
     return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "results": results})
 
 
-@app.route("/api/v174_fund_manager")
+@app.route("/api/v173_fund_manager")
 def api_v173_fund_manager():
     return jsonify(v173_build_fund_manager_report(force=False))
 
 
-@app.route("/api/v174_refresh_fund_manager")
+@app.route("/api/v173_refresh_fund_manager")
 def api_v173_refresh_fund_manager():
     report = v173_build_fund_manager_report(force=True)
     add_alert("V173 AI 자율운용센터 재분석 완료")
@@ -4758,28 +4766,28 @@ def api_v173_holding_ai(code):
     return jsonify({"ok": False, "version": APP_VERSION, "message": "해당 보유종목을 찾지 못했습니다."})
 
 
-@app.route("/api/v174_fund_manager")
-def api_v174_fund_manager():
+@app.route("/api/v175_fund_manager")
+def api_v175_fund_manager():
     return jsonify(v173_build_fund_manager_report(force=False))
 
 
-@app.route("/api/v174_refresh_fund_manager")
-def api_v174_refresh_fund_manager():
+@app.route("/api/v175_refresh_fund_manager")
+def api_v175_refresh_fund_manager():
     report = v173_build_fund_manager_report(force=True)
-    add_alert("V174 AI 자율운용센터 재분석 완료")
-    return jsonify({"ok": True, "version": APP_VERSION, "message": "V174 AI 자율운용센터 재분석 완료", "report": report})
+    add_alert("V175 AI 자율운용센터 재분석 완료")
+    return jsonify({"ok": True, "version": APP_VERSION, "message": "V175 AI 자율운용센터 재분석 완료", "report": report})
 
 
-@app.route("/api/v174_repair_holding_names")
-def api_v174_repair_holding_names():
+@app.route("/api/v175_repair_holding_names")
+def api_v175_repair_holding_names():
     before = get_cached_holdings()
     after = repair_holding_names(before, persist=True)
     changed = sum(1 for x in after if x.get("nameAutoRepaired"))
     return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "changed": changed, "items": after})
 
 
-@app.route("/api/v174_holding_ai/<code>")
-def api_v174_holding_ai(code):
+@app.route("/api/v175_holding_ai/<code>")
+def api_v175_holding_ai(code):
     code = str(code).zfill(6)
     for h in read_holdings():
         if str(h.get("code","")).zfill(6) == code:
