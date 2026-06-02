@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v171 AI AUTO TRADE EXECUTION ENGINE
-파일명: app_kiwoom_real_auto_scalping_v171_ai_auto_trade_execution_engine.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v173 AI AUTONOMOUS FUND MANAGER
+파일명: app_kiwoom_real_auto_scalping_v173_ai_autonomous_fund_manager.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,13 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v171"
+APP_VERSION = "v173"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v171_ai_auto_trade_execution_engine.py"
-APP_PATCH_NAME = "AI_AUTO_TRADE_EXECUTION_ENGINE"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v173_ai_autonomous_fund_manager.py"
+APP_PATCH_NAME = "AI_AUTONOMOUS_FUND_MANAGER"
 UPDATE_HISTORY = [
+    {"version": "v173", "title": "AI Autonomous Fund Manager / 자율운용센터 통합", "items": ["V169~V172 화면 흔적 정리", "AI 자율운용센터 통합", "메뉴 약 30% 재정리", "보유종목 카드 UI 개선", "AI 보유유지 점수 추가", "AI 운용일지 추가", "AI 매도판단 강화", "모바일 카드형 디자인 개선", "매수·보유·매도 이유 설명 강화"]},
+    {"version": "v172", "title": "클린 통합 UI / 이전버전 노출 정리", "items": ["v169/v170 섹션명을 v171 이하 버전명 없이 통합", "AI 자율운용 매니저 중심 화면 정리", "AI 자산운용/매도AI/AI후보/키움진단 메뉴를 보기 좋게 재배치", "모바일 카드 간격·글자 크기·색상 정리", "이전 기능은 유지하되 화면에는 현재버전 기준으로 표시"]},
     {"version": "v171", "title": "AI 자동매수·자동매도 실행 엔진", "items": ["AI 자동매수 유지", "AI 자동부분익절 실행", "AI 전량매도 자동실행", "AI 고점위험/강도하락 자동매도", "자동매도 ON/OFF 안전장치", "텔레그램 자동매도 알림", "자동교체매수는 승인 유지"]},
     {"version": "v170", "title": "AI Exit Engine PRO", "items": ["보유유지/추가매수/부분매도/전량매도/고점위험 점수", "AI 부분익절 엔진", "AI 실보유 분석센터 PRO", "AI 고점매도 PRO+", "매도판단 API/화면 추가", "실전 매도는 사용자 승인 버튼 유지"]},
     {"version": "v169", "title": "AI 자산운용센터 정리/경량화", "items": ["AI투자비서·헤지펀드·포트폴리오·자율운용을 AI 자산운용센터로 통합", "메뉴 약 30% 정리", "TOP3 비교 UI 축소 및 TOP5 집중감시 중심", "실보유 AI 분석센터 추가", "AI 펀드매니저/자산배분 제안", "매매복기 2.0 요약", "v168 API 호환 유지"]},
@@ -240,6 +242,19 @@ DEFAULT_STATE = {
     "v171_auto_sell_count_today": 0,
     "v171_last_auto_sell_date": "",
     "v171_last_auto_sell_report": {},
+    # v173: AI Autonomous Fund Manager
+    "v173_autonomous_fund_manager_enabled": True,
+    "v173_holding_score_enabled": True,
+    "v173_operation_journal_enabled": True,
+    "v173_ai_reason_explain_enabled": True,
+    "v173_menu_clean_enabled": True,
+    "v173_mobile_card_ui_enabled": True,
+    "v173_min_strong_hold_score": 90,
+    "v173_min_hold_score": 80,
+    "v173_caution_hold_score": 70,
+    "v173_exit_score_warning": 75,
+    "v173_exit_score_full_sell": 88,
+    "v173_last_fund_manager_report": {},
 }
 
 
@@ -2187,8 +2202,8 @@ def render_v171_auto_trade_center():
         body = ''.join(rows) if rows else "<div class='notice small'>보유종목이 없어 AI 자동매도 감시 대기중입니다.</div>"
         return f"""
         <section class='card' id='v171-auto-trade'>
-          <h2>🤖 V171 AI 자동매수·자동매도</h2>
-          <p class='muted'>AI 자동매수는 유지하고, 보유종목은 Exit Engine 점수에 따라 자동 부분익절·자동 전량매도·자동손절을 실행합니다. 자동교체매수는 위험도가 높아 승인 구조를 유지합니다.</p>
+          <h2>🤖 AI 자율운용 매니저</h2>
+          <p class='muted'>AI 자동매수와 AI 자동매도를 한 화면에서 관리합니다. 보유종목은 AI 매도엔진 점수에 따라 부분익절·전량매도·손절을 판단하며, 자동교체매수는 안전상 승인 구조를 유지합니다.</p>
           <div class='notice small'><b>현재 AI 자동매도: {'ON' if on else 'OFF'}</b><br>{html_escape(r.get('summary',''))}<br>일일 자동매도 {safe_int(st.get('v171_auto_sell_count_today',0),0)} / {safe_int(st.get('v171_daily_auto_sell_limit',10),10)}회</div>
           <div class='chips'>
             <span>자동매수 {'ON' if st.get('v171_auto_buy_enabled', True) else 'OFF'}</span>
@@ -2203,7 +2218,7 @@ def render_v171_auto_trade_center():
           </div>
         </section>"""
     except Exception as e:
-        return f"<section class='card'><h2>🤖 V171 AI 자동매수·자동매도</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+        return f"<section class='card'><h2>🤖 AI 자율운용 매니저</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
 
 def render_v170_exit_center():
     try:
@@ -2237,23 +2252,23 @@ def render_v170_exit_center():
                 <div class='grid2'><div><label>목표가</label><b>{money(x.get('target',0))}</b></div><div><label>트레일링/손절</label><b>{money(x.get('trailingStopPrice') or x.get('stop'))}</b></div></div>
                 <div class='reason-title'>판단 이유</div><ol>{reasons}</ol>
                 <div class='reason-title'>주의 신호</div><ol>{risks}</ol>
-                <div class='notice small'>v171 AI 자동매도 ON 시 조건 충족 종목은 자동매도됩니다. 자동교체매수는 승인 구조를 유지합니다.</div>
+                <div class='notice small'>AI 자동매도 ON 시 조건 충족 종목은 자동매도됩니다. 자동교체매수는 승인 구조를 유지합니다.</div>
               </details>
             </div>""")
         body = ''.join(rows) if rows else "<div class='notice'>보유종목이 없어 AI 매도판단 대기중입니다.</div>"
         return f"""
         <section class='card' id='exit-engine'>
-          <h2>🎯 V170 AI Exit Engine PRO</h2>
-          <p class='muted'>수익률을 높이기 위해 <b>언제 팔아야 하는지</b>를 집중 분석합니다. 보유유지·추가매수·부분매도·전량매도·고점위험 점수를 종목별로 계산합니다.</p>
+          <h2>🎯 AI 매도엔진 PRO</h2>
+          <p class='muted'>수익률을 높이기 위해 <b>언제 팔아야 하는지</b>를 집중 분석합니다. 보유유지·부분익절·전량매도·고점위험 점수를 종목별로 계산합니다.</p>
           <div class='notice small'><b>{html_escape(r.get('summary',''))}</b><br>{html_escape(r.get('partial_take_profit_rule',''))}</div>
           {body}
           <div class='btn-row'>
-            <button onclick="callAndReload('/api/v170_refresh_exit_engine')">V170 매도판단 재분석</button>
+            <button onclick="callAndReload('/api/v170_refresh_exit_engine')">매도판단 재분석</button>
             <a class='button dark' href='/api/v170_exit_engine'>JSON 확인</a>
           </div>
         </section>"""
     except Exception as e:
-        return f"<section class='card' id='exit-engine'><h2>🎯 V170 AI Exit Engine PRO</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+        return f"<section class='card' id='exit-engine'><h2>🎯 AI 매도엔진 PRO</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
 
 
 def render_v168_ultimate_center():
@@ -2274,11 +2289,12 @@ def render_v168_ultimate_center():
             return ''.join(out) or "<div class='notice small'>데이터 대기중</div>"
         return f"""
         <section class="v168-center" id="v168-ultimate">
-          <div class="v168-title"><h2>🏦 V169 AI 자산운용센터</h2><span class="v168-tag">V171 기능 통합</span></div>
+          <div class="v168-title"><h2>🏦 AI 자산운용센터</h2><span class="v168-tag">통합 운영</span></div>
           <p class="muted">AI후보100 · 집중감시10 · 세력유입 · 급등10분전 · 헤지펀드센터 · 고점매도예측 · 자율운용매니저를 통합 표시합니다.</p>
           <div class="v168-grid">
             <div><span>시장온도 PRO+</span><b>{safe_float(temp.get('temperature'),0):.0f}점 · {html_escape(temp.get('label','-'))}</b><small>{html_escape(temp.get('mode',''))}</small></div>
-            <div><span>감시/집중</span><b>{r.get('watch_count',0)}개 / {r.get('focus_count',0)}개</b><small>AI후보100 · TOP10 집중감시</small></div>
+            <div><span>감시 후보</span><b>{r.get('watch_count',0)}개</b><small>AI후보 전체 감시</small></div>
+            <div><span>집중 감시</span><b>TOP{r.get('focus_count',0)}</b><small>우선 확인 후보</small></div>
             <div><span>총자산 추정</span><b>{money(pf.get('total_eval',0)+pf.get('cash',0))}</b><small>현금 {pf.get('cash_ratio',0)}% / 주식 {pf.get('stock_ratio',0)}%</small></div>
             <div><span>AI 투자점수</span><b>{assistant.get('investment_score',0)}점</b><small>{html_escape(pf.get('opinion',''))}</small></div>
           </div>
@@ -2288,12 +2304,12 @@ def render_v168_ultimate_center():
           <details><summary>🚀 급등 10분전 예상 TOP5</summary><div class="v168-list">{rows(pump5,'v168Pump10mScore')}</div></details>
           <details><summary>🧭 AI 자율운용 매니저</summary><div class="notice small"><b>{html_escape(auto.get('action',''))}</b><br>{html_escape(auto.get('reason',''))}</div></details>
           <div class="btn-row">
-            <button onclick="callAndReload('/api/v168_refresh_ultimate')">V168 재분석</button>
+            <button onclick="callAndReload('/api/v168_refresh_ultimate')">AI 통합 재분석</button>
             <a class="button dark" href="/api/v168_ultimate">JSON 확인</a>
           </div>
         </section>"""
     except Exception as e:
-        return f"<section class='v168-center' id='v168-ultimate'><h2>🏦 V169 AI 자산운용센터</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+        return f"<section class='v168-center' id='v168-ultimate'><h2>🏦 AI 자산운용센터</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
 
 def render_version_summary():
     try:
@@ -3024,7 +3040,7 @@ def render_kiwoom_diagnosis_section():
 
         return f"""
         <section class="card" id="kiwoom-diagnosis">
-          <h2>🔧 키움 진단센터 PRO v167</h2>
+          <h2>🔧 키움 진단센터 PRO</h2>
           <p class="muted">APP KEY·SECRET·ACCOUNT·TOKEN·지정단말기·추가인증·계좌조회를 한 화면에서 확인하고, 오류코드를 자동 해석합니다.</p>
           <div class="notice small"><b>키움 연동 건강도: {health}점</b><br>{ip_line}</div>
           <div class="summary-grid">
@@ -3202,7 +3218,7 @@ def v169_build_asset_center_report(force=False):
         "holdings_ai": holdings_analysis,
         "review_2": review2,
         "removed_or_hidden": ["AI투자비서 단독메뉴", "TOP3 비교 단독표시", "중복 진단 API 메뉴"],
-        "compatibility": "v168 API는 호환 유지, 화면은 v169 AI 자산운용센터 중심으로 정리",
+        "compatibility": "기존 API는 호환 유지, 화면은 AI 자산운용센터 중심으로 정리",
     }
     st = read_state()
     st["v169_last_asset_center_report"] = {"time": report["time"], "focus_count": report["focus_count"], "temperature": temp.get("temperature"), "label": temp.get("label")}
@@ -3235,15 +3251,16 @@ def render_v168_ultimate_center():
         review_rows = ''.join(f"<span>{html_escape(x.get('name'))} 승률 {x.get('win_rate')}% / {money(x.get('pnl'))}</span>" for x in review2.get('by_strategy', [])[:4]) or '<span>복기 데이터 대기</span>'
         return f"""
         <section class="v168-center" id="asset-center">
-          <div class="v168-title"><h2>🏦 V169 AI 자산운용센터</h2><span class="v168-tag">메뉴 30% 정리</span></div>
-          <p class="muted">AI투자비서·헤지펀드센터·포트폴리오관리·자율운용매니저를 하나로 통합했습니다. 화면은 TOP5 집중감시와 실보유 AI 판단 중심으로 정리했습니다.</p>
+          <div class="v168-title"><h2>🏦 AI 자산운용센터</h2><span class="v168-tag">클린 통합</span></div>
+          <p class="muted">AI 자산운용·포트폴리오·펀드매니저 기능을 하나로 묶었습니다. TOP5 집중감시와 실보유 AI 판단을 중심으로 깔끔하게 표시합니다.</p>
           <div class="v168-grid">
             <div><span>시장온도</span><b>{safe_float(temp.get('temperature'),0):.0f}점 · {html_escape(temp.get('label','-'))}</b><small>{html_escape(temp.get('mode',''))}</small></div>
-            <div><span>감시/집중</span><b>{r.get('watch_count',0)}개 / TOP{r.get('focus_count',0)}</b><small>후보100 유지 · 화면은 TOP5 중심</small></div>
+            <div><span>감시 후보</span><b>{r.get('watch_count',0)}개</b><small>전체 후보 감시</small></div>
+            <div><span>집중 감시</span><b>TOP{r.get('focus_count',0)}</b><small>실전 확인 우선순위</small></div>
             <div><span>자산/현금</span><b>{money(pf.get('total_eval',0)+pf.get('cash',0))}</b><small>현금 {pf.get('cash_ratio',0)}% → 목표 {fund.get('target_cash_ratio',0)}%</small></div>
             <div><span>펀드매니저</span><b>{html_escape(fund.get('mode','-'))}</b><small>{html_escape(fund.get('opinion',''))}</small></div>
           </div>
-          <div class="v168-warn">중복 메뉴 정리: AI투자비서/TOP3 비교/중복 진단 메뉴는 숨김 처리하고, 기존 API 호환은 유지했습니다. 실전 주문 영향 기능은 승인대기 구조를 유지합니다.</div>
+          <div class="v168-warn">중복 메뉴는 정리하고 핵심 정보만 표시합니다. 기존 기능/API는 유지하며, 실전 주문 영향 기능은 안전장치를 유지합니다.</div>
           <details open><summary>🏆 집중감시 TOP5</summary><div class="v168-list">{rows(focus)}</div></details>
           <details><summary>💸 세력유입 TOP5</summary><div class="v168-list">{rows(money5,'v168MoneyFlowScore')}</div></details>
           <details><summary>🚀 급등 10분전 TOP5</summary><div class="v168-list">{rows(pump5,'v168Pump10mScore')}</div></details>
@@ -3251,22 +3268,22 @@ def render_v168_ultimate_center():
           <details><summary>🧭 AI 펀드매니저 자산배분</summary><div class="chips">{alloc_rows}</div><div class="notice small">{html_escape(fund.get('opinion',''))}</div></details>
           <details><summary>📘 매매복기 2.0</summary><div class="chips">{review_rows}</div><div class="notice small">{html_escape(review2.get('summary',''))}</div></details>
           <div class="btn-row">
-            <button onclick="callAndReload('/api/v169_refresh_asset_center')">V169 재분석</button>
+            <button onclick="callAndReload('/api/v169_refresh_asset_center')">자산운용 재분석</button>
             <a class="button dark" href="/api/v169_asset_center">JSON 확인</a>
           </div>
         </section>"""
     except Exception as e:
-        return f"<section class='v168-center' id='asset-center'><h2>🏦 V169 AI 자산운용센터</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+        return f"<section class='v168-center' id='asset-center'><h2>🏦 AI 자산운용센터</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
 
 
 def render_mobile_menu_cards():
     """v169: 사용 빈도 중심으로 메뉴를 30% 줄인 카드형 메뉴."""
     items = [
-        ("#asset-center", "🏦", "AI자산운용", "TOP5·실보유·펀드"),
-        ("#exit-engine", "🎯", "매도AI", "보유·부분익절"),
+        ("#asset-center", "🏦", "AI자산운용", "시장·TOP5·현금"),
+        ("#exit-engine", "🎯", "매도AI", "부분익절·고점"),
         ("#picks", "🤖", "AI후보", "추천이유·급등감시"),
         ("#conditions", "🧭", "매매조건", "익절·손절·고점매도"),
-        ("#analysis-center", "📊", "AI분석", "리포트·복기·전략"),
+        ("#analysis-center", "📊", "AI분석", "리포트·복기"),
         ("#kiwoom-diagnosis", "🔧", "키움진단", "토큰·계좌·실보유"),
         ("#holdings", "💼", "보유/매도", "실보유·수동매도"),
     ]
@@ -3278,7 +3295,386 @@ def render_mobile_menu_cards():
       {''.join(cards)}
     </div>
     <div class="menu-help-v167">
-      <b>v170 핵심</b> AI자산운용센터는 유지하고, <b>매도AI(Exit Engine)</b>를 추가했습니다. 사용 순서: AI자산운용 → 매도AI → AI후보 → 키움진단 → 보유/매도.
+      <b>핵심 사용법</b> 사용 순서: AI자산운용 → 매도AI → AI후보 → 키움진단 → 보유/매도 순서로 보면 가장 편합니다.
+    </div>"""
+
+
+# ==============================
+# v173 AI Autonomous Fund Manager
+# ==============================
+
+def v173_grade_from_score(score):
+    score = safe_float(score, 0)
+    if score >= 95:
+        return "S"
+    if score >= 90:
+        return "A+"
+    if score >= 80:
+        return "A"
+    if score >= 70:
+        return "B"
+    if score >= 60:
+        return "C"
+    return "D"
+
+
+def v173_ai_holding_score(h):
+    """보유종목을 계속 들고 갈지 판단하는 AI 보유유지 점수입니다."""
+    h = normalize_holding(h)
+    profit = safe_float(h.get("profitRate"), 0)
+    cur = safe_float(h.get("lastPrice"), 0)
+    buy = safe_float(h.get("buyPrice"), 0)
+    high = safe_float(h.get("highestPrice"), cur)
+    target = safe_float(h.get("activeDynamicTarget") or h.get("target"), 0)
+    trail = safe_float(h.get("trailingStopPrice"), 0)
+    stage = str(h.get("aiPeakStage", ""))
+    price_src = str(h.get("priceSource", "CACHE"))
+
+    volume_keep = 18
+    if price_src == "KIWOOM":
+        volume_keep += 6
+    elif price_src == "NAVER":
+        volume_keep += 3
+
+    strength = 12 + max(-10, min(25, profit * 3.2))
+    if "고점추적" in stage or "상향" in stage:
+        strength += 8
+    market_power = 12 + max(0, min(20, profit * 2.0))
+    money_flow = 10 + (6 if cur >= buy else 0) + (4 if target and cur >= target * 0.97 else 0)
+    volatility = 10
+    if high and cur:
+        pullback = (high - cur) / high * 100
+        if pullback >= 3.5:
+            volatility -= 7
+        elif pullback >= 2.0:
+            volatility -= 4
+        elif pullback <= 1.0:
+            volatility += 3
+    if trail and cur <= trail * 1.004:
+        volatility -= 8
+
+    score = volume_keep + strength + market_power + money_flow + volatility
+    score = max(0, min(100, score))
+    grade = v173_grade_from_score(score)
+
+    reasons = []
+    cautions = []
+    if profit > 0:
+        reasons.append(f"현재 수익권({profit:.2f}%)으로 보유 근거가 있습니다")
+    else:
+        cautions.append(f"현재 손익이 {profit:.2f}%라 방어 판단이 필요합니다")
+    if "고점추적" in stage or "상향" in stage:
+        reasons.append("AI 고점추적/목표상향 구간입니다")
+    if price_src in ("KIWOOM", "NAVER"):
+        reasons.append(f"현재가 출처가 {price_src}로 확인되었습니다")
+    if trail and cur <= trail * 1.004:
+        cautions.append("트레일링 보호선 근처라 매도 준비가 필요합니다")
+    if high and cur and (high-cur)/high*100 >= 2.0:
+        cautions.append("고점 대비 되돌림이 발생했습니다")
+    if not reasons:
+        reasons.append("기본 목표/손절 감시 구간입니다")
+    if not cautions:
+        cautions.append("현재 큰 위험 신호는 제한적입니다")
+
+    if score >= 90:
+        action = "강력보유"
+    elif score >= 80:
+        action = "보유"
+    elif score >= 70:
+        action = "경계보유"
+    elif score >= 60:
+        action = "부분매도 검토"
+    else:
+        action = "매도준비"
+
+    return {
+        "score": round(score, 1),
+        "grade": grade,
+        "action": action,
+        "reasons": reasons[:4],
+        "cautions": cautions[:4],
+        "components": {
+            "거래대금/가격확인": round(volume_keep, 1),
+            "상승강도": round(strength, 1),
+            "시장대비강도": round(market_power, 1),
+            "수급지속": round(money_flow, 1),
+            "변동성안정": round(volatility, 1),
+        }
+    }
+
+
+def v173_ai_exit_score(h):
+    """AI 매도판단 강화: 수급이탈/고점되돌림/강도하락/손절위험을 점수화합니다."""
+    h = normalize_holding(h)
+    profit = safe_float(h.get("profitRate"), 0)
+    cur = safe_float(h.get("lastPrice"), 0)
+    high = safe_float(h.get("highestPrice"), cur)
+    trail = safe_float(h.get("trailingStopPrice"), 0)
+    stop = safe_float(h.get("stop"), 0)
+    score = 20
+    reasons = []
+
+    if profit <= -2.0:
+        score += 28; reasons.append("손실폭 확대")
+    elif profit <= -1.0:
+        score += 16; reasons.append("손실 전환 경계")
+    if stop and cur <= stop * 1.01:
+        score += 30; reasons.append("손절가 근접")
+    if trail and cur <= trail * 1.004:
+        score += 34; reasons.append("트레일링 보호선 근접")
+    if high and cur:
+        pullback = (high-cur)/high*100
+        if pullback >= 4:
+            score += 30; reasons.append(f"고점 대비 {pullback:.1f}% 되돌림")
+        elif pullback >= 2:
+            score += 16; reasons.append(f"고점 대비 {pullback:.1f}% 되돌림")
+    if profit >= 5 and high and cur and (high-cur)/high*100 >= 1.2:
+        score += 12; reasons.append("수익권 고점반락")
+    if "기본" in str(h.get("aiPeakStage", "")) and profit < 0:
+        score += 8; reasons.append("상승강도 부족")
+
+    score = max(0, min(100, score))
+    if score >= 88:
+        action = "전량매도 추천"
+    elif score >= 75:
+        action = "부분매도/강한 경계"
+    elif score >= 60:
+        action = "매도 준비"
+    elif score >= 40:
+        action = "보유하되 감시"
+    else:
+        action = "보유 우세"
+    return {"score": round(score, 1), "action": action, "reasons": reasons[:5] or ["매도 위험 신호 제한적"]}
+
+
+def v173_explain_decision(h):
+    h = normalize_holding(h)
+    hold = v173_ai_holding_score(h)
+    exit_info = v173_ai_exit_score(h)
+    if exit_info["score"] >= 88:
+        decision = "매도"
+    elif exit_info["score"] >= 75:
+        decision = "부분매도"
+    elif hold["score"] >= 80:
+        decision = "보유"
+    elif hold["score"] >= 70:
+        decision = "경계보유"
+    else:
+        decision = "매도준비"
+    return {
+        "code": h.get("code"),
+        "name": h.get("name"),
+        "profitRate": round(safe_float(h.get("profitRate"), 0), 2),
+        "pnl": int(safe_float(h.get("pnl"), 0)),
+        "holding": hold,
+        "exit": exit_info,
+        "decision": decision,
+        "summary": f"AI 판단: {decision}. 보유점수 {hold['score']}점, 매도위험 {exit_info['score']}점입니다.",
+        "buy_reason": "AI 후보 점수, 거래대금, 시장대비 강세가 맞을 때 진입 대상으로 분류합니다.",
+        "hold_reason": " / ".join(hold.get("reasons", [])[:3]),
+        "sell_reason": " / ".join(exit_info.get("reasons", [])[:3]),
+    }
+
+
+def v173_operation_journal():
+    ledger = read_ledger()[-30:]
+    holdings = [v173_explain_decision(h) for h in read_holdings()]
+    today = now_kst().strftime("%Y-%m-%d")
+    buys, sells = [], []
+    for e in ledger:
+        if str(e.get("date") or "") == today:
+            typ = str(e.get("type") or e.get("side") or e.get("reason") or "").lower()
+            row = {"time": e.get("time", ""), "name": e.get("name") or e.get("code") or "-", "reason": e.get("reason", "AI 매매기록")}
+            if "buy" in typ or "매수" in typ:
+                buys.append(row)
+            if "sell" in typ or "매도" in typ or "stop" in typ:
+                sells.append(row)
+    hold_rows = [h for h in holdings if h.get("decision") in ("보유", "경계보유")]
+    risk_rows = [h for h in holdings if h.get("decision") not in ("보유", "경계보유")]
+    avg_hold = sum(safe_float(h.get("holding",{}).get("score"),0) for h in holdings) / max(1, len(holdings))
+    avg_exit = sum(safe_float(h.get("exit",{}).get("score"),0) for h in holdings) / max(1, len(holdings))
+    grade = v173_grade_from_score(max(0, min(100, avg_hold - avg_exit*0.25 + 25)))
+    return {
+        "date": today,
+        "buys": buys[:8],
+        "sells": sells[:8],
+        "holds": hold_rows[:8],
+        "risks": risk_rows[:8],
+        "avg_hold_score": round(avg_hold, 1),
+        "avg_exit_score": round(avg_exit, 1),
+        "grade": grade,
+        "comment": f"오늘 운용평가 {grade}등급. 평균 보유점수 {avg_hold:.1f}, 평균 매도위험 {avg_exit:.1f}입니다.",
+    }
+
+
+def v173_build_fund_manager_report(force=False):
+    holdings = [v173_explain_decision(h) for h in read_holdings()]
+    state = read_state()
+    try:
+        base = v169_build_asset_center_report(force=force)
+    except Exception:
+        base = {"market_temperature": {"temperature": state.get("last_market_temperature",0), "label": state.get("last_market_temperature_label","대기")}, "focus_top5": []}
+    temp = base.get("market_temperature", {})
+    focus = (base.get("focus_top5") or [])[:5]
+    journal = v173_operation_journal()
+    total_pnl = sum(safe_float(x.get("pnl"),0) for x in holdings)
+    hold_cnt = len([x for x in holdings if x.get("decision") in ("보유", "경계보유")])
+    sell_cnt = len([x for x in holdings if x.get("decision") not in ("보유", "경계보유")])
+    temp_score = safe_float(temp.get("temperature"), 0)
+    if temp_score >= 75 and sell_cnt == 0:
+        mode = "공격 보유"
+    elif temp_score >= 55:
+        mode = "균형 운용"
+    elif temp_score >= 35:
+        mode = "방어 운용"
+    else:
+        mode = "현금방어"
+    report = {
+        "ok": True,
+        "version": APP_VERSION,
+        "time": now_text(),
+        "mode": mode,
+        "market_temperature": temp,
+        "focus_top5": focus,
+        "holdings": holdings,
+        "journal": journal,
+        "summary": {
+            "holding_count": len(holdings),
+            "hold_decision_count": hold_cnt,
+            "sell_watch_count": sell_cnt,
+            "total_pnl": int(total_pnl),
+            "avg_hold_score": journal.get("avg_hold_score", 0),
+            "avg_exit_score": journal.get("avg_exit_score", 0),
+        },
+        "opinion": f"{mode}: 신규매수는 TOP5 집중감시, 보유종목은 보유점수와 매도위험 점수를 우선 기준으로 판단합니다.",
+    }
+    st = read_state()
+    st["v173_last_fund_manager_report"] = {"time": report["time"], "mode": mode, "avg_hold_score": journal.get("avg_hold_score"), "avg_exit_score": journal.get("avg_exit_score")}
+    write_state(st)
+    return report
+
+
+def render_v173_autonomous_fund_manager():
+    try:
+        r = v173_build_fund_manager_report()
+        temp = r.get("market_temperature", {})
+        summary = r.get("summary", {})
+        journal = r.get("journal", {})
+        focus = r.get("focus_top5", [])
+        holdings = r.get("holdings", [])
+        def focus_rows(items):
+            out=[]
+            for i,x in enumerate(items[:5],1):
+                out.append(f"<div class='v168-row'><div><b>{i}. {html_escape(x.get('name','-'))}</b><small>{html_escape(x.get('theme',''))} · {html_escape(x.get('entryType','AI감시'))}</small></div><div><b>{safe_float(x.get('riskAdjustedScore', x.get('score'))):.1f}</b><small>{html_escape(x.get('aiVerdict','AI 감시'))}</small></div></div>")
+            return ''.join(out) or "<div class='notice small'>집중감시 후보 대기중</div>"
+        def holding_rows(items):
+            out=[]
+            for x in items:
+                hold=x.get('holding',{}); ex=x.get('exit',{})
+                cls='pill-ok' if hold.get('score',0)>=80 and ex.get('score',0)<75 else 'pill-warn'
+                out.append(f"<div class='v168-row'><div><b>{html_escape(x.get('name','-'))}</b><small>수익률 {safe_float(x.get('profitRate'),0):.2f}% · {html_escape(x.get('hold_reason',''))}</small></div><div><b class='{cls}'>{html_escape(x.get('decision','-'))}</b><small>보유 {hold.get('score',0)}점 / 매도위험 {ex.get('score',0)}점</small></div></div>")
+            return ''.join(out) or "<div class='notice small'>보유종목 분석 대기중</div>"
+        buy_rows=''.join(f"<span>매수 {html_escape(x.get('name','-'))}</span>" for x in journal.get('buys',[])) or '<span>오늘 매수 기록 대기</span>'
+        sell_rows=''.join(f"<span>매도 {html_escape(x.get('name','-'))}</span>" for x in journal.get('sells',[])) or '<span>오늘 매도 기록 대기</span>'
+        risk_rows=''.join(f"<span>{html_escape(x.get('name','-'))} {html_escape(x.get('decision',''))}</span>" for x in journal.get('risks',[])) or '<span>위험 종목 제한적</span>'
+        return f"""
+        <section class="v168-center v173-center" id="autonomous-fund-manager">
+          <div class="v168-title"><h2>🤖 AI Autonomous Fund Manager</h2><span class="v168-tag">V173 자율운용</span></div>
+          <p class="muted">AI가 계좌상태·시장온도·보유점수·매도위험을 통합해 매수/보유/매도 이유를 설명합니다.</p>
+          <div class="v168-grid">
+            <div><span>운용모드</span><b>{html_escape(r.get('mode','-'))}</b><small>{html_escape(r.get('opinion',''))}</small></div>
+            <div><span>시장온도</span><b>{safe_float(temp.get('temperature'),0):.0f}점 · {html_escape(temp.get('label','대기'))}</b><small>신규매수 강도 판단</small></div>
+            <div><span>보유종목</span><b>{summary.get('holding_count',0)}종목</b><small>보유 {summary.get('hold_decision_count',0)} / 매도감시 {summary.get('sell_watch_count',0)}</small></div>
+            <div><span>총 평가손익</span><b>{money(summary.get('total_pnl',0))}</b><small>캐시/실보유 기준</small></div>
+            <div><span>AI 보유점수</span><b>{summary.get('avg_hold_score',0)}점</b><small>80점 이상 보유 우세</small></div>
+            <div><span>AI 매도위험</span><b>{summary.get('avg_exit_score',0)}점</b><small>75점 이상 매도 경계</small></div>
+          </div>
+          <div class="v168-warn">V173 핵심: 기능 추가보다 수익률 최적화, AI 매도판단, 모바일 UI 가독성에 집중했습니다.</div>
+          <details open><summary>🏆 TOP5 매수대기 / 집중감시</summary><div class="v168-list">{focus_rows(focus)}</div></details>
+          <details open><summary>💼 보유종목 AI 판단</summary><div class="v168-list">{holding_rows(holdings)}</div></details>
+          <details><summary>📘 AI 운용일지</summary><div class="chips">{buy_rows}{sell_rows}{risk_rows}</div><div class="notice small">{html_escape(journal.get('comment','운용일지 대기'))}</div></details>
+          <div class="btn-row"><button onclick="callAndReload('/api/v173_refresh_fund_manager')">AI 자율운용 재분석</button><a class="button dark" href="/api/v173_fund_manager">JSON 확인</a></div>
+        </section>"""
+    except Exception as e:
+        return f"<section class='v168-center v173-center' id='autonomous-fund-manager'><h2>🤖 AI Autonomous Fund Manager</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+
+
+def render_holdings_section():
+    """v173: 보유종목 카드를 AI 보유유지 점수/매도위험 중심으로 재구성합니다."""
+    res = fetch_kiwoom_holdings()
+    items = res.get("holdings") or read_holdings()
+    if not items:
+        msg = res.get("message") or "표시 가능한 보유 캐시가 없습니다."
+        return f"""
+        <section class="card" id="holdings">
+          <h2>💼 보유종목 AI 카드</h2>
+          <p class="muted">키움 실제 잔고 기준으로 표시합니다. 인증 실패 시 마지막 정상 캐시를 유지합니다.</p>
+          <div class="btn-row">
+            <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
+            <button class="dark" onclick="location.href='/api/status'">API 확인</button>
+          </div>
+          <div class="notice">{html_escape(msg)}</div>
+        </section>"""
+    cards=[]
+    for h in items:
+        h = normalize_holding(h)
+        dec = v173_explain_decision(h)
+        hold = dec.get('holding',{})
+        ex = dec.get('exit',{})
+        dynamic = h.get("activeDynamicTarget", 0)
+        trail = h.get("trailingStopPrice", 0)
+        reason_tags = render_badges(hold.get('reasons'), '✅')
+        risk_tags = render_badges(ex.get('reasons'), '⚠')
+        score_cls = 'pill-ok' if hold.get('score',0) >= 80 and ex.get('score',0) < 75 else 'pill-warn'
+        cards.append(f"""
+        <div class="holding-card v173-holding-card">
+          <div class="topline"><b>{html_escape(h['name'])}</b><span>{h['code']} · AI등급 {html_escape(hold.get('grade','-'))}</span></div>
+          <div class="grid2">
+            <div><label>현재수익률</label><b class="{'red' if h.get('profitRate',0)>=0 else 'blue'}">{pct(h['profitRate'])}</b><small>{money(h['pnl'])}</small></div>
+            <div><label>AI 추천행동</label><b class="{score_cls}">{html_escape(dec.get('decision','-'))}</b><small>{html_escape(dec.get('summary',''))}</small></div>
+            <div><label>AI 보유점수</label><b>{hold.get('score',0)}점</b><small>{html_escape(hold.get('action',''))}</small></div>
+            <div><label>AI 매도위험</label><b>{ex.get('score',0)}점</b><small>{html_escape(ex.get('action',''))}</small></div>
+            <div><label>매수가/현재가</label><b>{money(h['buyPrice'])}</b><small>현재 {money(h['lastPrice'])}</small></div>
+            <div><label>목표/손절</label><b class="red">{money(dynamic or h.get('target'))}</b><small>손절 {money(h['stop'])}</small></div>
+            <div><label>트레일링 보호</label><b class="blue">{money(trail) if trail else '-'}</b><small>되돌림 {h.get('aiTrailingRate','')}%</small></div>
+            <div><label>고점매도 단계</label><b>{html_escape(h.get('aiPeakStage','기본 감시'))}</b><small>{html_escape(h.get('priceSource','-'))}</small></div>
+          </div>
+          <div class="reason-title">🤖 AI 보유 이유</div><div class="reason-tags">{reason_tags}</div>
+          <div class="reason-title">🎯 AI 매도 판단 이유</div><div class="risk-tags">{risk_tags}</div>
+          <div class="comment">{html_escape(h.get('aiSellPlan',''))}<br>최근확인 {html_escape(h.get('lastCheckedAt','-'))} · {html_escape(h.get('priceSource','-'))}</div>
+          <button class="sell" onclick="manualSell('{h['code']}')">시장가 매도</button>
+        </div>""")
+    return f"""
+    <section class="card" id="holdings">
+      <h2>💼 보유종목 AI 카드</h2>
+      <p class="muted">표시 보유 {len(items)}종목 · 출처 {html_escape(res.get('source','CACHE'))} · AI 보유유지 점수와 매도위험을 우선 표시합니다.</p>
+      <div class="btn-row">
+        <button onclick="location.href='/api/refresh_holdings'">실보유 새로고침</button>
+        <button class="dark" onclick="location.href='/api/status'">API 확인</button>
+      </div>
+      {''.join(cards)}
+    </section>"""
+
+
+def render_mobile_menu_cards():
+    """v173: 메뉴 약 30% 정리. 자율운용센터 중심."""
+    items = [
+        ("#autonomous-fund-manager", "🤖", "AI 자율운용", "보유·매도·일지"),
+        ("#picks", "🏆", "AI후보100", "TOP10·TOP5"),
+        ("#holdings", "💼", "보유종목", "AI점수·매도판단"),
+        ("#exit-engine", "🎯", "매도AI", "고점·부분익절"),
+        ("#analysis-center", "📊", "전략성과", "리포트·복기"),
+        ("#kiwoom-diagnosis", "🔧", "키움진단", "토큰·계좌"),
+    ]
+    cards=[]
+    for href, icon, title, desc in items:
+        cards.append(f"<a href='{href}'><b>{icon} {html_escape(title)}</b><span>{html_escape(desc)}</span></a>")
+    return f"""
+    <div class="menu-grid-v167 menu-grid-v169 v173-menu">
+      {''.join(cards)}
+    </div>
+    <div class="menu-help-v167">
+      <b>V173 사용순서</b> AI 자율운용 → 보유종목 AI카드 → 매도AI → AI후보100 → 키움진단 순서로 보면 가장 깔끔합니다.
     </div>"""
 
 def render_page():
@@ -3302,6 +3698,7 @@ def render_page():
         menu_cards=render_mobile_menu_cards(),
         kiwoom_diagnosis=render_kiwoom_diagnosis_section(),
         v168_ultimate=render_v168_ultimate_center(),
+        v173_fund_manager=render_v173_autonomous_fund_manager(),
         v170_exit=render_v170_exit_center(),
         v171_auto=render_v171_auto_trade_center(),
     )
@@ -3339,6 +3736,28 @@ details summary{cursor:pointer;background:var(--pale);border-radius:18px;padding
 .v168-list{display:grid;gap:8px}.v168-row{background:#fff;border:1px solid #e3eadf;border-radius:16px;padding:11px;display:flex;justify-content:space-between;gap:8px;align-items:center}.v168-row small{display:block;color:#667085}.v168-warn{background:#fff4d5;border:1px solid #ffd27b;border-radius:16px;padding:12px;margin:10px 0;color:#715100;font-weight:800}
 @media(max-width:430px){.v168-grid{grid-template-columns:1fr}.v168-title h2{font-size:23px}.v168-row{display:block}}
 
+
+/* v173 AI AUTONOMOUS FUND MANAGER: 모바일 가독성/카드 디자인 개선 */
+.version-summary{background:rgba(255,255,255,.82);backdrop-filter:blur(10px);border:1px solid #dbead7;border-radius:24px;padding:16px;margin:14px 0;box-shadow:0 10px 28px rgba(24,59,45,.07)}
+.menu-grid-v169{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;margin:16px 0!important}
+.menu-grid-v169 a{background:linear-gradient(145deg,#f7fff5,#eef9e9)!important;border:1px solid #d8ead1!important;border-radius:22px!important;text-align:center;text-decoration:none;color:var(--ink);padding:16px 10px!important;min-height:86px!important;box-shadow:0 8px 18px rgba(36,78,53,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:.15s ease}
+.menu-grid-v169 a:active{transform:scale(.98)}
+.menu-grid-v169 b{font-size:19px!important;line-height:1.15}.menu-grid-v169 span{font-size:13px!important;color:var(--muted)}
+.menu-help-v167{border:1px dashed #cfe3c9;background:#fbfff8;border-radius:20px;padding:13px 15px;margin:8px 0 18px;color:#486050;font-size:14px}
+.v168-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.v168-title h2{margin:0!important;font-size:28px!important}.v168-tag{background:#e7f8e9;color:#23643a;border-radius:999px;padding:7px 12px;font-weight:900;font-size:13px}
+.v168-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}.v168-grid>div{background:#fffdf4;border:1px solid #efe7ca;border-radius:20px;padding:14px}.v168-grid span,.grid2 label{display:block;color:#6b7487;font-size:13px;margin-bottom:4px}.v168-grid b{font-size:22px;color:#1f4230}.v168-grid small{display:block;color:#667085;margin-top:4px;line-height:1.35}.v168-warn,.notice{border-radius:20px!important}.v168-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:#fff;border:1px solid #e6ebdf;border-radius:18px;padding:12px 14px;margin:8px 0}.v168-row small{display:block;color:#6b7280;margin-top:2px}.v168-row b{font-size:17px}.holding-card{border-radius:24px!important;box-shadow:0 8px 22px rgba(32,59,45,.06)}.holding-card .topline b{font-size:24px}.chips{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}.chips span,.pill-ok,.pill-warn{border-radius:999px;background:#eef9ea;padding:7px 10px;font-weight:800;font-size:13px}.pill-warn{background:#fff4cf}.red{color:#d64545!important}.blue{color:#2f6fe4!important}
+.btn-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.btn-row button,.btn-row .button{flex:1 1 140px;text-align:center;border-radius:18px!important}
+#v171-auto-trade,#asset-center,#exit-engine{scroll-margin-top:18px}.card h2,.v168-center h2{letter-spacing:-.03em}
+@media(max-width:430px){.wrap{padding-left:12px!important;padding-right:12px!important}.menu-grid-v169{gap:9px!important}.menu-grid-v169 a{min-height:78px!important;padding:12px 8px!important;border-radius:19px!important}.menu-grid-v169 b{font-size:16px!important}.menu-grid-v169 span{font-size:11.5px!important}.v168-grid{grid-template-columns:1fr!important}.v168-title h2{font-size:24px!important}.v168-row{grid-template-columns:1fr}.holding-card .topline b{font-size:21px}.hero h1{font-size:30px!important}}
+
+
+/* v173 AI Autonomous Fund Manager UI */
+.v173-center{background:linear-gradient(135deg,#f4fff6,#fff8df)!important;border:1px solid #cfe9d3!important;box-shadow:0 14px 34px rgba(33,84,57,.10)!important}
+.v173-menu{grid-template-columns:repeat(2,minmax(0,1fr))!important}.v173-holding-card{background:linear-gradient(180deg,#fffef8,#f9fff6)!important;border:1px solid #d6ead2!important}
+.ok-pill,.pill-ok{display:inline-block;border-radius:999px;background:#e7fff0;color:#10773b;padding:6px 10px;font-weight:900}.warn-pill,.pill-warn{display:inline-block;border-radius:999px;background:#fff3cd;color:#8a5a00;padding:6px 10px;font-weight:900}
+.v173-holding-card .reason-title{margin-top:12px}.v173-holding-card .grid2>div{background:#fff;border:1px solid #edf1e7}
+@media(max-width:430px){.v173-menu{grid-template-columns:repeat(2,minmax(0,1fr))!important}.v173-holding-card{padding:14px!important}.v173-holding-card .grid2{grid-template-columns:1fr!important}.v173-center .v168-grid{grid-template-columns:1fr!important}}
+
 </style>
 <script>
 function toggleDetail(id){const el=document.getElementById(id); if(el){el.classList.toggle('open')}}
@@ -3362,12 +3781,12 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
   <div class="hero">
     <span class="badge">🌿 KIWOOM REAL AUTO {{version}}</span>
     <h1>{{app_name}}</h1>
-    <p>키움 REST API 연동 · AI후보 감시 · 추천이유 설명 · 목표/손절/트레일링 · 전략성과 학습</p>
+    <p>키움 REST API 연동 · AI 자율운용 · AI후보100 · 보유점수 · 매도위험 · 전략성과 학습</p>
     {{version_summary|safe}}
   </div>
   {{quick_status_bar|safe}}
   {{menu_cards|safe}}
-  {{v168_ultimate|safe}}
+  {{v173_fund_manager|safe}}
   {{v170_exit|safe}}
 {{v171_auto|safe}}
   {{candidates|safe}}
@@ -4051,7 +4470,7 @@ def api_v169_asset_center():
 @app.route("/api/v169_refresh_asset_center")
 def api_v169_refresh_asset_center():
     r = v169_build_asset_center_report(force=True)
-    set_status("V169 자산운용센터 재분석", f"집중 TOP{r.get('focus_count',0)} / 시장온도 {r.get('market_temperature',{}).get('temperature',0)}점 / {r.get('fund_manager',{}).get('mode','')}")
+    set_status("AI 자산운용센터 재분석", f"집중 TOP{r.get('focus_count',0)} / 시장온도 {r.get('market_temperature',{}).get('temperature',0)}점 / {r.get('fund_manager',{}).get('mode','')}")
     return render_page()
 
 
@@ -4073,7 +4492,7 @@ def api_v170_exit_engine():
 @app.route("/api/v170_refresh_exit_engine")
 def api_v170_refresh_exit_engine():
     r = v170_exit_report(force=True)
-    set_status("V170 AI 매도판단 재분석", r.get("summary", ""))
+    set_status("AI 매도판단 재분석", r.get("summary", ""))
     return render_page()
 
 
@@ -4107,6 +4526,27 @@ def api_v171_run_auto_exit_once():
     for h in read_holdings():
         results.append(v171_auto_exit_decision_for_holding(h))
     return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "results": results})
+
+
+@app.route("/api/v173_fund_manager")
+def api_v173_fund_manager():
+    return jsonify(v173_build_fund_manager_report(force=False))
+
+
+@app.route("/api/v173_refresh_fund_manager")
+def api_v173_refresh_fund_manager():
+    report = v173_build_fund_manager_report(force=True)
+    add_alert("V173 AI 자율운용센터 재분석 완료")
+    return jsonify({"ok": True, "version": APP_VERSION, "message": "V173 AI 자율운용센터 재분석 완료", "report": report})
+
+
+@app.route("/api/v173_holding_ai/<code>")
+def api_v173_holding_ai(code):
+    code = str(code).zfill(6)
+    for h in read_holdings():
+        if str(h.get("code","")).zfill(6) == code:
+            return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "result": v173_explain_decision(h)})
+    return jsonify({"ok": False, "version": APP_VERSION, "message": "해당 보유종목을 찾지 못했습니다."})
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
