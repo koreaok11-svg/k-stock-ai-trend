@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v169 CLEAN ASSET CENTER
-파일명: app_kiwoom_real_auto_scalping_v169_clean_asset_center.py
+성일의 AI 주식바람 - KIWOOM REAL AUTO SCALPING v171 AI AUTO TRADE EXECUTION ENGINE
+파일명: app_kiwoom_real_auto_scalping_v171_ai_auto_trade_execution_engine.py
 
 목표:
 - 앱/코드/로그/화면 버전을 APP_VERSION 하나로 통합 관리
@@ -41,11 +41,13 @@ except Exception:
     fdr = None
 
 
-APP_VERSION = "v169"
+APP_VERSION = "v171"
 APP_TITLE = f"성일의 AI 주식바람 - KIWOOM REAL AUTO {APP_VERSION}"
-APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v169_clean_asset_center.py"
-APP_PATCH_NAME = "CLEAN_ASSET_CENTER"
+APP_FILE_NAME = "app_kiwoom_real_auto_scalping_v171_ai_auto_trade_execution_engine.py"
+APP_PATCH_NAME = "AI_AUTO_TRADE_EXECUTION_ENGINE"
 UPDATE_HISTORY = [
+    {"version": "v171", "title": "AI 자동매수·자동매도 실행 엔진", "items": ["AI 자동매수 유지", "AI 자동부분익절 실행", "AI 전량매도 자동실행", "AI 고점위험/강도하락 자동매도", "자동매도 ON/OFF 안전장치", "텔레그램 자동매도 알림", "자동교체매수는 승인 유지"]},
+    {"version": "v170", "title": "AI Exit Engine PRO", "items": ["보유유지/추가매수/부분매도/전량매도/고점위험 점수", "AI 부분익절 엔진", "AI 실보유 분석센터 PRO", "AI 고점매도 PRO+", "매도판단 API/화면 추가", "실전 매도는 사용자 승인 버튼 유지"]},
     {"version": "v169", "title": "AI 자산운용센터 정리/경량화", "items": ["AI투자비서·헤지펀드·포트폴리오·자율운용을 AI 자산운용센터로 통합", "메뉴 약 30% 정리", "TOP3 비교 UI 축소 및 TOP5 집중감시 중심", "실보유 AI 분석센터 추가", "AI 펀드매니저/자산배분 제안", "매매복기 2.0 요약", "v168 API 호환 유지"]},
     {"version": "v168", "title": "AI 자산운용사 Ultimate", "items": ["AI후보100/집중감시10", "세력유입탐지", "시장온도계 PRO+", "급등10분전 탐지", "후보진화엔진2.0", "AI헤지펀드센터/투자비서/포트폴리오", "AI고점매도예측/수익극대화/자율운용매니저"]},
     {"version": "v167", "title": "AI 수익률 최적화 엔진", "items": ["AI 실전 복기센터", "AI 후보 진화엔진", "AI 시장온도계 PRO", "AI 동적 익절률", "AI 강도변화 알림", "수익률 최적화 진단 API"]},
@@ -207,6 +209,37 @@ DEFAULT_STATE = {
     "v169_fund_manager_enabled": True,
     "v169_review_2_enabled": True,
     "v169_last_asset_center_report": {},
+    # v170: AI 매도판단 엔진 PRO
+    "v170_exit_engine_enabled": True,
+    "v170_partial_take_profit_enabled": True,
+    "v170_partial_tp1_rate": 0.050,
+    "v170_partial_tp1_sell_ratio": 0.30,
+    "v170_partial_tp2_rate": 0.100,
+    "v170_partial_tp2_sell_ratio": 0.30,
+    "v170_partial_tp3_rate": 0.150,
+    "v170_partial_tp3_sell_ratio": 0.20,
+    "v170_partial_tp4_rate": 0.200,
+    "v170_partial_tp4_sell_ratio": 0.10,
+    "v170_high_risk_pullback_pct": 1.2,
+    "v170_exit_alert_threshold": 75,
+    "v170_last_exit_report": {},
+    # v171: AI 자동매수·자동매도 실행 엔진
+    "v171_auto_buy_enabled": True,
+    "v171_auto_sell_enabled": True,
+    "v171_auto_partial_sell_enabled": True,
+    "v171_auto_full_sell_enabled": True,
+    "v171_auto_stop_loss_enabled": True,
+    "v171_auto_peak_risk_sell_enabled": True,
+    "v171_auto_strength_drop_sell_enabled": True,
+    "v171_auto_rotation_requires_approval": True,
+    "v171_min_hold_minutes_before_ai_sell": 3,
+    "v171_full_sell_score_threshold": 85,
+    "v171_partial_sell_score_threshold": 80,
+    "v171_peak_risk_score_threshold": 88,
+    "v171_daily_auto_sell_limit": 10,
+    "v171_auto_sell_count_today": 0,
+    "v171_last_auto_sell_date": "",
+    "v171_last_auto_sell_report": {},
 }
 
 
@@ -1495,6 +1528,199 @@ def v167_strength_alert_for_holding(h):
     except Exception:
         pass
 
+
+# ==============================
+# v171 AI 자동매수·자동매도 실행 엔진
+# ==============================
+
+def v171_reset_daily_auto_sell_counter(state=None):
+    state = dict(state or read_state())
+    today = now_kst().strftime("%Y-%m-%d")
+    if state.get("v171_last_auto_sell_date") != today:
+        state["v171_last_auto_sell_date"] = today
+        state["v171_auto_sell_count_today"] = 0
+    return state
+
+
+def v171_can_auto_sell(state=None):
+    state = v171_reset_daily_auto_sell_counter(state)
+    if not state.get("v171_auto_sell_enabled", True):
+        return False, "AI 자동매도 OFF", state
+    if state.get("panic_stop"):
+        return False, "긴급정지 상태", state
+    if safe_float(state.get("daily_realized_pnl", 0), 0) <= safe_float(state.get("daily_max_loss", -30000), -30000):
+        return False, "일일 최대손실 제한 도달", state
+    if safe_int(state.get("v171_auto_sell_count_today", 0), 0) >= safe_int(state.get("v171_daily_auto_sell_limit", 10), 10):
+        return False, "일일 자동매도 횟수 제한 도달", state
+    return True, "AI 자동매도 가능", state
+
+
+def v171_holding_age_minutes(h):
+    for key in ["buyTime", "buy_time", "entryTime", "createdAt", "time"]:
+        t = str(h.get(key, "") or "")[:19]
+        if not t:
+            continue
+        try:
+            dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST)
+            return max(0, (now_kst() - dt).total_seconds() / 60)
+        except Exception:
+            pass
+    return 9999
+
+
+def v171_mark_auto_sell_count(state=None):
+    state = v171_reset_daily_auto_sell_counter(state)
+    state["v171_auto_sell_count_today"] = safe_int(state.get("v171_auto_sell_count_today", 0), 0) + 1
+    write_state(state)
+    return state
+
+
+def v171_update_holding_after_partial_sell(h, sell_qty):
+    code = str(h.get("code", "")).zfill(6)
+    remaining = max(0, safe_int(h.get("qty"), 0) - safe_int(sell_qty, 0))
+    items = []
+    for row in read_holdings():
+        if str(row.get("code", "")).zfill(6) == code:
+            if remaining > 0:
+                row["qty"] = remaining
+                row.setdefault("v171PartialHistory", [])
+                row["v171PartialHistory"].append({"time": now_text(), "sell_qty": int(sell_qty), "remaining_qty": int(remaining)})
+                items.append(row)
+        else:
+            items.append(row)
+    write_holdings(items)
+    return remaining
+
+
+def v171_auto_sell_quantity(reason, holding, sell_qty, cur_price=None, partial=False):
+    h = normalize_holding(holding)
+    code = str(h.get("code", "")).zfill(6)
+    qty = min(safe_int(sell_qty, 0), safe_int(h.get("qty"), 0))
+    if qty <= 0:
+        return {"ok": False, "message": "자동매도 수량 없음", "code": code}
+    state = read_state()
+    can, msg, state = v171_can_auto_sell(state)
+    if not can:
+        return {"ok": False, "message": msg, "code": code}
+    sell_price = safe_float(cur_price or h.get("lastPrice") or h.get("buyPrice"), 0)
+    buy_price = safe_float(h.get("buyPrice"), 0)
+    buy_value = buy_price * qty
+    pnl = (sell_price - buy_price) * qty
+    strategy = h.get("strategy") or state.get("current_strategy", "AI후보형")
+    event = {"side":"sell", "auto":True, "partial":bool(partial), "code":code, "name":h.get("name"), "qty":qty, "fill_price":sell_price, "buy_price":buy_price, "pnl":int(pnl), "return_pct":round((pnl/buy_value*100) if buy_value else 0,2), "strategy":strategy, "reason":reason}
+    try:
+        if not KIWOOM_REAL_TRADING or KIWOOM_DRY_RUN:
+            event["dry_run"] = True
+            append_trade_event(event)
+            record_strategy_result(strategy, pnl, buy_value, reason, code, h.get("name"))
+            if partial and qty < safe_int(h.get("qty"), 0):
+                remaining = v171_update_holding_after_partial_sell(h, qty)
+            else:
+                remove_holding(code)
+                remaining = 0
+            v171_mark_auto_sell_count(state)
+            send_telegram(f"🤖 AI 자동매도(DRY_RUN) {h.get('name')} {qty}주 / {reason} / 손익 {int(pnl):,}원 / 잔량 {remaining}주")
+            return {"ok": True, "dry_run": True, "message": "DRY_RUN 자동매도 기록", "remaining_qty": remaining, "event": event}
+        res = kiwoom_order("sell", code, qty)
+        if res.get("ok"):
+            event["order_response"] = res
+            append_trade_event(event)
+            record_strategy_result(strategy, pnl, buy_value, reason, code, h.get("name"))
+            if partial and qty < safe_int(h.get("qty"), 0):
+                remaining = v171_update_holding_after_partial_sell(h, qty)
+            else:
+                remove_holding(code)
+                remaining = 0
+            v171_mark_auto_sell_count(state)
+            send_telegram(f"🤖 AI 자동매도 {h.get('name')} {qty}주 / {reason} / 손익 {int(pnl):,}원 / 잔량 {remaining}주")
+            return {"ok": True, "message": "AI 자동매도 주문 전송", "remaining_qty": remaining, "event": event, "order": res}
+        return {"ok": False, "message": res.get("message") or str(res)[:300], "order": res}
+    except Exception as e:
+        return {"ok": False, "message": auth_message(str(e)), "code": code}
+
+
+def v171_choose_partial_level(h, exit_info):
+    """도달한 부분익절 구간 중 아직 실행하지 않은 가장 높은 구간을 선택합니다."""
+    done = set(str(x) for x in (h.get("v171PartialDoneLevels") or []))
+    best = None
+    for p in exit_info.get("partial_plan", []):
+        level = str(p.get("profit_rate_pct"))
+        if p.get("status") == "도달" and level not in done:
+            best = p
+    return best
+
+
+def v171_apply_partial_done_level(h, level):
+    levels = list(h.get("v171PartialDoneLevels") or [])
+    val = str(level)
+    if val not in levels:
+        levels.append(val)
+    h["v171PartialDoneLevels"] = levels
+    return h
+
+
+def v171_auto_exit_decision_for_holding(h):
+    """AI Exit Engine 점수를 실제 자동매도 실행 조건으로 변환합니다."""
+    h = normalize_holding(h)
+    st = read_state()
+    info = v170_exit_engine_for_holding(h)
+    result = {"executed": False, "skip_update": False, "reason": "조건 미충족", "exit": info, "holding": h}
+    if not st.get("v171_auto_sell_enabled", True):
+        result["reason"] = "AI 자동매도 OFF"
+        return result
+    age = v171_holding_age_minutes(h)
+    if age < safe_float(st.get("v171_min_hold_minutes_before_ai_sell", 3), 3) and safe_float(info.get("profitRate"), 0) > safe_float(st.get("stop_rate", -0.018), -0.018) * 100:
+        result["reason"] = f"최소보유시간 미충족({age:.1f}분)"
+        return result
+    full_th = safe_float(st.get("v171_full_sell_score_threshold", 85), 85)
+    partial_th = safe_float(st.get("v171_partial_sell_score_threshold", 80), 80)
+    peak_th = safe_float(st.get("v171_peak_risk_score_threshold", 88), 88)
+    cur = safe_float(h.get("lastPrice"), 0)
+    qty = safe_int(h.get("qty"), 0)
+    # 손절/트레일링/고점위험은 전량매도 우선
+    if st.get("v171_auto_stop_loss_enabled", True) and h.get("stop") and cur <= safe_float(h.get("stop"), 0):
+        res = v171_auto_sell_quantity("v171_auto_stop_loss", h, qty, cur, partial=False)
+        result.update({"executed": bool(res.get("ok")), "skip_update": bool(res.get("ok")), "reason": "AI 자동손절", "order": res})
+        return result
+    if st.get("v171_auto_full_sell_enabled", True) and safe_float(info.get("full_sell_score"), 0) >= full_th:
+        res = v171_auto_sell_quantity("v171_auto_full_exit_score", h, qty, cur, partial=False)
+        result.update({"executed": bool(res.get("ok")), "skip_update": bool(res.get("ok")), "reason": "AI 전량매도 점수 도달", "order": res})
+        return result
+    if st.get("v171_auto_peak_risk_sell_enabled", True) and safe_float(info.get("peak_risk_score"), 0) >= peak_th and safe_float(info.get("profitRate"),0) >= 3:
+        res = v171_auto_sell_quantity("v171_auto_peak_risk_exit", h, qty, cur, partial=False)
+        result.update({"executed": bool(res.get("ok")), "skip_update": bool(res.get("ok")), "reason": "AI 고점위험 자동매도", "order": res})
+        return result
+    # 부분익절은 아직 실행하지 않은 구간만 1회씩 실행
+    if st.get("v171_auto_partial_sell_enabled", True) and safe_float(info.get("partial_sell_score"), 0) >= partial_th:
+        level = v171_choose_partial_level(h, info)
+        if level:
+            ratio = safe_float(level.get("sell_ratio_pct"), 0) / 100.0
+            sell_qty = max(1, int(qty * ratio))
+            if sell_qty >= qty:
+                sell_qty = max(1, qty - 1) if qty > 1 else qty
+            h = v171_apply_partial_done_level(h, level.get("profit_rate_pct"))
+            res = v171_auto_sell_quantity(f"v171_auto_partial_tp_{level.get('profit_rate_pct')}pct", h, sell_qty, cur, partial=(sell_qty < qty))
+            result.update({"executed": bool(res.get("ok")), "skip_update": bool(res.get("ok")), "reason": f"AI 자동 부분익절 {level.get('profit_rate_pct')}%", "order": res})
+            return result
+    return result
+
+
+def v171_auto_sell_report(force=False):
+    holdings = read_holdings()
+    analyses = []
+    for h in holdings:
+        info = v170_exit_engine_for_holding(h)
+        analyses.append({
+            "code": info.get("code"), "name": info.get("name"), "profitRate": info.get("profitRate"),
+            "action": info.get("action"), "hold_score": info.get("hold_score"), "partial_sell_score": info.get("partial_sell_score"),
+            "full_sell_score": info.get("full_sell_score"), "peak_risk_score": info.get("peak_risk_score"),
+            "auto_sell_candidate": safe_float(info.get("full_sell_score"),0) >= safe_float(read_state().get("v171_full_sell_score_threshold",85),85) or safe_float(info.get("partial_sell_score"),0) >= safe_float(read_state().get("v171_partial_sell_score_threshold",80),80),
+            "safety": "자동교체매수는 승인 유지 / 자동매도는 ON/OFF와 일일제한 적용"
+        })
+    summary = f"AI 자동매도 감시 {len(analyses)}종목 / 후보 {sum(1 for x in analyses if x.get('auto_sell_candidate'))}개"
+    st = read_state(); st["v171_last_auto_sell_report"] = {"time": now_text(), "summary": summary, "count": len(analyses)}; write_state(st)
+    return {"ok": True, "version": APP_VERSION, "time": now_text(), "summary": summary, "auto_sell_enabled": bool(read_state().get("v171_auto_sell_enabled", True)), "items": analyses}
+
 def watch_loop():
     while WATCH_STATE.get("running"):
         try:
@@ -1511,17 +1737,29 @@ def watch_loop():
                 if h["activeDynamicTarget"] and h["lastPrice"] >= h["baseTarget"]:
                     h["aiHoldMode"] = True
                     h["aiTargetReason"] = "목표 도달 후 강세로 판단되어 AI 상향익절/트레일링 감시 중"
-                if h["trailingStopPrice"] and h["lastPrice"] <= h["trailingStopPrice"]:
-                    auto_sell_holding("ai_peak_trailing_stop", h, h["lastPrice"])
-                elif h["lastPrice"] <= h["stop"]:
-                    auto_sell_holding("stop", h, h["lastPrice"])
-                elif (not read_state().get("dynamic_target_enabled", True)) and h["lastPrice"] >= h["baseTarget"]:
-                    auto_sell_holding("target", h, h["lastPrice"])
-                updated.append(h)
-            if updated:
-                write_holdings(updated)
+                sold = False
+                # v171: AI 자동매도 실행형 엔진. 자동교체매수는 승인 유지.
+                decision = v171_auto_exit_decision_for_holding(h)
+                if decision.get("executed"):
+                    sold = True
+                    WATCH_STATE["last_message"] = str(decision.get("reason", "AI 자동매도 실행"))[:200]
+                # 기존 목표/손절/트레일링은 v171 조건 미실행 시 보조 안전장치로 유지
+                if not sold:
+                    if h["trailingStopPrice"] and h["lastPrice"] <= h["trailingStopPrice"]:
+                        res = auto_sell_holding("ai_peak_trailing_stop", h, h["lastPrice"])
+                        sold = bool(res.get("ok"))
+                    elif h["lastPrice"] <= h["stop"]:
+                        res = auto_sell_holding("stop", h, h["lastPrice"])
+                        sold = bool(res.get("ok"))
+                    elif (not read_state().get("dynamic_target_enabled", True)) and h["lastPrice"] >= h["baseTarget"]:
+                        res = auto_sell_holding("target", h, h["lastPrice"])
+                        sold = bool(res.get("ok"))
+                if not sold:
+                    updated.append(h)
+            write_holdings(updated)
             WATCH_STATE["last_check"] = now_text()
             get_market_candidates(limit=8, min_score=60)
+            v171_auto_sell_report()
         except Exception as e:
             WATCH_STATE["last_message"] = str(e)[:200]
         time.sleep(max(10, safe_int(read_state().get("candidate_scan_interval", 30), 30)))
@@ -1760,6 +1998,262 @@ def v168_autonomous_manager_report(temp=None, focus=None, portfolio=None):
         action = "최우선 후보 감시"
         reason = f"{best.get('name')} 후보가 상위입니다. 급등예상/세력유입/키움 현재가를 확인하세요."
     return {"enabled": allowed, "auto_rotation_enabled": auto_rotation, "action": action, "reason": reason, "approval_required": bool(state.get("v168_require_user_approval", True)), "best_candidate": best}
+
+
+
+# ==============================
+# v170 AI Exit Engine PRO / 매도판단 중심 패치
+# ==============================
+
+def v170_exit_engine_for_holding(h):
+    """보유종목별 매도 판단 점수를 산출합니다.
+    실전 주문은 자동 실행하지 않고, 보유/추가매수/부분매도/전량매도 판단과 이유만 제공합니다.
+    """
+    h = normalize_holding(h)
+    st = read_state()
+    buy = safe_float(h.get("buyPrice"), 0)
+    cur = safe_float(h.get("lastPrice"), 0)
+    high = max(safe_float(h.get("highestPrice"), 0), cur, buy)
+    profit = safe_float(h.get("profitRate"), 0)
+    trail = safe_float(h.get("trailingStopPrice"), 0)
+    target = safe_float(h.get("activeDynamicTarget") or h.get("target"), 0)
+    stop = safe_float(h.get("stop"), 0)
+    stage = str(h.get("aiPeakStage", ""))
+    pullback = ((high - cur) / high * 100) if high > 0 else 0
+
+    # 기본 점수
+    hold_score = 55
+    add_score = 35
+    partial_sell_score = 20
+    full_sell_score = 15
+    peak_risk_score = 10
+    reasons = []
+    risks = []
+
+    # 수익률 구간별 판단
+    if profit >= 20:
+        hold_score += 8; partial_sell_score += 45; peak_risk_score += 35
+        reasons.append("20% 이상 초과수익 구간으로 일부 수익확정 우선")
+    elif profit >= 15:
+        hold_score += 12; partial_sell_score += 38; peak_risk_score += 28
+        reasons.append("15% 이상 강한 수익권, 부분익절 검토")
+    elif profit >= 10:
+        hold_score += 18; partial_sell_score += 30; peak_risk_score += 20
+        reasons.append("10% 이상 수익권, 추세 유지와 부분익절 병행")
+    elif profit >= 5:
+        hold_score += 22; partial_sell_score += 18; peak_risk_score += 10
+        reasons.append("5% 이상 수익권, 고점추적 유지")
+    elif profit >= 2:
+        hold_score += 18; add_score += 8
+        reasons.append("수익권 유지, 추세 확인 후 보유 우세")
+    elif profit <= -5:
+        hold_score -= 25; full_sell_score += 45; peak_risk_score += 20
+        risks.append("-5% 이상 손실권, 손절/리스크 점검 필요")
+    elif profit <= -2:
+        hold_score -= 10; full_sell_score += 20
+        risks.append("손실권 진입, 회복 강도 확인 필요")
+    else:
+        reasons.append("수익률 중립 구간, 시장온도와 후보 강도 확인")
+
+    # 고점 대비 되돌림/트레일링
+    if pullback >= safe_float(st.get("v170_high_risk_pullback_pct", 1.2), 1.2) and profit >= 3:
+        peak_risk_score += min(35, pullback * 8)
+        partial_sell_score += min(25, pullback * 5)
+        risks.append(f"고점 대비 {pullback:.2f}% 되돌림 발생")
+    if trail and cur <= trail * 1.003:
+        full_sell_score += 40
+        partial_sell_score += 25
+        risks.append("AI 트레일링 가격 근처 도달")
+    if stop and cur <= stop:
+        full_sell_score += 60
+        risks.append("손절 기준 이탈")
+    if target and cur >= target and profit >= 3:
+        hold_score += 5
+        partial_sell_score += 15
+        reasons.append("목표가 구간 도달, 일부 수익확정 검토")
+    if "고점추적" in stage:
+        hold_score += 10
+        reasons.append("AI 고점추적 단계 유지")
+
+    # 추가매수는 수익권·강한 보유점수에서만 보수적으로
+    if profit >= 0 and profit < 7 and hold_score >= 70:
+        add_score += 15
+    if profit >= 10 or peak_risk_score >= 55:
+        add_score -= 25
+    if profit < -2:
+        add_score -= 30
+
+    # 점수 범위 정리
+    hold_score = max(0, min(100, hold_score))
+    add_score = max(0, min(100, add_score))
+    partial_sell_score = max(0, min(100, partial_sell_score))
+    full_sell_score = max(0, min(100, full_sell_score))
+    peak_risk_score = max(0, min(100, peak_risk_score))
+
+    # 최종 의견
+    if full_sell_score >= 80:
+        action = "전량매도 검토"
+    elif partial_sell_score >= 70 or peak_risk_score >= 70:
+        action = "부분익절 우선"
+    elif hold_score >= 75 and peak_risk_score < 55:
+        action = "보유유지"
+    elif add_score >= 70:
+        action = "소액 추가매수 검토"
+    else:
+        action = "관망"
+
+    # 부분익절 계획
+    partial_plan = []
+    if st.get("v170_partial_take_profit_enabled", True):
+        levels = [
+            (safe_float(st.get("v170_partial_tp1_rate", 0.05), 0.05), safe_float(st.get("v170_partial_tp1_sell_ratio", 0.30), 0.30)),
+            (safe_float(st.get("v170_partial_tp2_rate", 0.10), 0.10), safe_float(st.get("v170_partial_tp2_sell_ratio", 0.30), 0.30)),
+            (safe_float(st.get("v170_partial_tp3_rate", 0.15), 0.15), safe_float(st.get("v170_partial_tp3_sell_ratio", 0.20), 0.20)),
+            (safe_float(st.get("v170_partial_tp4_rate", 0.20), 0.20), safe_float(st.get("v170_partial_tp4_sell_ratio", 0.10), 0.10)),
+        ]
+        for rate, ratio in levels:
+            reached = profit >= rate * 100
+            partial_plan.append({
+                "profit_rate_pct": round(rate * 100, 1),
+                "sell_ratio_pct": round(ratio * 100, 0),
+                "status": "도달" if reached else "대기",
+            })
+
+    return {
+        "code": h.get("code"),
+        "name": h.get("name"),
+        "profitRate": round(profit, 2),
+        "buyPrice": int(buy),
+        "lastPrice": int(cur),
+        "highestPrice": int(high),
+        "pullback_pct": round(pullback, 2),
+        "target": int(target) if target else 0,
+        "stop": int(stop) if stop else 0,
+        "trailingStopPrice": int(trail) if trail else 0,
+        "hold_score": round(hold_score, 1),
+        "add_score": round(add_score, 1),
+        "partial_sell_score": round(partial_sell_score, 1),
+        "full_sell_score": round(full_sell_score, 1),
+        "peak_risk_score": round(peak_risk_score, 1),
+        "action": action,
+        "stage": stage,
+        "reasons": reasons[:6] or ["기본 보유 감시 구간"],
+        "risks": risks[:6] or ["큰 매도 위험 신호는 제한적"],
+        "partial_plan": partial_plan,
+        "safety": "v171에서는 AI 자동매도 ON 시 조건 충족 종목을 자동매도합니다. 자동교체매수는 승인 구조를 유지합니다.",
+    }
+
+
+def v170_exit_report(force=False):
+    holdings = read_holdings()
+    analyses = [v170_exit_engine_for_holding(h) for h in holdings]
+    analyses = sorted(analyses, key=lambda x: (safe_float(x.get("full_sell_score"),0), safe_float(x.get("partial_sell_score"),0), safe_float(x.get("peak_risk_score"),0)), reverse=True)
+    summary = "보유종목이 없어 AI 매도판단 대기중입니다."
+    if analyses:
+        danger = sum(1 for x in analyses if safe_float(x.get("full_sell_score"),0) >= 80)
+        partial = sum(1 for x in analyses if safe_float(x.get("partial_sell_score"),0) >= 70)
+        hold = sum(1 for x in analyses if str(x.get("action")) == "보유유지")
+        summary = f"보유 {len(analyses)}종목 분석: 전량매도검토 {danger}개, 부분익절우선 {partial}개, 보유유지 {hold}개"
+    report = {
+        "ok": True,
+        "version": APP_VERSION,
+        "time": now_text(),
+        "summary": summary,
+        "holdings_exit": analyses,
+        "partial_take_profit_rule": "+5% 30%, +10% 30%, +15% 20%, +20% 10%, 잔량 추세추종",
+        "safety": "AI 자동매도 ON 시 부분익절/전량매도/손절을 자동 실행합니다. 자동교체매수는 승인 유지.",
+    }
+    st = read_state()
+    st["v170_last_exit_report"] = {"time": report["time"], "summary": summary, "count": len(analyses)}
+    write_state(st)
+    return report
+
+
+
+def render_v171_auto_trade_center():
+    try:
+        st = read_state()
+        r = v171_auto_sell_report()
+        on = bool(st.get("v171_auto_sell_enabled", True))
+        items = r.get("items", [])
+        rows = []
+        for x in items[:6]:
+            cand = "자동매도 후보" if x.get("auto_sell_candidate") else "감시중"
+            rows.append(f"""
+            <div class='v168-row'>
+              <div><b>{html_escape(x.get('name','-'))}</b><small>{html_escape(x.get('action',''))} · 수익률 {safe_float(x.get('profitRate'),0):.2f}%</small></div>
+              <div><b>{html_escape(cand)}</b><small>부분 {safe_float(x.get('partial_sell_score'),0):.0f} / 전량 {safe_float(x.get('full_sell_score'),0):.0f} / 고점 {safe_float(x.get('peak_risk_score'),0):.0f}</small></div>
+            </div>""")
+        body = ''.join(rows) if rows else "<div class='notice small'>보유종목이 없어 AI 자동매도 감시 대기중입니다.</div>"
+        return f"""
+        <section class='card' id='v171-auto-trade'>
+          <h2>🤖 V171 AI 자동매수·자동매도</h2>
+          <p class='muted'>AI 자동매수는 유지하고, 보유종목은 Exit Engine 점수에 따라 자동 부분익절·자동 전량매도·자동손절을 실행합니다. 자동교체매수는 위험도가 높아 승인 구조를 유지합니다.</p>
+          <div class='notice small'><b>현재 AI 자동매도: {'ON' if on else 'OFF'}</b><br>{html_escape(r.get('summary',''))}<br>일일 자동매도 {safe_int(st.get('v171_auto_sell_count_today',0),0)} / {safe_int(st.get('v171_daily_auto_sell_limit',10),10)}회</div>
+          <div class='chips'>
+            <span>자동매수 {'ON' if st.get('v171_auto_buy_enabled', True) else 'OFF'}</span>
+            <span>부분익절 {'ON' if st.get('v171_auto_partial_sell_enabled', True) else 'OFF'}</span>
+            <span>전량매도 {'ON' if st.get('v171_auto_full_sell_enabled', True) else 'OFF'}</span>
+            <span>손절 {'ON' if st.get('v171_auto_stop_loss_enabled', True) else 'OFF'}</span>
+          </div>
+          {body}
+          <div class='btn-row'>
+            <a class='button dark' href='/api/v171_auto_sell_report'>JSON 확인</a>
+            <button onclick="callAndReload('/api/v171_toggle_auto_sell')">AI 자동매도 ON/OFF</button>
+          </div>
+        </section>"""
+    except Exception as e:
+        return f"<section class='card'><h2>🤖 V171 AI 자동매수·자동매도</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
+
+def render_v170_exit_center():
+    try:
+        r = v170_exit_report()
+        items = r.get("holdings_exit", [])
+        def score_badge(label, val):
+            val = safe_float(val,0)
+            klass = "pill-ok" if val < 50 else "pill-warn" if val < 75 else "red"
+            return f"<span class='{klass}'>{html_escape(label)} {val:.0f}</span>"
+        rows = []
+        for x in items:
+            plans = ''.join(f"<span>{p.get('profit_rate_pct')}%/{p.get('sell_ratio_pct')}% {html_escape(p.get('status'))}</span>" for p in x.get('partial_plan', []))
+            reasons = ''.join(f"<li>{html_escape(v)}</li>" for v in x.get('reasons', [])[:4])
+            risks = ''.join(f"<li>{html_escape(v)}</li>" for v in x.get('risks', [])[:4])
+            rows.append(f"""
+            <div class='holding-card'>
+              <div class='topline'><b>{html_escape(x.get('name','-'))}</b><span>{html_escape(x.get('action','관망'))}</span></div>
+              <div class='grid2'>
+                <div><label>수익률</label><b class='{ 'red' if safe_float(x.get('profitRate'),0)<0 else 'blue'}'>{safe_float(x.get('profitRate'),0):.2f}%</b><small>고점대비 {safe_float(x.get('pullback_pct'),0):.2f}% 밀림</small></div>
+                <div><label>현재/고점</label><b>{money(x.get('lastPrice',0))}</b><small>고점 {money(x.get('highestPrice',0))}</small></div>
+              </div>
+              <div class='chips'>
+                {score_badge('보유', x.get('hold_score'))}
+                {score_badge('추가', x.get('add_score'))}
+                {score_badge('부분매도', x.get('partial_sell_score'))}
+                {score_badge('전량매도', x.get('full_sell_score'))}
+                {score_badge('고점위험', x.get('peak_risk_score'))}
+              </div>
+              <details><summary>AI 매도판단 상세보기</summary>
+                <div class='notice small'><b>부분익절 계획</b><div class='chips'>{plans}</div></div>
+                <div class='grid2'><div><label>목표가</label><b>{money(x.get('target',0))}</b></div><div><label>트레일링/손절</label><b>{money(x.get('trailingStopPrice') or x.get('stop'))}</b></div></div>
+                <div class='reason-title'>판단 이유</div><ol>{reasons}</ol>
+                <div class='reason-title'>주의 신호</div><ol>{risks}</ol>
+                <div class='notice small'>v171 AI 자동매도 ON 시 조건 충족 종목은 자동매도됩니다. 자동교체매수는 승인 구조를 유지합니다.</div>
+              </details>
+            </div>""")
+        body = ''.join(rows) if rows else "<div class='notice'>보유종목이 없어 AI 매도판단 대기중입니다.</div>"
+        return f"""
+        <section class='card' id='exit-engine'>
+          <h2>🎯 V170 AI Exit Engine PRO</h2>
+          <p class='muted'>수익률을 높이기 위해 <b>언제 팔아야 하는지</b>를 집중 분석합니다. 보유유지·추가매수·부분매도·전량매도·고점위험 점수를 종목별로 계산합니다.</p>
+          <div class='notice small'><b>{html_escape(r.get('summary',''))}</b><br>{html_escape(r.get('partial_take_profit_rule',''))}</div>
+          {body}
+          <div class='btn-row'>
+            <button onclick="callAndReload('/api/v170_refresh_exit_engine')">V170 매도판단 재분석</button>
+            <a class='button dark' href='/api/v170_exit_engine'>JSON 확인</a>
+          </div>
+        </section>"""
+    except Exception as e:
+        return f"<section class='card' id='exit-engine'><h2>🎯 V170 AI Exit Engine PRO</h2><div class='notice'>표시 오류: {html_escape(str(e))}</div></section>"
 
 
 def render_v168_ultimate_center():
@@ -2769,6 +3263,7 @@ def render_mobile_menu_cards():
     """v169: 사용 빈도 중심으로 메뉴를 30% 줄인 카드형 메뉴."""
     items = [
         ("#asset-center", "🏦", "AI자산운용", "TOP5·실보유·펀드"),
+        ("#exit-engine", "🎯", "매도AI", "보유·부분익절"),
         ("#picks", "🤖", "AI후보", "추천이유·급등감시"),
         ("#conditions", "🧭", "매매조건", "익절·손절·고점매도"),
         ("#analysis-center", "📊", "AI분석", "리포트·복기·전략"),
@@ -2783,7 +3278,7 @@ def render_mobile_menu_cards():
       {''.join(cards)}
     </div>
     <div class="menu-help-v167">
-      <b>v169 정리 방향</b> AI투자비서·헤지펀드·포트폴리오·자율운용은 <b>AI자산운용센터</b> 하나로 통합했습니다. 사용 순서: AI자산운용 → AI후보 → 키움진단 → 매매조건 → 보유/매도.
+      <b>v170 핵심</b> AI자산운용센터는 유지하고, <b>매도AI(Exit Engine)</b>를 추가했습니다. 사용 순서: AI자산운용 → 매도AI → AI후보 → 키움진단 → 보유/매도.
     </div>"""
 
 def render_page():
@@ -2807,6 +3302,8 @@ def render_page():
         menu_cards=render_mobile_menu_cards(),
         kiwoom_diagnosis=render_kiwoom_diagnosis_section(),
         v168_ultimate=render_v168_ultimate_center(),
+        v170_exit=render_v170_exit_center(),
+        v171_auto=render_v171_auto_trade_center(),
     )
 
 
@@ -2871,6 +3368,8 @@ document.addEventListener('DOMContentLoaded',startScanCountdown);
   {{quick_status_bar|safe}}
   {{menu_cards|safe}}
   {{v168_ultimate|safe}}
+  {{v170_exit|safe}}
+{{v171_auto|safe}}
   {{candidates|safe}}
   {{conditions|safe}}
   {{ai_upgrade|safe}}
@@ -3564,6 +4063,50 @@ def api_v169_holdings_ai():
 @app.route("/api/v169_review2")
 def api_v169_review2():
     return jsonify({"ok": True, "version": APP_VERSION, "review_2": v169_review_2_report()})
+
+
+@app.route("/api/v170_exit_engine")
+def api_v170_exit_engine():
+    return jsonify(v170_exit_report(force=str(request.args.get("force","0"))=="1"))
+
+
+@app.route("/api/v170_refresh_exit_engine")
+def api_v170_refresh_exit_engine():
+    r = v170_exit_report(force=True)
+    set_status("V170 AI 매도판단 재분석", r.get("summary", ""))
+    return render_page()
+
+
+@app.route("/api/v170_holding_exit/<code>")
+def api_v170_holding_exit(code):
+    code = str(code).zfill(6)
+    for h in read_holdings():
+        if str(h.get("code","")).zfill(6) == code:
+            return jsonify({"ok": True, "version": APP_VERSION, "exit": v170_exit_engine_for_holding(h)})
+    return jsonify({"ok": False, "version": APP_VERSION, "message": "보유종목에서 해당 코드를 찾지 못했습니다."})
+
+
+
+@app.route("/api/v171_auto_sell_report")
+def api_v171_auto_sell_report():
+    return jsonify(v171_auto_sell_report(force=str(request.args.get("force","0"))=="1"))
+
+
+@app.route("/api/v171_toggle_auto_sell")
+def api_v171_toggle_auto_sell():
+    st = read_state()
+    st["v171_auto_sell_enabled"] = not bool(st.get("v171_auto_sell_enabled", True))
+    write_state(st)
+    set_status("V171 AI 자동매도 설정 변경", "ON" if st.get("v171_auto_sell_enabled") else "OFF")
+    return render_page()
+
+
+@app.route("/api/v171_run_auto_exit_once")
+def api_v171_run_auto_exit_once():
+    results = []
+    for h in read_holdings():
+        results.append(v171_auto_exit_decision_for_holding(h))
+    return jsonify({"ok": True, "version": APP_VERSION, "time": now_text(), "results": results})
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
